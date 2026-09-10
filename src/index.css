@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@layer base {
+  .font-serif-romantic {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+  .font-handwriting {
+    font-family: 'Caveat', cursive;
+  }
+}
+
+/* Custom romantic smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF7F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #F43F5E33;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #F43F5E66;
+}
+
+@keyframes pulse-heart {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.15); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.18); }
+  70% { transform: scale(1); }
+}
+
+.animate-heartbeat {
+  animation: pulse-heart 1.3s infinite ease-in-out;
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(0.8) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-120px) scale(1.2) rotate(15deg);
+    opacity: 0;
+  }
+}
+
+.floating-heart {
+  animation: float-up 2.2s forwards cubic-bezier(0.2, 0.8, 0.2, 1);
+}

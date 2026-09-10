@@ -1,0 +1,6 @@
+{
+  "name": "Nid d'Amour - Espace Couple & Souvenirs",
+  "description": "Application pour couple : timeline de souvenirs, capsules temporelles, carte interactive, billets doux, quiz de complicité, générateur de date night et coupons d'amour.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
