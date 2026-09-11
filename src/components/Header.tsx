@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Sparkles, Settings, ArrowLeftRight, Bell, Camera, MapPin, Lock, Images, Cloud, CloudCheck } from 'lucide-react';
+import { Heart, Sparkles, Settings, ArrowLeftRight, Bell, Camera, MapPin, Lock, Images, Cloud, CloudCheck, Download, Smartphone } from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
 
@@ -17,6 +17,7 @@ interface HeaderProps {
   isPinEnabled?: boolean;
   onLockApp?: () => void;
   isFirebaseConnected?: boolean;
+  onOpenInstallModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   isPinEnabled,
   onLockApp,
   isFirebaseConnected = true,
+  onOpenInstallModal,
 }) => {
   const [showPulseMenu, setShowPulseMenu] = useState(false);
   const [pulseSending, setPulseSending] = useState(false);
@@ -194,6 +196,21 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {onOpenInstallModal && (
+              <button
+                onClick={onOpenInstallModal}
+                className="text-stone-500 hover:text-rose-600 p-1.5 rounded-full hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1"
+                title="Installer l'application sur votre téléphone"
+                id="btn-install-app-mobile"
+              >
+                <img
+                  src="/app-icon.png"
+                  alt="App Icon"
+                  className="w-5 h-5 rounded-md object-cover shadow-xs ring-1 ring-rose-300"
+                />
+              </button>
+            )}
+
             <button
               onClick={onOpenSettings}
               className="text-stone-500 hover:text-rose-600 p-2 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
@@ -209,6 +226,22 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-rose-100/60">
           {/* Desktop utility buttons */}
           <div className="hidden sm:flex items-center gap-1">
+            {onOpenInstallModal && (
+              <button
+                onClick={onOpenInstallModal}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 border border-rose-200/80 text-rose-800 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
+                title="Installer l'application sur votre téléphone"
+                id="btn-install-app-desktop"
+              >
+                <img
+                  src="/app-icon.png"
+                  alt="App Icon"
+                  className="w-4 h-4 rounded object-cover shadow-xs ring-1 ring-rose-300 group-hover:scale-105 transition-transform"
+                />
+                <span>Installer l'App</span>
+                <Download className="w-3 h-3 text-rose-500" />
+              </button>
+            )}
             {onGoToGallery && (
               <button
                 onClick={onGoToGallery}

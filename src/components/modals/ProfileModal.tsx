@@ -23,6 +23,7 @@ import {
   CloudCheck,
   Flame,
   CheckCircle2,
+  Smartphone,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../../types';
 import { soundEffects } from '../../lib/audio';
@@ -56,7 +57,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLockApp,
   isFirebaseConnected = true,
 }) => {
-  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'music' | 'backup' | 'firebase'>('profile');
+  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'music' | 'backup' | 'firebase' | 'app_mobile'>('profile');
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [activePartnerSubTab, setActivePartnerSubTab] = useState<'both' | 'p1' | 'p2'>(
     initialFocusPartner === 'p2' ? 'p2' : initialFocusPartner === 'p1' ? 'p1' : 'both'
@@ -330,6 +331,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           >
             <Cloud className="w-3.5 h-3.5 text-amber-500" />
             <span>Cloud & Vercel</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalTab('app_mobile')}
+            className={`py-2 px-3 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              modalTab === 'app_mobile'
+                ? 'bg-white text-rose-700 shadow-xs ring-1 ring-rose-200'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <img src="/app-icon.png" alt="App Icon" className="w-3.5 h-3.5 rounded object-cover shadow-2xs" />
+            <span>Icône & Mobile</span>
           </button>
         </div>
 
@@ -1045,6 +1058,79 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <span>
                     La configuration Firebase charge automatiquement la configuration locale intégrée ou vos variables d'environnement Vercel si vous les définissez.
                   </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: ICÔNE & APPLICATION MOBILE */}
+          {modalTab === 'app_mobile' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gradient-to-br from-rose-50/70 via-stone-50 to-pink-50/50 rounded-2xl border border-rose-100/80 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <div className="relative group shrink-0">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-xl ring-4 ring-rose-200/80 border border-rose-200">
+                    <img
+                      src="/app-icon.png"
+                      alt="Icône Nid d'Amour"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 p-1 bg-rose-500 text-white rounded-full shadow-xs">
+                    <Heart className="w-3.5 h-3.5 fill-current" />
+                  </span>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <h4 className="font-serif-romantic text-base sm:text-lg font-bold text-stone-900">
+                      Icône Mobile « Nid d'Amour »
+                    </h4>
+                    <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full">
+                      PWA Prête
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                    Icône luxueuse avec deux cœurs entrelacés en or et or rose, nichés dans un nid d'amour protecteur sur fond terracotta doux.
+                  </p>
+                  <div className="flex items-center justify-center sm:justify-start gap-2 mt-2.5">
+                    <a
+                      href="/app-icon.png"
+                      download="nid-damour-icon.png"
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold border border-stone-200 shadow-2xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Télécharger l'icône HD</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions per device */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
+                    <Smartphone className="w-4 h-4 text-emerald-600" />
+                    <span>Sur Android (Chrome / Samsung)</span>
+                  </div>
+                  <ol className="text-[11px] text-stone-600 space-y-1 list-decimal list-inside leading-relaxed">
+                    <li>Ouvrez le site dans Google Chrome.</li>
+                    <li>Touchez le menu (<strong>⋮</strong> en haut à droite).</li>
+                    <li>Appuyez sur <strong>« Installer l'application »</strong> ou <strong>« Ajouter à l'écran d'accueil »</strong>.</li>
+                    <li>L'icône dorée apparaît sur votre écran d'accueil comme une vraie application !</li>
+                  </ol>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
+                    <Smartphone className="w-4 h-4 text-blue-600" />
+                    <span>Sur iPhone / iPad (Safari)</span>
+                  </div>
+                  <ol className="text-[11px] text-stone-600 space-y-1 list-decimal list-inside leading-relaxed">
+                    <li>Ouvrez le lien dans le navigateur <strong>Safari</strong>.</li>
+                    <li>Touchez l'icône de partage <strong>Partager</strong> en bas au centre.</li>
+                    <li>Faites défiler et choisissez <strong>« Sur l'écran d'accueil »</strong>.</li>
+                    <li>Appuyez sur <strong>Ajouter</strong> en haut à droite.</li>
+                  </ol>
                 </div>
               </div>
             </div>

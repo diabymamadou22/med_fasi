@@ -139,27 +139,45 @@ export async function seedInitialDataIfEmpty(defaults: {
 }
 
 // Abonnements en temps réel (onSnapshot)
-export function subscribeProfile(onUpdate: (profile: CoupleProfile) => void) {
+export function subscribeProfile(
+  onUpdate: (profile: CoupleProfile) => void,
+  onError?: (error: Error) => void
+) {
   const ref = doc(db, COLLECTIONS.PROFILE, 'main_profile');
-  return onSnapshot(ref, (snap) => {
-    if (snap.exists()) {
-      onUpdate(snap.data() as CoupleProfile);
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) {
+        onUpdate(snap.data() as CoupleProfile);
+      }
+    },
+    (err) => {
+      console.error('Firestore Profile sync error:', err);
+      if (onError) onError(err);
     }
-  });
+  );
 }
 
 export function subscribeCollection<T extends { id: string }>(
   collectionName: string,
-  onUpdate: (items: T[]) => void
+  onUpdate: (items: T[]) => void,
+  onError?: (error: Error) => void
 ) {
   const colRef = collection(db, collectionName);
-  return onSnapshot(colRef, (snap) => {
-    const items: T[] = [];
-    snap.forEach((docSnap) => {
-      items.push({ id: docSnap.id, ...docSnap.data() } as T);
-    });
-    onUpdate(items);
-  });
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const items: T[] = [];
+      snap.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() } as T);
+      });
+      onUpdate(items);
+    },
+    (err) => {
+      console.error(`Firestore sync error on ${collectionName}:`, err);
+      if (onError) onError(err);
+    }
+  );
 }
 
 // Fonctions de sauvegarde et suppression
@@ -251,13 +269,23 @@ export async function saveSettings(settings: CoupleSettings) {
   await setDoc(ref, { ...settings, id: 'main_settings' }, { merge: true });
 }
 
-export function subscribeSettings(onUpdate: (settings: CoupleSettings) => void) {
+export function subscribeSettings(
+  onUpdate: (settings: CoupleSettings) => void,
+  onError?: (error: Error) => void
+) {
   const ref = doc(db, COLLECTIONS.SETTINGS, 'main_settings');
-  return onSnapshot(ref, (snap) => {
-    if (snap.exists()) {
-      onUpdate(snap.data() as CoupleSettings);
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) {
+        onUpdate(snap.data() as CoupleSettings);
+      }
+    },
+    (err) => {
+      console.error('Firestore Settings sync error:', err);
+      if (onError) onError(err);
     }
-  });
+  );
 }
 
 export async function sendMissYouPulse(pulse: MissYouPulse) {
@@ -265,15 +293,32 @@ export async function sendMissYouPulse(pulse: MissYouPulse) {
   await setDoc(ref, pulse);
 }
 
-export function subscribeLatestPulse(onUpdate: (pulse: MissYouPulse) => void) {
+export function subscribeLatestPulse(
+  onUpdate: (pulse: MissYouPulse) => void,
+  onError?: (error: Error) => void
+) {
   const colRef = collection(db, COLLECTIONS.PULSES);
-  return onSnapshot(colRef, (snap) => {
-    snap.docChanges().forEach((change) => {
-      if (change.type === 'added') {
-        onUpdate({ id: change.doc.id, ...change.doc.data() } as MissYouPulse);
-      }
-    });
-  });
+  const listenerStartTime = Date.now();
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      snap.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data() as MissYouPulse;
+          // Trigger only if pulse was generated within last 60 seconds
+          const idMatch = change.doc.id.match(/^pulse-(\d+)$/);
+          const pulseTime = idMatch ? parseInt(idMatch[1], 10) : 0;
+          if (pulseTime >= listenerStartTime - 60000) {
+            onUpdate({ id: change.doc.id, ...data });
+          }
+        }
+      });
+    },
+    (err) => {
+      console.error('Firestore Pulse sync error:', err);
+      if (onError) onError(err);
+    }
+  );
 }
 
 export { COLLECTIONS };

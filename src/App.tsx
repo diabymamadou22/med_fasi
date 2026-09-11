@@ -18,6 +18,7 @@ import { AddBucketModal } from './components/modals/AddBucketModal';
 import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { ProfileModal } from './components/modals/ProfileModal';
 import { PinLockModal } from './components/modals/PinLockModal';
+import { PWAInstallModal } from './components/modals/PWAInstallModal';
 import { RomanticMusicBar } from './components/RomanticMusicBar';
 import { soundEffects } from './lib/audio';
 import { triggerCelebrationConfetti } from './lib/confetti';
@@ -283,6 +284,7 @@ export default function App() {
   const [showAddLocationModal, setShowAddLocationModal] = useState(false);
   const [showAddVoucherModal, setShowAddVoucherModal] = useState(false);
   const [showAddBucketModal, setShowAddBucketModal] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   // Edit states for existing items
   const [editingMemory, setEditingMemory] = useState<TimelineMemory | null>(null);
@@ -1033,6 +1035,7 @@ export default function App() {
         isPinEnabled={settings.isPinEnabled}
         onLockApp={() => setIsAppLocked(true)}
         isFirebaseConnected={true}
+        onOpenInstallModal={() => setShowInstallModal(true)}
       />
 
       {/* Romantic Music and Soundscape Bar */}
@@ -1332,6 +1335,11 @@ export default function App() {
             onCancel={() => setDeleteTarget(null)}
           />
         )}
+
+        <PWAInstallModal
+          isOpen={showInstallModal}
+          onClose={() => setShowInstallModal(false)}
+        />
       </AnimatePresence>
 
       {/* Secret PIN Lock Screen */}

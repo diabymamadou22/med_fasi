@@ -1,0 +1,38 @@
+{
+  "id": "/",
+  "name": "Nid d'Amour - Espace Couple & Souvenirs",
+  "short_name": "Nid d'Amour",
+  "description": "Application intime pour couples : timeline de souvenirs, capsules temporelles, billets doux, quiz et humeur partagée.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF7F5",
+  "theme_color": "#FAF7F5",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
