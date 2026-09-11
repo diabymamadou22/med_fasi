@@ -152,3 +152,37 @@ export interface MissYouPulse {
   vibe: 'hug' | 'kiss' | 'thought' | 'flame' | 'urgent';
   message: string;
 }
+
+export type AmbientTrackId =
+  | 'kora_serenade'
+  | 'river_breeze'
+  | 'starry_night'
+  | 'soft_rain'
+  | 'none';
+
+export interface CoupleSettings {
+  pinCode?: string; // 4 chiffres, ex: "2024"
+  isPinEnabled: boolean;
+  songTitle?: string; // e.g. "Sidiki Diabaté - C'est bon" or "Notre chanson d'amour"
+  songAudioUrl?: string; // optional user mp3 / audio stream URL
+  ambientTrackId: AmbientTrackId;
+  musicVolume: number; // 0 to 1
+  isMusicPlaying: boolean;
+}
+
+export interface FullCoupleBackup {
+  version: string;
+  exportedAt: string;
+  profile: CoupleProfile;
+  memories: TimelineMemory[];
+  capsules: TimeCapsule[];
+  locations: MemoryLocation[];
+  notes: SweetNote[];
+  quizzes: QuizQuestion[];
+  dateIdeas: DateIdea[];
+  challenges: CoupleChallenge[];
+  bucketList: BucketItem[];
+  vouchers: LoveVoucher[];
+  gratitudes: DailyGratitude[];
+  settings?: CoupleSettings;
+}

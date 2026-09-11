@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, FolderHeart, Compass, Sparkles } from 'lucide-react';
+import { X, FolderHeart, Compass, Sparkles, Trash2 } from 'lucide-react';
 import { PartnerId, BucketItem } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti } from '../../lib/confetti';
@@ -8,35 +8,59 @@ import { triggerCelebrationConfetti } from '../../lib/confetti';
 interface AddBucketModalProps {
   activePartnerId: PartnerId;
   onClose: () => void;
-  onAddBucketItem: (item: Omit<BucketItem, 'id' | 'status'>) => void;
+  onAddBucketItem?: (item: Omit<BucketItem, 'id' | 'status'>) => void;
+  initialBucketItem?: BucketItem | null;
+  onUpdateBucketItem?: (item: BucketItem) => void;
+  onDeleteBucketItem?: (itemId: string) => void;
 }
 
 export const AddBucketModal: React.FC<AddBucketModalProps> = ({
   activePartnerId,
   onClose,
   onAddBucketItem,
+  initialBucketItem,
+  onUpdateBucketItem,
+  onDeleteBucketItem,
 }) => {
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<BucketItem['category']>('Voyage');
-  const [targetDate, setTargetDate] = useState('');
-  const [budgetEstimate, setBudgetEstimate] = useState('');
-  const [notes, setNotes] = useState('');
+  const isEditing = Boolean(initialBucketItem);
+
+  const [title, setTitle] = useState(initialBucketItem?.title || '');
+  const [category, setCategory] = useState<BucketItem['category']>(
+    initialBucketItem?.category || 'Voyage'
+  );
+  const [targetDate, setTargetDate] = useState(initialBucketItem?.targetDate || '');
+  const [budgetEstimate, setBudgetEstimate] = useState(
+    initialBucketItem?.budgetEstimate || ''
+  );
+  const [notes, setNotes] = useState(initialBucketItem?.notes || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    onAddBucketItem({
-      title: title.trim(),
-      category,
-      targetDate: targetDate.trim() || undefined,
-      budgetEstimate: budgetEstimate.trim() || undefined,
-      notes: notes.trim() || undefined,
-      addedBy: activePartnerId,
-    });
+    if (isEditing && initialBucketItem && onUpdateBucketItem) {
+      onUpdateBucketItem({
+        ...initialBucketItem,
+        title: title.trim(),
+        category,
+        targetDate: targetDate.trim() || undefined,
+        budgetEstimate: budgetEstimate.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+      soundEffects.playSuccessSparkle();
+    } else if (onAddBucketItem) {
+      onAddBucketItem({
+        title: title.trim(),
+        category,
+        targetDate: targetDate.trim() || undefined,
+        budgetEstimate: budgetEstimate.trim() || undefined,
+        notes: notes.trim() || undefined,
+        addedBy: activePartnerId,
+      });
+      soundEffects.playSuccessSparkle();
+      triggerCelebrationConfetti();
+    }
 
-    soundEffects.playSuccessSparkle();
-    triggerCelebrationConfetti();
     onClose();
   };
 
@@ -50,7 +74,7 @@ export const AddBucketModal: React.FC<AddBucketModalProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1.5 rounded-full hover:bg-stone-100"
+          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1.5 rounded-full hover:bg-stone-100 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -61,10 +85,12 @@ export const AddBucketModal: React.FC<AddBucketModalProps> = ({
           </div>
           <div>
             <h3 className="font-serif-romantic text-xl font-bold text-stone-900">
-              Ajouter un Souhait Partagé
+              {isEditing ? 'Modifier ce Souhait Partagé' : 'Ajouter un Souhait Partagé'}
             </h3>
             <p className="text-xs text-stone-500">
-              Nourrir notre Bucket List de rêves à accomplir
+              {isEditing
+                ? 'Mettre à jour les détails de ce projet commun'
+                : 'Nourrir notre Bucket List de rêves à accomplir'}
             </p>
           </div>
         </div>
@@ -141,21 +167,39 @@ export const AddBucketModal: React.FC<AddBucketModalProps> = ({
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Ajouter à notre Bucket List</span>
-            </button>
+          <div className="flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
+            {isEditing && initialBucketItem && onDeleteBucketItem ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteBucketItem(initialBucketItem.id);
+                  onClose();
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Supprimer</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100 cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isEditing ? 'Enregistrer les modifications' : 'Ajouter à notre Bucket List'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

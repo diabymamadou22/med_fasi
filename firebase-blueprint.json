@@ -1,0 +1,184 @@
+{
+  "entities": {
+    "CoupleProfile": {
+      "title": "CoupleProfile",
+      "description": "Profil partagé du couple",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "partner1": { "type": "object" },
+        "partner2": { "type": "object" },
+        "anniversaryDate": { "type": "string" },
+        "relationshipTitle": { "type": "string" },
+        "themeColor": { "type": "string" }
+      },
+      "required": ["id", "partner1", "partner2", "anniversaryDate"]
+    },
+    "TimelineMemory": {
+      "title": "TimelineMemory",
+      "description": "Souvenir du couple sur la frise chronologique",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "locationName": { "type": "string" },
+        "authorId": { "type": "string" },
+        "likes": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "title", "date", "description", "authorId"]
+    },
+    "TimeCapsule": {
+      "title": "TimeCapsule",
+      "description": "Capsule temporelle scellée jusqu'à une date future",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "targetUnlockDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "authorId": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "message": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "sealTheme": { "type": "string" },
+        "isOpened": { "type": "boolean" }
+      },
+      "required": ["id", "title", "targetUnlockDate", "authorId", "message"]
+    },
+    "MemoryLocation": {
+      "title": "MemoryLocation",
+      "description": "Lieu romantique sur la carte interactive",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "xPercent": { "type": "number" },
+        "yPercent": { "type": "number" },
+        "city": { "type": "string" },
+        "iconName": { "type": "string" }
+      },
+      "required": ["id", "name", "xPercent", "yPercent"]
+    },
+    "SweetNote": {
+      "title": "SweetNote",
+      "description": "Mot doux ou lettre d'amour",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "backgroundStyle": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "reaction": { "type": "string" }
+      },
+      "required": ["id", "senderId", "recipientId", "content"]
+    },
+    "DailyGratitude": {
+      "title": "DailyGratitude",
+      "description": "Gratitude quotidienne partagée",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "authorId": { "type": "string" },
+        "content": { "type": "string" },
+        "likes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "authorId", "content"]
+    },
+    "LoveVoucher": {
+      "title": "LoveVoucher",
+      "description": "Bon d'amour ou coupon de tendresse",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "giverId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "isRedeemed": { "type": "boolean" },
+        "redeemedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "giverId", "receiverId"]
+    },
+    "BucketItem": {
+      "title": "BucketItem",
+      "description": "Objectif ou souhait de la liste commune",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "addedBy": { "type": "string" },
+        "targetDate": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "title", "status", "addedBy"]
+    },
+    "MissYouPulse": {
+      "title": "MissYouPulse",
+      "description": "Signal 'Tu me manques'",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "fromPartnerId": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "fromPartnerId"]
+    }
+  },
+  "firestore": {
+    "couple_profile": {
+      "schema": "CoupleProfile",
+      "description": "Profil et humeur du couple"
+    },
+    "memories": {
+      "schema": "TimelineMemory",
+      "description": "Souvenirs de couple"
+    },
+    "capsules": {
+      "schema": "TimeCapsule",
+      "description": "Capsules temporelles"
+    },
+    "locations": {
+      "schema": "MemoryLocation",
+      "description": "Lieux marquants"
+    },
+    "notes": {
+      "schema": "SweetNote",
+      "description": "Mots doux envoyés"
+    },
+    "gratitudes": {
+      "schema": "DailyGratitude",
+      "description": "Gratitudes partagées"
+    },
+    "vouchers": {
+      "schema": "LoveVoucher",
+      "description": "Bons d'amour"
+    },
+    "bucket_list": {
+      "schema": "BucketItem",
+      "description": "Bucket list du couple"
+    },
+    "pulses": {
+      "schema": "MissYouPulse",
+      "description": "Vibrations 'Tu me manques'"
+    }
+  }
+}

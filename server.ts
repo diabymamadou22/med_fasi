@@ -38,12 +38,13 @@ async function startServer() {
         });
       }
 
-      const prompt = `Tu es un expert en relations amoureuses et créateur de moments inoubliables pour les couples.
-Génère 3 idées de rendez-vous amoureux originales, chaleureuses et détaillées pour un couple nommé "${coupleNames || "les amoureux"}".
+      const prompt = `Tu es un expert en relations amoureuses et créateur de moments inoubliables pour les couples vivant au Mali (notamment à Bamako et ses environs magnifiques comme Siby, le Lac de Sélingué, les rives du fleuve Niger Djoliba, le Parc National du Mali).
+Génère 3 idées de rendez-vous amoureux originales, chaleureuses et détaillées pour le couple "${coupleNames || "Med & Safi"}".
 Critères demandés :
-- Budget : ${budget || "Indifférent"}
-- Météo / Saison : ${weather || "Indifférent"}
+- Budget : ${budget || "Indifférent"} (les montants doivent être en FCFA ou Gratuit, ex: Gratuit, 5 000 FCFA, 15 000 FCFA, 30 000 FCFA)
+- Météo / Saison : ${weather || "Indifférent"} (climat du Mali : brise du soir, coucher de soleil au bord du fleuve, fraîcheur sous les manguiers)
 - Lieu / Ambiance : ${location || "Maison ou Sortie"} (Vibe : ${vibe || "Romantique et complice"})
+- N'hésite pas à intégrer avec délicatesse et romantisme des touches de vie au Mali (le rituel des 3 thés à la menthe, le capitaine braisé au bord du Niger, balade au Parc National, fruits doux de saison).
 
 Réponds UNIQUEMENT sous forme d'un objet JSON strict avec cette structure :
 {
@@ -51,9 +52,9 @@ Réponds UNIQUEMENT sous forme d'un objet JSON strict avec cette structure :
     {
       "title": "Titre accrocheur",
       "description": "Description concrète du déroulement pas à pas (2-3 phrases)",
-      "vibe": "Mot-clé ambiance (ex: Cocooning, Aventure, Gourmand, Chic)",
-      "budget": "Gratuit / € / €€ / €€€",
-      "location": "Maison / Extérieur / Resto / Nature",
+      "vibe": "Mot-clé ambiance (ex: Cocooning, Aventure, Gourmand, Fleuve, Étoilé)",
+      "budget": "Gratuit / 5 000 FCFA / 15 000 FCFA / 30 000 FCFA+",
+      "location": "Maison / Bord du fleuve / Nature / Resto",
       "prepTip": "Un petit conseil de préparation secret"
     }
   ]
@@ -93,17 +94,17 @@ Réponds UNIQUEMENT sous forme d'un objet JSON strict avec cette structure :
         });
       }
 
-      const prompt = `Rédige un petit billet doux / message d'amour personnalisé de ${senderName || "Moi"} pour ${recipientName || "Mon amour"}.
+      const prompt = `Rédige un petit billet doux / message d'amour personnalisé de ${senderName || "Moi"} pour ${recipientName || "Mon amour"} pour ce couple uni au Mali (Med & Safi).
 Ton : ${tone || "Doux et poétique"} (ex: Drôle, Passionné, Tendre, Réconfortant).
 Occasion : ${occasion || "Billet du matin / pensée spontanée"}.
 Détails ou anecdote : ${details || "Juste rappeler combien tu comptes pour moi"}.
 
-Rédige un message court (3 à 5 phrases) touchant, sincère, sans clichés mièvres, qui va faire sourire ou fondre le partenaire.
+Rédige un message court (3 à 5 phrases) touchant, sincère, chaleureux, ancré dans leur douce vie complice au Mali (ex: un thé partagé, la brise du soir, ton doux sourire), qui va faire sourire ou fondre le partenaire.
 Renvoie un JSON strict :
 {
   "note": "Le texte du billet doux",
   "signature": "Formule de fin courte",
-  "suggestedGiftOrAction": "Petite attention suggérée à accompagner (ex: un café chaud, une chanson, un baiser)"
+  "suggestedGiftOrAction": "Petite attention suggérée à accompagner (ex: un thé à la menthe chaud, une mangue fraîche découpée, un baiser doux)"
 }`;
 
       const response = await ai.models.generateContent({
@@ -132,14 +133,14 @@ Renvoie un JSON strict :
         return res.status(200).json({ success: false, fallback: true });
       }
 
-      const prompt = `Génère 3 questions de quiz pour couple amusantes et intimes sur le thème : "${theme || "Complicité & Quotidien"}".
-Chaque question doit proposer 2 ou 4 options de réponse et susciter une discussion bienveillante.
+      const prompt = `Génère 3 questions de quiz pour couple amusantes et intimes pour un couple vivant au Mali (Med & Safi), sur le thème : "${theme || "Complicité, quotidien au Mali & Rêves"}".
+Chaque question doit proposer 4 options de réponse et susciter une discussion bienveillante et complice.
 Renvoie un JSON strict :
 {
   "questions": [
     {
       "question": "Texte de la question",
-      "category": "Thème",
+      "category": "Complicité / Rêves & Futur / Quotidien / Fous Rires",
       "options": ["Choix A", "Choix B", "Choix C", "Choix D"],
       "funFactPrompt": "Question de relance pour la discussion"
     }

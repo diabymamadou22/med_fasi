@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Heart, Zap, Coffee, Edit3, Check } from 'lucide-react';
+import { Sparkles, Heart, Zap, Coffee, Edit3, Check, Camera } from 'lucide-react';
 import { CoupleProfile, PartnerId } from '../types';
 
 interface MoodAndNeedsBarProps {
@@ -10,6 +10,7 @@ interface MoodAndNeedsBarProps {
     partnerId: PartnerId,
     mood: { energy: number; status: string; need: string; note?: string }
   ) => void;
+  onOpenPhotoPicker?: (partnerId: PartnerId) => void;
 }
 
 const MOOD_OPTIONS = [
@@ -35,6 +36,7 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
   profile,
   activePartnerId,
   onUpdateMood,
+  onOpenPhotoPicker,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
@@ -67,12 +69,19 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                 : 'bg-stone-50/70 border border-stone-200/60'
             }`}
           >
-            <div className="relative">
+            <div
+              className="relative group/avatar cursor-pointer"
+              onClick={() => onOpenPhotoPicker && onOpenPhotoPicker('p1')}
+              title={`Changer la photo de ${profile.partner1.name}`}
+            >
               <img
                 src={profile.partner1.avatar}
                 alt={profile.partner1.name}
-                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-2xs"
+                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-rose-400 transition-all"
               />
+              <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white">
+                <Camera className="w-3.5 h-3.5" />
+              </span>
               <span className="absolute -bottom-1 -right-1 text-xs">
                 {MOOD_OPTIONS.find((m) => m.label.startsWith(profile.partner1.mood.status))?.emoji || '❤️'}
               </span>
@@ -124,12 +133,19 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                 : 'bg-stone-50/70 border border-stone-200/60'
             }`}
           >
-            <div className="relative">
+            <div
+              className="relative group/avatar cursor-pointer"
+              onClick={() => onOpenPhotoPicker && onOpenPhotoPicker('p2')}
+              title={`Changer la photo de ${profile.partner2.name}`}
+            >
               <img
                 src={profile.partner2.avatar}
                 alt={profile.partner2.name}
-                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-2xs"
+                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-sky-400 transition-all"
               />
+              <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white">
+                <Camera className="w-3.5 h-3.5" />
+              </span>
               <span className="absolute -bottom-1 -right-1 text-xs">
                 {MOOD_OPTIONS.find((m) => m.label.startsWith(profile.partner2.mood.status))?.emoji || '❤️'}
               </span>

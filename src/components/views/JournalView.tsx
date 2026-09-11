@@ -14,6 +14,8 @@ import {
   Feather,
   Smile,
   Quote,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, SweetNote, DailyGratitude } from '../../types';
 import { soundEffects } from '../../lib/audio';
@@ -30,6 +32,9 @@ interface JournalViewProps {
   onReactNote: (noteId: string, emoji: string) => void;
   onAddGratitude: (content: string) => void;
   onLikeGratitude: (gratitudeId: string) => void;
+  onEditNote?: (note: SweetNote) => void;
+  onDeleteNote?: (noteId: string) => void;
+  onDeleteGratitude?: (gratitudeId: string) => void;
 }
 
 export const JournalView: React.FC<JournalViewProps> = ({
@@ -43,6 +48,9 @@ export const JournalView: React.FC<JournalViewProps> = ({
   onReactNote,
   onAddGratitude,
   onLikeGratitude,
+  onEditNote,
+  onDeleteNote,
+  onDeleteGratitude,
 }) => {
   const [selectedNote, setSelectedNote] = useState<SweetNote | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'received' | 'favorites'>('all');
@@ -203,9 +211,40 @@ export const JournalView: React.FC<JournalViewProps> = ({
                       }`}
                     />
                   </button>
+
+                  {onEditNote && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const noteToEdit = selectedNote;
+                        setSelectedNote(null);
+                        onEditNote(noteToEdit);
+                      }}
+                      className="p-2 rounded-full text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Modifier ce mot doux"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {onDeleteNote && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const idToDelete = selectedNote.id;
+                        setSelectedNote(null);
+                        onDeleteNote(idToDelete);
+                      }}
+                      className="p-2 rounded-full text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Supprimer ce mot doux"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setSelectedNote(null)}
-                    className="px-3 py-1 text-xs font-semibold bg-stone-100 text-stone-600 rounded-full hover:bg-stone-200"
+                    className="px-3 py-1 text-xs font-semibold bg-stone-100 text-stone-600 rounded-full hover:bg-stone-200 cursor-pointer"
                   >
                     Fermer
                   </button>
@@ -345,9 +384,37 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
                   <div className="flex items-center justify-between text-[10px] text-stone-400 mt-3 pt-2 border-t border-stone-200/50">
                     <span>{note.date}</span>
-                    <span className="text-rose-600 font-semibold group-hover:underline">
-                      Ouvrir la lettre →
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {onEditNote && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditNote(note);
+                          }}
+                          className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-100/50 transition-colors cursor-pointer"
+                          title="Modifier ce mot doux"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                      {onDeleteNote && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteNote(note.id);
+                          }}
+                          className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-100/50 transition-colors cursor-pointer"
+                          title="Supprimer ce mot doux"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                      <span className="text-rose-600 font-semibold group-hover:underline ml-1">
+                        Ouvrir →
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -432,20 +499,33 @@ export const JournalView: React.FC<JournalViewProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => onLikeGratitude(grat.id)}
-                  className={`p-2 rounded-xl transition-all flex items-center gap-1 text-xs font-semibold ${
-                    hasLiked
-                      ? 'text-rose-600 bg-rose-100/70'
-                      : 'text-stone-400 hover:text-rose-600 hover:bg-rose-50'
-                  }`}
-                  title="Aimer cette gratitude"
-                >
-                  <Heart
-                    className={`w-4 h-4 ${hasLiked ? 'fill-rose-500 text-rose-500' : ''}`}
-                  />
-                  <span>{grat.likes.length}</span>
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => onLikeGratitude(grat.id)}
+                    className={`p-2 rounded-xl transition-all flex items-center gap-1 text-xs font-semibold cursor-pointer ${
+                      hasLiked
+                        ? 'text-rose-600 bg-rose-100/70'
+                        : 'text-stone-400 hover:text-rose-600 hover:bg-rose-50'
+                    }`}
+                    title="Aimer cette gratitude"
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${hasLiked ? 'fill-rose-500 text-rose-500' : ''}`}
+                    />
+                    <span>{grat.likes.length}</span>
+                  </button>
+
+                  {onDeleteGratitude && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteGratitude(grat.id)}
+                      className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Supprimer cette gratitude"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

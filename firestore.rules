@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Les données de l'application de couple sont accessibles en lecture/écriture
+    // pour permettre la synchronisation en direct entre les deux partenaires
+    match /couple_profile/{document} {
+      allow read, write: if true;
+    }
+    match /memories/{document} {
+      allow read, write: if true;
+    }
+    match /capsules/{document} {
+      allow read, write: if true;
+    }
+    match /locations/{document} {
+      allow read, write: if true;
+    }
+    match /notes/{document} {
+      allow read, write: if true;
+    }
+    match /gratitudes/{document} {
+      allow read, write: if true;
+    }
+    match /vouchers/{document} {
+      allow read, write: if true;
+    }
+    match /bucket_list/{document} {
+      allow read, write: if true;
+    }
+    match /pulses/{document} {
+      allow read, write: if true;
+    }
+    match /quizzes/{document} {
+      allow read, write: if true;
+    }
+    match /dates/{document} {
+      allow read, write: if true;
+    }
+    match /challenges/{document} {
+      allow read, write: if true;
+    }
+    match /couple_settings/{document} {
+      allow read, write: if true;
+    }
+  }
+}

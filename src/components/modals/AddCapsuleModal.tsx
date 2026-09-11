@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Lock, Calendar, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { X, Lock, Calendar, Sparkles, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { CoupleProfile, PartnerId, TimeCapsule } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti } from '../../lib/confetti';
@@ -9,7 +9,10 @@ interface AddCapsuleModalProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
   onClose: () => void;
-  onAddCapsule: (capsule: Omit<TimeCapsule, 'id' | 'createdAt' | 'isOpened'>) => void;
+  onAddCapsule?: (capsule: Omit<TimeCapsule, 'id' | 'createdAt' | 'isOpened'>) => void;
+  initialCapsule?: TimeCapsule | null;
+  onUpdateCapsule?: (capsule: TimeCapsule) => void;
+  onDeleteCapsule?: (capsuleId: string) => void;
 }
 
 export const AddCapsuleModal: React.FC<AddCapsuleModalProps> = ({
@@ -17,7 +20,11 @@ export const AddCapsuleModal: React.FC<AddCapsuleModalProps> = ({
   activePartnerId,
   onClose,
   onAddCapsule,
+  initialCapsule,
+  onUpdateCapsule,
+  onDeleteCapsule,
 }) => {
+  const isEditing = Boolean(initialCapsule);
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const recipientPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
 
@@ -26,28 +33,44 @@ export const AddCapsuleModal: React.FC<AddCapsuleModalProps> = ({
   defaultFutureDate.setMonth(defaultFutureDate.getMonth() + 6);
   const formattedFutureDate = defaultFutureDate.toISOString().split('T')[0];
 
-  const [title, setTitle] = useState('');
-  const [targetUnlockDate, setTargetUnlockDate] = useState(formattedFutureDate);
-  const [message, setMessage] = useState('');
-  const [sealTheme, setSealTheme] = useState<TimeCapsule['sealTheme']>('gold');
-  const [photoUrl, setPhotoUrl] = useState('');
+  const [title, setTitle] = useState(initialCapsule?.title || '');
+  const [targetUnlockDate, setTargetUnlockDate] = useState(
+    initialCapsule?.targetUnlockDate || formattedFutureDate
+  );
+  const [message, setMessage] = useState(initialCapsule?.message || '');
+  const [sealTheme, setSealTheme] = useState<TimeCapsule['sealTheme']>(
+    initialCapsule?.sealTheme || 'gold'
+  );
+  const [photoUrl, setPhotoUrl] = useState(initialCapsule?.photoUrl || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) return;
 
-    onAddCapsule({
-      title: title.trim(),
-      targetUnlockDate,
-      authorId: activePartnerId,
-      recipientId: recipientPartner.id,
-      message: message.trim(),
-      photoUrl: photoUrl.trim() || undefined,
-      sealTheme,
-    });
+    if (isEditing && initialCapsule && onUpdateCapsule) {
+      onUpdateCapsule({
+        ...initialCapsule,
+        title: title.trim(),
+        targetUnlockDate,
+        message: message.trim(),
+        photoUrl: photoUrl.trim() || undefined,
+        sealTheme,
+      });
+      soundEffects.playSuccessSparkle();
+    } else if (onAddCapsule) {
+      onAddCapsule({
+        title: title.trim(),
+        targetUnlockDate,
+        authorId: activePartnerId,
+        recipientId: recipientPartner.id,
+        message: message.trim(),
+        photoUrl: photoUrl.trim() || undefined,
+        sealTheme,
+      });
+      soundEffects.playSuccessSparkle();
+      triggerCelebrationConfetti();
+    }
 
-    soundEffects.playSuccessSparkle();
-    triggerCelebrationConfetti();
     onClose();
   };
 
@@ -61,7 +84,7 @@ export const AddCapsuleModal: React.FC<AddCapsuleModalProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1.5 rounded-full hover:bg-stone-100"
+          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1.5 rounded-full hover:bg-stone-100 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -72,10 +95,12 @@ export const AddCapsuleModal: React.FC<AddCapsuleModalProps> = ({
           </div>
           <div>
             <h3 className="font-serif-romantic text-xl font-bold text-stone-900">
-              Sceller une Capsule Temporelle
+              {isEditing ? 'Modifier la Capsule Temporelle' : 'Sceller une Capsule Temporelle'}
             </h3>
             <p className="text-xs text-stone-500">
-              Message secret programmé pour s'ouvrir dans le futur
+              {isEditing
+                ? 'Modifier la date de déverrouillage ou le message scellé'
+                : 'Message secret programmé pour s\'ouvrir dans le futur'}
             </p>
           </div>
         </div>
@@ -150,21 +175,39 @@ export const AddCapsuleModal: React.FC<AddCapsuleModalProps> = ({
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Sceller la Capsule</span>
-            </button>
+          <div className="flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
+            {isEditing && initialCapsule && onDeleteCapsule ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteCapsule(initialCapsule.id);
+                  onClose();
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Supprimer</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100 cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{isEditing ? 'Enregistrer les modifications' : 'Sceller la Capsule'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

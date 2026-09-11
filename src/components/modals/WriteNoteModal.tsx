@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Feather, X, Sparkles, Bot, Send, Heart } from 'lucide-react';
+import { Feather, X, Sparkles, Bot, Send, Heart, Trash2 } from 'lucide-react';
 import { CoupleProfile, PartnerId, SweetNote } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
@@ -9,7 +9,10 @@ interface WriteNoteModalProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
   onClose: () => void;
-  onSendNote: (note: Omit<SweetNote, 'id' | 'isRead' | 'isFavorite'>) => void;
+  onSendNote?: (note: Omit<SweetNote, 'id' | 'isRead' | 'isFavorite'>) => void;
+  initialNote?: SweetNote | null;
+  onUpdateNote?: (note: SweetNote) => void;
+  onDeleteNote?: (noteId: string) => void;
 }
 
 export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
@@ -17,12 +20,18 @@ export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
   activePartnerId,
   onClose,
   onSendNote,
+  initialNote,
+  onUpdateNote,
+  onDeleteNote,
 }) => {
+  const isEditing = Boolean(initialNote);
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const recipientPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
 
-  const [content, setContent] = useState('');
-  const [backgroundStyle, setBackgroundStyle] = useState<SweetNote['backgroundStyle']>('rose');
+  const [content, setContent] = useState(initialNote?.content || '');
+  const [backgroundStyle, setBackgroundStyle] = useState<SweetNote['backgroundStyle']>(
+    initialNote?.backgroundStyle || 'rose'
+  );
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [tone, setTone] = useState('Doux & Poétique');
 
@@ -73,16 +82,25 @@ export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
     e.preventDefault();
     if (!content.trim()) return;
 
-    onSendNote({
-      senderId: activePartnerId,
-      recipientId: recipientPartner.id,
-      date: "Aujourd'hui à " + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      content: content.trim(),
-      backgroundStyle,
-    });
+    if (isEditing && initialNote && onUpdateNote) {
+      onUpdateNote({
+        ...initialNote,
+        content: content.trim(),
+        backgroundStyle,
+      });
+      soundEffects.playHeartPulse();
+    } else if (onSendNote) {
+      onSendNote({
+        senderId: activePartnerId,
+        recipientId: recipientPartner.id,
+        date: "Aujourd'hui à " + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        content: content.trim(),
+        backgroundStyle,
+      });
+      soundEffects.playHeartPulse();
+      triggerHeartConfetti();
+    }
 
-    soundEffects.playHeartPulse();
-    triggerHeartConfetti();
     onClose();
   };
 
@@ -96,7 +114,7 @@ export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1.5 rounded-full hover:bg-stone-100"
+          className="absolute top-4 right-4 text-stone-400 hover:text-stone-700 p-1.5 rounded-full hover:bg-stone-100 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -107,14 +125,15 @@ export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
           </div>
           <div>
             <h3 className="font-serif-romantic text-xl font-bold text-stone-900">
-              Écrire un Billet Doux
+              {isEditing ? 'Modifier le Billet Doux' : 'Écrire un Billet Doux'}
             </h3>
             <p className="text-xs text-stone-500">
-              De {currentPartner.name} pour {recipientPartner.name}
+              {isEditing
+                ? 'Mettez à jour vos mots secrets'
+                : `De ${currentPartner.name} pour ${recipientPartner.name}`}
             </p>
           </div>
         </div>
-
         {/* AI Assistant Quick Generator */}
         <div className="mb-4 p-3 bg-purple-50 rounded-2xl border border-purple-100 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs text-purple-900 font-medium">
@@ -199,22 +218,40 @@ export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={!content.trim()}
-              className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-md"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Sceller & Envoyer le Billet</span>
-            </button>
+          <div className="flex items-center justify-between gap-2 pt-3 border-t border-stone-100">
+            {isEditing && initialNote && onDeleteNote ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteNote(initialNote.id);
+                  onClose();
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Supprimer</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:bg-stone-100 cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={!content.trim()}
+                className="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isEditing ? 'Enregistrer les modifications' : 'Sceller & Envoyer le Billet'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

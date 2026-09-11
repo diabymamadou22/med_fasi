@@ -19,6 +19,8 @@ import {
   Image as ImageIcon,
   ChevronRight,
   Filter,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -41,6 +43,12 @@ interface TimelineViewProps {
   onOpenAddLocationModal: () => void;
   onLikeMemory: (memoryId: string) => void;
   onUnlockCapsule: (capsuleId: string) => void;
+  onEditMemory?: (memory: TimelineMemory) => void;
+  onDeleteMemory?: (memoryId: string) => void;
+  onEditCapsule?: (capsule: TimeCapsule) => void;
+  onDeleteCapsule?: (capsuleId: string) => void;
+  onEditLocation?: (location: MemoryLocation) => void;
+  onDeleteLocation?: (locationId: string) => void;
 }
 
 export const TimelineView: React.FC<TimelineViewProps> = ({
@@ -54,6 +62,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   onOpenAddLocationModal,
   onLikeMemory,
   onUnlockCapsule,
+  onEditMemory,
+  onDeleteMemory,
+  onEditCapsule,
+  onDeleteCapsule,
+  onEditLocation,
+  onDeleteLocation,
 }) => {
   const [subSection, setSubSection] = useState<'timeline' | 'capsules' | 'map'>('timeline');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -245,12 +259,36 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         </h3>
                       </div>
 
-                      {mem.locationName && (
-                        <div className="flex items-center gap-1 text-xs text-stone-500 bg-stone-50 px-2.5 py-1 rounded-xl w-fit">
-                          <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                          <span>{mem.locationName}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {mem.locationName && (
+                          <div className="flex items-center gap-1 text-xs text-stone-500 bg-stone-50 px-2.5 py-1 rounded-xl w-fit">
+                            <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                            <span>{mem.locationName}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          {onEditMemory && (
+                            <button
+                              type="button"
+                              onClick={() => onEditMemory(mem)}
+                              className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Modifier ce souvenir"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDeleteMemory && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteMemory(mem.id)}
+                              className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Supprimer ce souvenir"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Photo if available */}
@@ -422,15 +460,44 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         )}
                       </div>
 
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          isUnlocked
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-amber-100 text-amber-900'
-                        }`}
-                      >
-                        {isUnlocked ? 'Déverrouillé !' : `Dans ${daysLeft} jours`}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            isUnlocked
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-900'
+                          }`}
+                        >
+                          {isUnlocked ? 'Déverrouillé !' : `Dans ${daysLeft} jours`}
+                        </span>
+
+                        {onEditCapsule && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditCapsule(cap);
+                            }}
+                            className="p-1 rounded-lg text-stone-400 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                            title="Modifier cette capsule"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {onDeleteCapsule && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteCapsule(cap.id);
+                            }}
+                            className="p-1 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Supprimer cette capsule"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <h3 className="font-serif-romantic text-lg font-bold text-stone-900 mb-1">
@@ -655,6 +722,32 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       Date du souvenir : {selectedLocation.date}
                     </p>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  {onEditLocation && (
+                    <button
+                      type="button"
+                      onClick={() => onEditLocation(selectedLocation)}
+                      className="px-3 py-1.5 rounded-xl border border-stone-200 hover:border-sky-300 text-stone-600 hover:text-sky-700 hover:bg-sky-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Modifier</span>
+                    </button>
+                  )}
+                  {onDeleteLocation && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDeleteLocation(selectedLocation.id);
+                        setSelectedLocation(null);
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-stone-200 hover:border-rose-300 text-stone-600 hover:text-rose-600 hover:bg-rose-50 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Supprimer</span>
+                    </button>
+                  )}
                 </div>
               </motion.div>
             )}

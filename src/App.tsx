@@ -6,6 +6,7 @@ import { MoodAndNeedsBar } from './components/MoodAndNeedsBar';
 import { MissYouModal } from './components/MissYouModal';
 import { JournalView } from './components/views/JournalView';
 import { TimelineView } from './components/views/TimelineView';
+import { SharedGalleryView } from './components/views/SharedGalleryView';
 import { GamesView } from './components/views/GamesView';
 import { VouchersAndBucketView } from './components/views/VouchersAndBucketView';
 import { WriteNoteModal } from './components/modals/WriteNoteModal';
@@ -14,7 +15,12 @@ import { AddCapsuleModal } from './components/modals/AddCapsuleModal';
 import { AddLocationModal } from './components/modals/AddLocationModal';
 import { AddVoucherModal } from './components/modals/AddVoucherModal';
 import { AddBucketModal } from './components/modals/AddBucketModal';
+import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { ProfileModal } from './components/modals/ProfileModal';
+import { PinLockModal } from './components/modals/PinLockModal';
+import { RomanticMusicBar } from './components/RomanticMusicBar';
+import { soundEffects } from './lib/audio';
+import { triggerCelebrationConfetti } from './lib/confetti';
 import {
   CoupleProfile,
   PartnerId,
@@ -29,6 +35,8 @@ import {
   LoveVoucher,
   DailyGratitude,
   MissYouPulse,
+  CoupleSettings,
+  FullCoupleBackup,
 } from './types';
 import {
   INITIAL_PROFILE,
@@ -43,6 +51,34 @@ import {
   INITIAL_VOUCHERS,
   INITIAL_GRATITUDES,
 } from './data/initialData';
+import {
+  seedInitialDataIfEmpty,
+  subscribeProfile,
+  subscribeCollection,
+  subscribeSettings,
+  subscribeLatestPulse,
+  saveProfile,
+  saveMemory,
+  deleteMemoryFromDb,
+  saveCapsule,
+  deleteCapsuleFromDb,
+  saveLocation,
+  deleteLocationFromDb,
+  saveSweetNote,
+  deleteSweetNoteFromDb,
+  saveGratitude,
+  deleteGratitudeFromDb,
+  saveVoucher,
+  deleteVoucherFromDb,
+  saveBucketItem,
+  deleteBucketItemFromDb,
+  saveQuiz,
+  saveDateIdea,
+  saveChallenge,
+  saveSettings,
+  sendMissYouPulse,
+  COLLECTIONS,
+} from './lib/firestoreService';
 
 const STORAGE_KEYS = {
   PROFILE: 'nid_damour_profile',
@@ -57,6 +93,7 @@ const STORAGE_KEYS = {
   VOUCHERS: 'nid_damour_vouchers',
   GRATITUDES: 'nid_damour_gratitudes',
   ACTIVE_PARTNER: 'nid_damour_active_partner',
+  SETTINGS: 'nid_damour_settings',
 };
 
 export default function App() {
@@ -196,11 +233,50 @@ export default function App() {
     }
   });
 
+  // Couple Settings (PIN, Romantic Music, Ambiance)
+  const [settings, setSettings] = useState<CoupleSettings>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      return saved
+        ? JSON.parse(saved)
+        : {
+            isPinEnabled: false,
+            pinCode: '1234',
+            songTitle: "Sidiki Diabaté - C'est bon",
+            ambientTrackId: 'kora_serenade',
+            musicVolume: 0.35,
+            isMusicPlaying: false,
+          };
+    } catch {
+      return {
+        isPinEnabled: false,
+        pinCode: '1234',
+        songTitle: "Sidiki Diabaté - C'est bon",
+        ambientTrackId: 'kora_serenade',
+        musicVolume: 0.35,
+        isMusicPlaying: false,
+      };
+    }
+  });
+
+  // App lock state
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Boolean(parsed.isPinEnabled);
+      }
+    } catch {}
+    return false;
+  });
+
   // Real-time Miss You Pulse state
   const [activeMissYouPulse, setActiveMissYouPulse] = useState<MissYouPulse | null>(null);
 
   // Modals state
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileFocusPartner, setProfileFocusPartner] = useState<PartnerId | undefined>(undefined);
   const [showWriteNoteModal, setShowWriteNoteModal] = useState(false);
   const [showAddMemoryModal, setShowAddMemoryModal] = useState(false);
   const [showAddCapsuleModal, setShowAddCapsuleModal] = useState(false);
@@ -208,7 +284,174 @@ export default function App() {
   const [showAddVoucherModal, setShowAddVoucherModal] = useState(false);
   const [showAddBucketModal, setShowAddBucketModal] = useState(false);
 
-  // Sync state to localStorage
+  // Edit states for existing items
+  const [editingMemory, setEditingMemory] = useState<TimelineMemory | null>(null);
+  const [editingNote, setEditingNote] = useState<SweetNote | null>(null);
+  const [editingCapsule, setEditingCapsule] = useState<TimeCapsule | null>(null);
+  const [editingLocation, setEditingLocation] = useState<MemoryLocation | null>(null);
+  const [editingVoucher, setEditingVoucher] = useState<LoveVoucher | null>(null);
+  const [editingBucketItem, setEditingBucketItem] = useState<BucketItem | null>(null);
+
+  // Generic delete confirmation modal
+  const [deleteTarget, setDeleteTarget] = useState<{
+    title: string;
+    itemType: string;
+    itemName?: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  // Initial seed to Firebase if database is empty
+  useEffect(() => {
+    seedInitialDataIfEmpty({
+      profile: INITIAL_PROFILE,
+      memories: INITIAL_MEMORIES,
+      capsules: INITIAL_CAPSULES,
+      locations: INITIAL_LOCATIONS,
+      notes: INITIAL_NOTES,
+      gratitudes: INITIAL_GRATITUDES,
+      vouchers: INITIAL_VOUCHERS,
+      bucketList: INITIAL_BUCKET_LIST,
+      quizzes: INITIAL_QUIZZES,
+      dateIdeas: INITIAL_DATE_IDEAS,
+      challenges: INITIAL_CHALLENGES,
+    });
+  }, []);
+
+  // Real-time Firestore subscriptions
+  useEffect(() => {
+    const unsubProfile = subscribeProfile((remoteProfile) => {
+      if (remoteProfile) setProfile(remoteProfile);
+    });
+
+    const unsubMemories = subscribeCollection<TimelineMemory>(
+      COLLECTIONS.MEMORIES,
+      (remoteMemories) => {
+        if (remoteMemories && remoteMemories.length > 0) {
+          setMemories(remoteMemories);
+        }
+      }
+    );
+
+    const unsubCapsules = subscribeCollection<TimeCapsule>(
+      COLLECTIONS.CAPSULES,
+      (remoteCapsules) => {
+        if (remoteCapsules && remoteCapsules.length > 0) {
+          setCapsules(remoteCapsules);
+        }
+      }
+    );
+
+    const unsubLocations = subscribeCollection<MemoryLocation>(
+      COLLECTIONS.LOCATIONS,
+      (remoteLocations) => {
+        if (remoteLocations && remoteLocations.length > 0) {
+          setLocations(remoteLocations);
+        }
+      }
+    );
+
+    const unsubNotes = subscribeCollection<SweetNote>(
+      COLLECTIONS.NOTES,
+      (remoteNotes) => {
+        if (remoteNotes && remoteNotes.length > 0) {
+          // Sort newest first
+          const sorted = [...remoteNotes].sort((a, b) => b.id.localeCompare(a.id));
+          setNotes(sorted);
+        }
+      }
+    );
+
+    const unsubGratitudes = subscribeCollection<DailyGratitude>(
+      COLLECTIONS.GRATITUDES,
+      (remoteGratitudes) => {
+        if (remoteGratitudes && remoteGratitudes.length > 0) {
+          const sorted = [...remoteGratitudes].sort((a, b) => b.id.localeCompare(a.id));
+          setGratitudes(sorted);
+        }
+      }
+    );
+
+    const unsubVouchers = subscribeCollection<LoveVoucher>(
+      COLLECTIONS.VOUCHERS,
+      (remoteVouchers) => {
+        if (remoteVouchers && remoteVouchers.length > 0) {
+          setVouchers(remoteVouchers);
+        }
+      }
+    );
+
+    const unsubBucket = subscribeCollection<BucketItem>(
+      COLLECTIONS.BUCKET_LIST,
+      (remoteBucket) => {
+        if (remoteBucket && remoteBucket.length > 0) {
+          setBucketList(remoteBucket);
+        }
+      }
+    );
+
+    const unsubQuizzes = subscribeCollection<QuizQuestion>(
+      COLLECTIONS.QUIZZES,
+      (remoteQuizzes) => {
+        if (remoteQuizzes && remoteQuizzes.length > 0) {
+          setQuizzes(remoteQuizzes);
+        }
+      }
+    );
+
+    const unsubDates = subscribeCollection<DateIdea>(
+      COLLECTIONS.DATES,
+      (remoteDates) => {
+        if (remoteDates && remoteDates.length > 0) {
+          setDateIdeas(remoteDates);
+        }
+      }
+    );
+
+    const unsubChallenges = subscribeCollection<CoupleChallenge>(
+      COLLECTIONS.CHALLENGES,
+      (remoteChallenges) => {
+        if (remoteChallenges && remoteChallenges.length > 0) {
+          setChallenges(remoteChallenges);
+        }
+      }
+    );
+
+    const unsubSettings = subscribeSettings((remoteSettings) => {
+      if (remoteSettings) {
+        setSettings((prev) => ({
+          ...prev,
+          ...remoteSettings,
+          // Preserve local playing audio flag so sound doesn't auto-start abruptly
+          isMusicPlaying: prev.isMusicPlaying,
+        }));
+      }
+    });
+
+    const unsubPulse = subscribeLatestPulse((pulse) => {
+      if (pulse && pulse.senderId !== activePartnerId) {
+        setActiveMissYouPulse(pulse);
+        soundEffects.playHeartPulse();
+      }
+    });
+
+    return () => {
+      unsubProfile();
+      unsubMemories();
+      unsubCapsules();
+      unsubLocations();
+      unsubNotes();
+      unsubGratitudes();
+      unsubVouchers();
+      unsubBucket();
+      unsubQuizzes();
+      unsubDates();
+      unsubChallenges();
+      unsubSettings();
+      unsubPulse();
+    };
+  }, [activePartnerId]);
+
+  // Sync state to localStorage as offline fallback
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_PARTNER, activePartnerId);
   }, [activePartnerId]);
@@ -257,6 +500,68 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.GRATITUDES, JSON.stringify(gratitudes));
   }, [gratitudes]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+  }, [settings]);
+
+  // Export full JSON backup
+  const handleExportBackup = () => {
+    const backup: FullCoupleBackup = {
+      version: '2.0.0',
+      exportedAt: new Date().toISOString(),
+      profile,
+      memories,
+      capsules,
+      locations,
+      notes,
+      quizzes,
+      dateIdeas,
+      challenges,
+      bucketList,
+      vouchers,
+      gratitudes,
+      settings,
+    };
+    const dataStr =
+      'data:text/json;charset=utf-8,' +
+      encodeURIComponent(JSON.stringify(backup, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const p1 = (profile.partner1?.name || 'safi').toLowerCase();
+    const p2 = (profile.partner2?.name || 'med').toLowerCase();
+    const today = new Date().toISOString().slice(0, 10);
+    const filename = `nid_damour_${p1}_${p2}_sauvegarde_${today}.json`;
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', filename);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    soundEffects.playSuccessSparkle();
+  };
+
+  // Import full JSON backup
+  const handleImportBackup = (backup: FullCoupleBackup) => {
+    if (backup.profile) setProfile(backup.profile);
+    if (backup.memories) setMemories(backup.memories);
+    if (backup.capsules) setCapsules(backup.capsules);
+    if (backup.locations) setLocations(backup.locations);
+    if (backup.notes) setNotes(backup.notes);
+    if (backup.quizzes) setQuizzes(backup.quizzes);
+    if (backup.dateIdeas) setDateIdeas(backup.dateIdeas);
+    if (backup.challenges) setChallenges(backup.challenges);
+    if (backup.bucketList) setBucketList(backup.bucketList);
+    if (backup.vouchers) setVouchers(backup.vouchers);
+    if (backup.gratitudes) setGratitudes(backup.gratitudes);
+    if (backup.settings) setSettings(backup.settings);
+  };
+
+  const handleUpdateSettings = (newSettings: Partial<CoupleSettings>) => {
+    setSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      saveSettings(updated).catch(console.error);
+      return updated;
+    });
+  };
+
   // Actions
   const handleSwitchPartner = (id: PartnerId) => {
     setActivePartnerId(id);
@@ -273,16 +578,19 @@ export default function App() {
         minute: '2-digit',
       });
 
-    setProfile((prev) => ({
-      ...prev,
+    const updatedProfile: CoupleProfile = {
+      ...profile,
       [partnerId === 'p1' ? 'partner1' : 'partner2']: {
-        ...prev[partnerId === 'p1' ? 'partner1' : 'partner2'],
+        ...profile[partnerId === 'p1' ? 'partner1' : 'partner2'],
         mood: {
           ...newMood,
           lastUpdated: formattedTime,
         },
       },
-    }));
+    };
+
+    setProfile(updatedProfile);
+    saveProfile(updatedProfile).catch(console.error);
   };
 
   const handleSendMissYou = (vibe: MissYouPulse['vibe'], message: string) => {
@@ -297,6 +605,7 @@ export default function App() {
       message,
     };
     setActiveMissYouPulse(pulse);
+    sendMissYouPulse(pulse).catch(console.error);
   };
 
   // Notes actions
@@ -308,30 +617,40 @@ export default function App() {
       isFavorite: false,
     };
     setNotes((prev) => [newNote, ...prev]);
+    saveSweetNote(newNote).catch(console.error);
   };
 
   const handleMarkNoteAsRead = (noteId: string) => {
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === noteId
-          ? { ...n, isRead: true, readAt: "Aujourd'hui" }
-          : n
-      )
-    );
+    const note = notes.find((n) => n.id === noteId);
+    if (note) {
+      const updatedNote = { ...note, isRead: true, readAt: "Aujourd'hui" };
+      setNotes((prev) =>
+        prev.map((n) => (n.id === noteId ? updatedNote : n))
+      );
+      saveSweetNote(updatedNote).catch(console.error);
+    }
   };
 
   const handleToggleFavoriteNote = (noteId: string) => {
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === noteId ? { ...n, isFavorite: !n.isFavorite } : n
-      )
-    );
+    const note = notes.find((n) => n.id === noteId);
+    if (note) {
+      const updatedNote = { ...note, isFavorite: !note.isFavorite };
+      setNotes((prev) =>
+        prev.map((n) => (n.id === noteId ? updatedNote : n))
+      );
+      saveSweetNote(updatedNote).catch(console.error);
+    }
   };
 
   const handleReactNote = (noteId: string, emoji: string) => {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === noteId ? { ...n, reaction: emoji } : n))
-    );
+    const note = notes.find((n) => n.id === noteId);
+    if (note) {
+      const updatedNote = { ...note, reaction: emoji };
+      setNotes((prev) =>
+        prev.map((n) => (n.id === noteId ? updatedNote : n))
+      );
+      saveSweetNote(updatedNote).catch(console.error);
+    }
   };
 
   // Gratitude actions
@@ -344,23 +663,24 @@ export default function App() {
       likes: [activePartnerId],
     };
     setGratitudes((prev) => [newGrat, ...prev]);
+    saveGratitude(newGrat).catch(console.error);
   };
 
   const handleLikeGratitude = (gratId: string) => {
-    setGratitudes((prev) =>
-      prev.map((g) => {
-        if (g.id === gratId) {
-          const hasLiked = g.likes.includes(activePartnerId);
-          return {
-            ...g,
-            likes: hasLiked
-              ? g.likes.filter((id) => id !== activePartnerId)
-              : [...g.likes, activePartnerId],
-          };
-        }
-        return g;
-      })
-    );
+    const grat = gratitudes.find((g) => g.id === gratId);
+    if (grat) {
+      const hasLiked = grat.likes.includes(activePartnerId);
+      const updatedGrat = {
+        ...grat,
+        likes: hasLiked
+          ? grat.likes.filter((id) => id !== activePartnerId)
+          : [...grat.likes, activePartnerId],
+      };
+      setGratitudes((prev) =>
+        prev.map((g) => (g.id === gratId ? updatedGrat : g))
+      );
+      saveGratitude(updatedGrat).catch(console.error);
+    }
   };
 
   // Memory actions
@@ -371,23 +691,24 @@ export default function App() {
       likes: [activePartnerId],
     };
     setMemories((prev) => [newMem, ...prev]);
+    saveMemory(newMem).catch(console.error);
   };
 
   const handleLikeMemory = (memId: string) => {
-    setMemories((prev) =>
-      prev.map((m) => {
-        if (m.id === memId) {
-          const hasLiked = m.likes.includes(activePartnerId);
-          return {
-            ...m,
-            likes: hasLiked
-              ? m.likes.filter((id) => id !== activePartnerId)
-              : [...m.likes, activePartnerId],
-          };
-        }
-        return m;
-      })
-    );
+    const mem = memories.find((m) => m.id === memId);
+    if (mem) {
+      const hasLiked = mem.likes.includes(activePartnerId);
+      const updatedMem = {
+        ...mem,
+        likes: hasLiked
+          ? mem.likes.filter((id) => id !== activePartnerId)
+          : [...mem.likes, activePartnerId],
+      };
+      setMemories((prev) =>
+        prev.map((m) => (m.id === memId ? updatedMem : m))
+      );
+      saveMemory(updatedMem).catch(console.error);
+    }
   };
 
   // Capsule actions
@@ -399,12 +720,18 @@ export default function App() {
       isOpened: false,
     };
     setCapsules((prev) => [newCap, ...prev]);
+    saveCapsule(newCap).catch(console.error);
   };
 
   const handleUnlockCapsule = (capId: string) => {
-    setCapsules((prev) =>
-      prev.map((c) => (c.id === capId ? { ...c, isOpened: true } : c))
-    );
+    const cap = capsules.find((c) => c.id === capId);
+    if (cap) {
+      const updatedCap = { ...cap, isOpened: true };
+      setCapsules((prev) =>
+        prev.map((c) => (c.id === capId ? updatedCap : c))
+      );
+      saveCapsule(updatedCap).catch(console.error);
+    }
   };
 
   // Location actions
@@ -414,6 +741,7 @@ export default function App() {
       ...locData,
     };
     setLocations((prev) => [...prev, newLoc]);
+    saveLocation(newLoc).catch(console.error);
   };
 
   // Quiz actions
@@ -422,48 +750,52 @@ export default function App() {
     partnerId: PartnerId,
     answerIndex: number
   ) => {
-    setQuizzes((prev) =>
-      prev.map((q) => {
-        if (q.id === quizId) {
-          return {
-            ...q,
-            [partnerId === 'p1' ? 'partner1Answer' : 'partner2Answer']: answerIndex,
-          };
-        }
-        return q;
-      })
-    );
+    const quiz = quizzes.find((q) => q.id === quizId);
+    if (quiz) {
+      const updatedQuiz = {
+        ...quiz,
+        [partnerId === 'p1' ? 'partner1Answer' : 'partner2Answer']: answerIndex,
+      };
+      setQuizzes((prev) =>
+        prev.map((q) => (q.id === quizId ? updatedQuiz : q))
+      );
+      saveQuiz(updatedQuiz).catch(console.error);
+    }
   };
 
   const handleAddNewQuiz = (newQ: QuizQuestion) => {
     setQuizzes((prev) => [...prev, newQ]);
+    saveQuiz(newQ).catch(console.error);
   };
 
   // Date ideas actions
   const handleSaveDateIdea = (idea: DateIdea) => {
+    const updatedIdea = { ...idea, isSaved: true };
     setDateIdeas((prev) =>
-      prev.map((d) => (d.id === idea.id ? { ...d, isSaved: true } : d))
+      prev.map((d) => (d.id === idea.id ? updatedIdea : d))
     );
+    saveDateIdea(updatedIdea).catch(console.error);
   };
 
   const handleAddNewDateIdea = (idea: DateIdea) => {
     setDateIdeas((prev) => [idea, ...prev]);
+    saveDateIdea(idea).catch(console.error);
   };
 
   // Challenge actions
   const handleToggleChallenge = (challengeId: string) => {
-    setChallenges((prev) =>
-      prev.map((c) => {
-        if (c.id === challengeId) {
-          return {
-            ...c,
-            isCompleted: !c.isCompleted,
-            completedDate: !c.isCompleted ? "Aujourd'hui" : undefined,
-          };
-        }
-        return c;
-      })
-    );
+    const challenge = challenges.find((c) => c.id === challengeId);
+    if (challenge) {
+      const updated = {
+        ...challenge,
+        isCompleted: !challenge.isCompleted,
+        completedDate: !challenge.isCompleted ? "Aujourd'hui" : undefined,
+      };
+      setChallenges((prev) =>
+        prev.map((c) => (c.id === challengeId ? updated : c))
+      );
+      saveChallenge(updated).catch(console.error);
+    }
   };
 
   // Voucher actions
@@ -473,13 +805,14 @@ export default function App() {
       month: 'long',
       year: 'numeric',
     });
-    setVouchers((prev) =>
-      prev.map((v) =>
-        v.id === voucherId
-          ? { ...v, isRedeemed: true, redeemedAt: formattedDate }
-          : v
-      )
-    );
+    const voucher = vouchers.find((v) => v.id === voucherId);
+    if (voucher) {
+      const updated = { ...voucher, isRedeemed: true, redeemedAt: formattedDate };
+      setVouchers((prev) =>
+        prev.map((v) => (v.id === voucherId ? updated : v))
+      );
+      saveVoucher(updated).catch(console.error);
+    }
   };
 
   const handleAddVoucher = (
@@ -491,6 +824,7 @@ export default function App() {
       isRedeemed: false,
     };
     setVouchers((prev) => [newV, ...prev]);
+    saveVoucher(newV).catch(console.error);
   };
 
   // Bucket actions
@@ -501,15 +835,155 @@ export default function App() {
       status: 'todo',
     };
     setBucketList((prev) => [...prev, newB]);
+    saveBucketItem(newB).catch(console.error);
   };
 
   const handleUpdateBucketStatus = (
     itemId: string,
     status: BucketItem['status']
   ) => {
-    setBucketList((prev) =>
-      prev.map((b) => (b.id === itemId ? { ...b, status } : b))
-    );
+    const item = bucketList.find((b) => b.id === itemId);
+    if (item) {
+      const updated = { ...item, status };
+      setBucketList((prev) =>
+        prev.map((b) => (b.id === itemId ? updated : b))
+      );
+      saveBucketItem(updated).catch(console.error);
+    }
+  };
+
+  // Edit & Delete handlers for all couple entities
+  const handleUpdateMemory = (updated: TimelineMemory) => {
+    setMemories((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    setEditingMemory(null);
+    saveMemory(updated).catch(console.error);
+  };
+
+  const handleDeleteMemory = (memoryId: string) => {
+    const mem = memories.find((m) => m.id === memoryId);
+    setDeleteTarget({
+      title: 'Supprimer ce souvenir ?',
+      itemType: 'souvenir',
+      itemName: mem?.title,
+      onConfirm: () => {
+        setMemories((prev) => prev.filter((m) => m.id !== memoryId));
+        setEditingMemory(null);
+        deleteMemoryFromDb(memoryId).catch(console.error);
+      },
+    });
+  };
+
+  const handleUpdateNote = (updated: SweetNote) => {
+    setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+    setEditingNote(null);
+    saveSweetNote(updated).catch(console.error);
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    const note = notes.find((n) => n.id === noteId);
+    setDeleteTarget({
+      title: 'Supprimer ce mot doux ?',
+      itemType: 'mot doux',
+      itemName: note?.content ? `« ${note.content.slice(0, 35)}... »` : undefined,
+      onConfirm: () => {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        setEditingNote(null);
+        deleteSweetNoteFromDb(noteId).catch(console.error);
+      },
+    });
+  };
+
+  const handleDeleteGratitude = (gratId: string) => {
+    const grat = gratitudes.find((g) => g.id === gratId);
+    setDeleteTarget({
+      title: 'Supprimer cette pensée de gratitude ?',
+      itemType: 'gratitude',
+      itemName: grat?.content ? `« ${grat.content.slice(0, 35)}... »` : undefined,
+      onConfirm: () => {
+        setGratitudes((prev) => prev.filter((g) => g.id !== gratId));
+        deleteGratitudeFromDb(gratId).catch(console.error);
+      },
+    });
+  };
+
+  const handleUpdateCapsule = (updated: TimeCapsule) => {
+    setCapsules((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setEditingCapsule(null);
+    saveCapsule(updated).catch(console.error);
+  };
+
+  const handleDeleteCapsule = (capId: string) => {
+    const cap = capsules.find((c) => c.id === capId);
+    setDeleteTarget({
+      title: 'Supprimer cette capsule temporelle ?',
+      itemType: 'capsule temporelle',
+      itemName: cap?.title,
+      onConfirm: () => {
+        setCapsules((prev) => prev.filter((c) => c.id !== capId));
+        setEditingCapsule(null);
+        deleteCapsuleFromDb(capId).catch(console.error);
+      },
+    });
+  };
+
+  const handleUpdateLocation = (updated: MemoryLocation) => {
+    setLocations((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    setEditingLocation(null);
+    saveLocation(updated).catch(console.error);
+  };
+
+  const handleDeleteLocation = (locId: string) => {
+    const loc = locations.find((l) => l.id === locId);
+    setDeleteTarget({
+      title: 'Supprimer ce lieu précieux ?',
+      itemType: 'lieu',
+      itemName: loc?.name,
+      onConfirm: () => {
+        setLocations((prev) => prev.filter((l) => l.id !== locId));
+        setEditingLocation(null);
+        deleteLocationFromDb(locId).catch(console.error);
+      },
+    });
+  };
+
+  const handleUpdateVoucher = (updated: LoveVoucher) => {
+    setVouchers((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+    setEditingVoucher(null);
+    saveVoucher(updated).catch(console.error);
+  };
+
+  const handleDeleteVoucher = (voucherId: string) => {
+    const v = vouchers.find((item) => item.id === voucherId);
+    setDeleteTarget({
+      title: "Supprimer ce bon d'amour ?",
+      itemType: "bon d'amour",
+      itemName: v?.title,
+      onConfirm: () => {
+        setVouchers((prev) => prev.filter((item) => item.id !== voucherId));
+        setEditingVoucher(null);
+        deleteVoucherFromDb(voucherId).catch(console.error);
+      },
+    });
+  };
+
+  const handleUpdateBucketItem = (updated: BucketItem) => {
+    setBucketList((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+    setEditingBucketItem(null);
+    saveBucketItem(updated).catch(console.error);
+  };
+
+  const handleDeleteBucketItem = (itemId: string) => {
+    const item = bucketList.find((b) => b.id === itemId);
+    setDeleteTarget({
+      title: 'Supprimer ce souhait de la Bucket List ?',
+      itemType: 'souhait',
+      itemName: item?.title,
+      onConfirm: () => {
+        setBucketList((prev) => prev.filter((b) => b.id !== itemId));
+        setEditingBucketItem(null);
+        deleteBucketItemFromDb(itemId).catch(console.error);
+      },
+    });
   };
 
   // Reset to default
@@ -544,19 +1018,37 @@ export default function App() {
         profile={profile}
         activePartnerId={activePartnerId}
         onSwitchPartner={handleSwitchPartner}
-        onOpenSettings={() => setShowProfileModal(true)}
+        onOpenSettings={() => {
+          setProfileFocusPartner(undefined);
+          setShowProfileModal(true);
+        }}
+        onOpenPhotoPicker={(pId) => {
+          setProfileFocusPartner(pId);
+          setShowProfileModal(true);
+        }}
         onSendMissYou={handleSendMissYou}
         unreadNotesCount={unreadNotesCount}
         onGoToNotes={() => setActiveTab('journal')}
+        onGoToGallery={() => setActiveTab('gallery')}
+        isPinEnabled={settings.isPinEnabled}
+        onLockApp={() => setIsAppLocked(true)}
+        isFirebaseConnected={true}
       />
 
+      {/* Romantic Music and Soundscape Bar */}
+      <RomanticMusicBar settings={settings} onUpdateSettings={handleUpdateSettings} />
+
       {/* Main Body */}
-      <main className="flex-1 pb-12">
+      <main className="flex-1 pb-28 sm:pb-12">
         {/* Real-time Mood & Needs Bar */}
         <MoodAndNeedsBar
           profile={profile}
           activePartnerId={activePartnerId}
           onUpdateMood={handleUpdateMood}
+          onOpenPhotoPicker={(pId) => {
+            setProfileFocusPartner(pId);
+            setShowProfileModal(true);
+          }}
         />
 
         {/* Tab Navigation */}
@@ -574,12 +1066,18 @@ export default function App() {
               activePartnerId={activePartnerId}
               notes={notes}
               gratitudes={gratitudes}
-              onOpenWriteNoteModal={() => setShowWriteNoteModal(true)}
+              onOpenWriteNoteModal={() => {
+                setEditingNote(null);
+                setShowWriteNoteModal(true);
+              }}
               onMarkNoteAsRead={handleMarkNoteAsRead}
               onToggleFavoriteNote={handleToggleFavoriteNote}
               onReactNote={handleReactNote}
               onAddGratitude={handleAddGratitude}
               onLikeGratitude={handleLikeGratitude}
+              onEditNote={(note) => setEditingNote(note)}
+              onDeleteNote={handleDeleteNote}
+              onDeleteGratitude={handleDeleteGratitude}
             />
           )}
 
@@ -590,11 +1088,49 @@ export default function App() {
               memories={memories}
               capsules={capsules}
               locations={locations}
-              onOpenAddMemoryModal={() => setShowAddMemoryModal(true)}
-              onOpenAddCapsuleModal={() => setShowAddCapsuleModal(true)}
-              onOpenAddLocationModal={() => setShowAddLocationModal(true)}
+              onOpenAddMemoryModal={() => {
+                setEditingMemory(null);
+                setShowAddMemoryModal(true);
+              }}
+              onOpenAddCapsuleModal={() => {
+                setEditingCapsule(null);
+                setShowAddCapsuleModal(true);
+              }}
+              onOpenAddLocationModal={() => {
+                setEditingLocation(null);
+                setShowAddLocationModal(true);
+              }}
               onLikeMemory={handleLikeMemory}
               onUnlockCapsule={handleUnlockCapsule}
+              onEditMemory={(mem) => setEditingMemory(mem)}
+              onDeleteMemory={handleDeleteMemory}
+              onEditCapsule={(cap) => setEditingCapsule(cap)}
+              onDeleteCapsule={handleDeleteCapsule}
+              onEditLocation={(loc) => setEditingLocation(loc)}
+              onDeleteLocation={handleDeleteLocation}
+            />
+          )}
+
+          {activeTab === 'gallery' && (
+            <SharedGalleryView
+              profile={profile}
+              activePartnerId={activePartnerId}
+              memories={memories}
+              locations={locations}
+              capsules={capsules}
+              challenges={challenges}
+              bucketList={bucketList}
+              onLikeMemory={handleLikeMemory}
+              onOpenAddMemoryModal={() => {
+                setEditingMemory(null);
+                setShowAddMemoryModal(true);
+              }}
+              onOpenProfileModal={(pId) => {
+                setProfileFocusPartner(pId);
+                setShowProfileModal(true);
+              }}
+              onEditMemory={(mem) => setEditingMemory(mem)}
+              onDeleteMemory={handleDeleteMemory}
             />
           )}
 
@@ -620,9 +1156,19 @@ export default function App() {
               vouchers={vouchers}
               bucketList={bucketList}
               onRedeemVoucher={handleRedeemVoucher}
-              onOpenAddVoucherModal={() => setShowAddVoucherModal(true)}
-              onOpenAddBucketModal={() => setShowAddBucketModal(true)}
+              onOpenAddVoucherModal={() => {
+                setEditingVoucher(null);
+                setShowAddVoucherModal(true);
+              }}
+              onOpenAddBucketModal={() => {
+                setEditingBucketItem(null);
+                setShowAddBucketModal(true);
+              }}
               onUpdateBucketStatus={handleUpdateBucketStatus}
+              onEditVoucher={(v) => setEditingVoucher(v)}
+              onDeleteVoucher={handleDeleteVoucher}
+              onEditBucketItem={(item) => setEditingBucketItem(item)}
+              onDeleteBucketItem={handleDeleteBucketItem}
             />
           )}
         </div>
@@ -661,63 +1207,140 @@ export default function App() {
 
       {/* Modals */}
       <AnimatePresence>
-        {showWriteNoteModal && (
+        {(showWriteNoteModal || editingNote) && (
           <WriteNoteModal
             profile={profile}
             activePartnerId={activePartnerId}
-            onClose={() => setShowWriteNoteModal(false)}
+            initialNote={editingNote || undefined}
+            onClose={() => {
+              setShowWriteNoteModal(false);
+              setEditingNote(null);
+            }}
             onSendNote={handleSendNote}
+            onUpdateNote={handleUpdateNote}
+            onDeleteNote={handleDeleteNote}
           />
         )}
 
-        {showAddMemoryModal && (
+        {(showAddMemoryModal || editingMemory) && (
           <AddMemoryModal
             profile={profile}
             activePartnerId={activePartnerId}
-            onClose={() => setShowAddMemoryModal(false)}
+            initialMemory={editingMemory || undefined}
+            onClose={() => {
+              setShowAddMemoryModal(false);
+              setEditingMemory(null);
+            }}
             onAddMemory={handleAddMemory}
+            onUpdateMemory={handleUpdateMemory}
+            onDeleteMemory={handleDeleteMemory}
           />
         )}
 
-        {showAddCapsuleModal && (
+        {(showAddCapsuleModal || editingCapsule) && (
           <AddCapsuleModal
             profile={profile}
             activePartnerId={activePartnerId}
-            onClose={() => setShowAddCapsuleModal(false)}
+            initialCapsule={editingCapsule || undefined}
+            onClose={() => {
+              setShowAddCapsuleModal(false);
+              setEditingCapsule(null);
+            }}
             onAddCapsule={handleAddCapsule}
+            onUpdateCapsule={handleUpdateCapsule}
+            onDeleteCapsule={handleDeleteCapsule}
           />
         )}
 
-        {showAddLocationModal && (
+        {(showAddLocationModal || editingLocation) && (
           <AddLocationModal
-            onClose={() => setShowAddLocationModal(false)}
+            initialLocation={editingLocation || undefined}
+            onClose={() => {
+              setShowAddLocationModal(false);
+              setEditingLocation(null);
+            }}
             onAddLocation={handleAddLocation}
+            onUpdateLocation={handleUpdateLocation}
+            onDeleteLocation={handleDeleteLocation}
           />
         )}
 
-        {showAddVoucherModal && (
+        {(showAddVoucherModal || editingVoucher) && (
           <AddVoucherModal
             profile={profile}
             activePartnerId={activePartnerId}
-            onClose={() => setShowAddVoucherModal(false)}
+            initialVoucher={editingVoucher || undefined}
+            onClose={() => {
+              setShowAddVoucherModal(false);
+              setEditingVoucher(null);
+            }}
             onAddVoucher={handleAddVoucher}
+            onUpdateVoucher={handleUpdateVoucher}
+            onDeleteVoucher={handleDeleteVoucher}
           />
         )}
 
-        {showAddBucketModal && (
+        {(showAddBucketModal || editingBucketItem) && (
           <AddBucketModal
             activePartnerId={activePartnerId}
-            onClose={() => setShowAddBucketModal(false)}
+            initialBucketItem={editingBucketItem || undefined}
+            onClose={() => {
+              setShowAddBucketModal(false);
+              setEditingBucketItem(null);
+            }}
             onAddBucketItem={handleAddBucketItem}
+            onUpdateBucketItem={handleUpdateBucketItem}
+            onDeleteBucketItem={handleDeleteBucketItem}
           />
         )}
 
         {showProfileModal && (
           <ProfileModal
             profile={profile}
-            onClose={() => setShowProfileModal(false)}
-            onSaveProfile={setProfile}
+            settings={settings}
+            initialFocusPartner={profileFocusPartner}
+            onClose={() => {
+              setShowProfileModal(false);
+              setProfileFocusPartner(undefined);
+            }}
+            onSaveProfile={(updatedProfile) => {
+              setProfile(updatedProfile);
+              saveProfile(updatedProfile).catch(console.error);
+            }}
+            onSaveSettings={(updatedSettings) => {
+              setSettings(updatedSettings);
+              saveSettings(updatedSettings).catch(console.error);
+            }}
             onResetToDefault={handleResetToDefault}
+            onExportBackup={handleExportBackup}
+            onImportBackup={handleImportBackup}
+            onLockApp={() => setIsAppLocked(true)}
+            isFirebaseConnected={true}
+          />
+        )}
+
+        {deleteTarget && (
+          <ConfirmDeleteModal
+            isOpen={Boolean(deleteTarget)}
+            title={deleteTarget.title}
+            itemName={deleteTarget.itemName}
+            itemType={deleteTarget.itemType}
+            onConfirm={() => {
+              deleteTarget.onConfirm();
+              setDeleteTarget(null);
+            }}
+            onCancel={() => setDeleteTarget(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Secret PIN Lock Screen */}
+      <AnimatePresence>
+        {isAppLocked && settings.isPinEnabled && (
+          <PinLockModal
+            correctPin={settings.pinCode || '1234'}
+            profile={profile}
+            onUnlock={() => setIsAppLocked(false)}
           />
         )}
       </AnimatePresence>

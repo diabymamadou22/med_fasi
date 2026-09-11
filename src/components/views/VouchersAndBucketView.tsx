@@ -17,6 +17,8 @@ import {
   DollarSign,
   Gift,
   FolderHeart,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, LoveVoucher, BucketItem } from '../../types';
 import { soundEffects } from '../../lib/audio';
@@ -31,6 +33,10 @@ interface VouchersAndBucketViewProps {
   onOpenAddVoucherModal: () => void;
   onOpenAddBucketModal: () => void;
   onUpdateBucketStatus: (itemId: string, status: BucketItem['status']) => void;
+  onEditVoucher?: (voucher: LoveVoucher) => void;
+  onDeleteVoucher?: (voucherId: string) => void;
+  onEditBucketItem?: (item: BucketItem) => void;
+  onDeleteBucketItem?: (itemId: string) => void;
 }
 
 export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
@@ -42,6 +48,10 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
   onOpenAddVoucherModal,
   onOpenAddBucketModal,
   onUpdateBucketStatus,
+  onEditVoucher,
+  onDeleteVoucher,
+  onEditBucketItem,
+  onDeleteBucketItem,
 }) => {
   const [subTab, setSubTab] = useState<'vouchers' | 'bucket'>('vouchers');
   const [voucherFilter, setVoucherFilter] = useState<'all' | 'available' | 'used'>('available');
@@ -219,7 +229,29 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                           </h3>
                         </div>
                       </div>
-                      <Heart className="w-5 h-5 fill-white/30 text-white" />
+                      <div className="flex items-center gap-1.5">
+                        {onEditVoucher && (
+                          <button
+                            type="button"
+                            onClick={() => onEditVoucher(v)}
+                            className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+                            title="Modifier ce bon"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {onDeleteVoucher && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteVoucher(v.id)}
+                            className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+                            title="Supprimer ce bon"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <Heart className="w-5 h-5 fill-white/30 text-white ml-1" />
+                      </div>
                     </div>
 
                     {/* Perforated Divider */}
@@ -449,6 +481,28 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                         <option value="in_progress">En cours 🚀</option>
                         <option value="done">Réalisé ! 🎉</option>
                       </select>
+
+                      {onEditBucketItem && (
+                        <button
+                          type="button"
+                          onClick={() => onEditBucketItem(item)}
+                          className="p-1.5 rounded-xl border border-stone-200 hover:border-sky-300 text-stone-500 hover:text-sky-600 hover:bg-sky-50 transition-colors cursor-pointer"
+                          title="Modifier ce souhait"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {onDeleteBucketItem && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteBucketItem(item.id)}
+                          className="p-1.5 rounded-xl border border-stone-200 hover:border-rose-300 text-stone-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Supprimer ce souhait"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
