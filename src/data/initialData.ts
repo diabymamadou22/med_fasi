@@ -17,7 +17,7 @@ export const INITIAL_PROFILE: CoupleProfile = {
     id: 'p1',
     name: 'Safi',
     nickname: 'Mon étoile ✨',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+    avatar: '',
     color: '#F43F5E', // Rose
     mood: {
       energy: 4,
@@ -31,7 +31,7 @@ export const INITIAL_PROFILE: CoupleProfile = {
     id: 'p2',
     name: 'Med',
     nickname: 'Mon cœur ❤️',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    avatar: '',
     color: '#0EA5E9', // Sky/Indigo
     mood: {
       energy: 4,

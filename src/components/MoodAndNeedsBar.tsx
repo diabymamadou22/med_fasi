@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Heart, Zap, Coffee, Edit3, Check, Camera } from 'lucide-react';
 import { CoupleProfile, PartnerId } from '../types';
+import { PartnerAvatar } from './PartnerAvatar';
 
 interface MoodAndNeedsBarProps {
   profile: CoupleProfile;
@@ -72,12 +73,14 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
             <div
               className="relative group/avatar cursor-pointer"
               onClick={() => onOpenPhotoPicker && onOpenPhotoPicker('p1')}
-              title={`Changer la photo de ${profile.partner1.name}`}
+              title={`Profil de ${profile.partner1.name}`}
             >
-              <img
-                src={profile.partner1.avatar}
-                alt={profile.partner1.name}
-                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-rose-400 transition-all"
+              <PartnerAvatar
+                name={profile.partner1.name}
+                avatar={profile.partner1.avatar}
+                partnerId="p1"
+                size="lg"
+                className="border-2 border-white shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-rose-400 transition-all"
               />
               <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white">
                 <Camera className="w-3.5 h-3.5" />
@@ -136,12 +139,14 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
             <div
               className="relative group/avatar cursor-pointer"
               onClick={() => onOpenPhotoPicker && onOpenPhotoPicker('p2')}
-              title={`Changer la photo de ${profile.partner2.name}`}
+              title={`Profil de ${profile.partner2.name}`}
             >
-              <img
-                src={profile.partner2.avatar}
-                alt={profile.partner2.name}
-                className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-sky-400 transition-all"
+              <PartnerAvatar
+                name={profile.partner2.name}
+                avatar={profile.partner2.avatar}
+                partnerId="p2"
+                size="lg"
+                className="border-2 border-white shadow-2xs group-hover/avatar:ring-2 group-hover/avatar:ring-sky-400 transition-all"
               />
               <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white">
                 <Camera className="w-3.5 h-3.5" />

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, Settings, ArrowLeftRight, Bell, Camera, MapPin, Lock, Images, Cloud, CloudCheck, Download, Smartphone } from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
+import { PartnerAvatar } from './PartnerAvatar';
 
 interface HeaderProps {
   profile: CoupleProfile;
@@ -75,12 +76,14 @@ export const Header: React.FC<HeaderProps> = ({
                     onOpenPhotoPicker ? onOpenPhotoPicker('p1') : onOpenSettings();
                   }}
                   className="relative group/p1 cursor-pointer"
-                  title={`Changer la photo de ${profile.partner1.name}`}
+                  title={`Profil de ${profile.partner1.name}`}
                 >
-                  <img
-                    src={profile.partner1.avatar}
-                    alt={profile.partner1.name}
-                    className="w-8 h-8 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-white shadow-xs ring-2 ring-rose-400/60 group-hover/p1:ring-rose-500 transition-all"
+                  <PartnerAvatar
+                    name={profile.partner1.name}
+                    avatar={profile.partner1.avatar}
+                    partnerId="p1"
+                    size="md"
+                    className="border-2 border-white shadow-xs ring-2 ring-rose-400/60 group-hover/p1:ring-rose-500 transition-all"
                   />
                   <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/p1:opacity-100 transition-opacity text-white">
                     <Camera className="w-3 h-3" />
@@ -94,12 +97,14 @@ export const Header: React.FC<HeaderProps> = ({
                     onOpenPhotoPicker ? onOpenPhotoPicker('p2') : onOpenSettings();
                   }}
                   className="relative group/p2 cursor-pointer"
-                  title={`Changer la photo de ${profile.partner2.name}`}
+                  title={`Profil de ${profile.partner2.name}`}
                 >
-                  <img
-                    src={profile.partner2.avatar}
-                    alt={profile.partner2.name}
-                    className="w-8 h-8 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-white shadow-xs ring-2 ring-sky-400/60 group-hover/p2:ring-sky-500 transition-all"
+                  <PartnerAvatar
+                    name={profile.partner2.name}
+                    avatar={profile.partner2.avatar}
+                    partnerId="p2"
+                    size="md"
+                    className="border-2 border-white shadow-xs ring-2 ring-sky-400/60 group-hover/p2:ring-sky-500 transition-all"
                   />
                   <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/p2:opacity-100 transition-opacity text-white">
                     <Camera className="w-3 h-3" />
@@ -381,10 +386,11 @@ export const Header: React.FC<HeaderProps> = ({
               id="switch-partner-p1"
               title={`Basculer sur ${profile.partner1.name}`}
             >
-              <img
-                src={profile.partner1.avatar}
-                alt={profile.partner1.name}
-                className="w-4 h-4 rounded-full object-cover"
+              <PartnerAvatar
+                name={profile.partner1.name}
+                avatar={profile.partner1.avatar}
+                partnerId="p1"
+                size="xs"
               />
               <span>{profile.partner1.name}</span>
             </button>
@@ -401,10 +407,11 @@ export const Header: React.FC<HeaderProps> = ({
               id="switch-partner-p2"
               title={`Basculer sur ${profile.partner2.name}`}
             >
-              <img
-                src={profile.partner2.avatar}
-                alt={profile.partner2.name}
-                className="w-4 h-4 rounded-full object-cover"
+              <PartnerAvatar
+                name={profile.partner2.name}
+                avatar={profile.partner2.avatar}
+                partnerId="p2"
+                size="xs"
               />
               <span>{profile.partner2.name}</span>
             </button>

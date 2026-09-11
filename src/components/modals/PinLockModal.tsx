@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Lock, Unlock, Heart, Delete, HelpCircle, ShieldCheck } from 'lucide-react';
 import { CoupleProfile } from '../../types';
 import { soundEffects } from '../../lib/audio';
+import { PartnerAvatar } from '../PartnerAvatar';
 
 interface PinLockModalProps {
   correctPin: string;
@@ -78,15 +79,19 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
       >
         {/* Couple Avatars */}
         <div className="flex items-center justify-center -space-x-3 mb-4">
-          <img
-            src={profile.partner1.avatar}
-            alt={profile.partner1.name}
-            className="w-14 h-14 rounded-full object-cover border-2 border-stone-800 shadow-md ring-2 ring-rose-500/80"
+          <PartnerAvatar
+            name={profile.partner1.name}
+            avatar={profile.partner1.avatar}
+            partnerId="p1"
+            size="lg"
+            className="border-2 border-stone-800 shadow-md ring-2 ring-rose-500/80"
           />
-          <img
-            src={profile.partner2.avatar}
-            alt={profile.partner2.name}
-            className="w-14 h-14 rounded-full object-cover border-2 border-stone-800 shadow-md ring-2 ring-sky-500/80"
+          <PartnerAvatar
+            name={profile.partner2.name}
+            avatar={profile.partner2.avatar}
+            partnerId="p2"
+            size="lg"
+            className="border-2 border-stone-800 shadow-md ring-2 ring-sky-500/80"
           />
         </div>
 

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Heart, Sparkles, X, MessageCircleHeart } from 'lucide-react';
 import { MissYouPulse, Partner } from '../types';
 import { soundEffects } from '../lib/audio';
+import { PartnerAvatar } from './PartnerAvatar';
 
 interface MissYouModalProps {
   lastPulse: MissYouPulse | null;
@@ -83,12 +84,16 @@ export const MissYouModal: React.FC<MissYouModalProps> = ({
         {/* Sender Avatar with Heart Aura */}
         <div className="relative inline-block mb-3">
           <div className="absolute -inset-2 bg-gradient-to-r from-rose-400 to-pink-400 rounded-full blur-md opacity-70 animate-pulse" />
-          <img
-            src={sender.avatar}
-            alt={sender.name}
-            className="relative w-18 h-18 rounded-full object-cover border-4 border-white shadow-md mx-auto"
-          />
-          <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-rose-500 rounded-full flex items-center justify-center text-sm text-white shadow-sm">
+          <div className="relative z-10 mx-auto">
+            <PartnerAvatar
+              name={sender.name}
+              avatar={sender.avatar}
+              partnerId={sender.id}
+              size="xl"
+              className="border-4 border-white shadow-md mx-auto"
+            />
+          </div>
+          <div className="absolute -bottom-1 -right-1 z-20 w-7 h-7 bg-rose-500 rounded-full flex items-center justify-center text-sm text-white shadow-sm">
             {currentVibe.emoji}
           </div>
         </div>

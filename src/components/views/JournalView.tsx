@@ -20,6 +20,7 @@ import {
 import { CoupleProfile, PartnerId, SweetNote, DailyGratitude } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
+import { PartnerAvatar } from '../PartnerAvatar';
 
 interface JournalViewProps {
   profile: CoupleProfile;
@@ -175,14 +176,20 @@ export const JournalView: React.FC<JournalViewProps> = ({
             >
               <div className="flex items-center justify-between pb-4 border-b border-rose-100">
                 <div className="flex items-center gap-3">
-                  <img
-                    src={
+                  <PartnerAvatar
+                    name={
+                      selectedNote.senderId === 'p1'
+                        ? profile.partner1.name
+                        : profile.partner2.name
+                    }
+                    avatar={
                       selectedNote.senderId === 'p1'
                         ? profile.partner1.avatar
                         : profile.partner2.avatar
                     }
-                    alt="Auteur"
-                    className="w-10 h-10 rounded-full object-cover border-2 border-rose-300"
+                    partnerId={selectedNote.senderId}
+                    size="md"
+                    className="border-2 border-rose-300"
                   />
                   <div>
                     <p className="font-semibold text-xs text-rose-950">
@@ -355,10 +362,11 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 >
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-1.5">
-                      <img
-                        src={sender.avatar}
-                        alt={sender.name}
-                        className="w-5 h-5 rounded-full object-cover"
+                      <PartnerAvatar
+                        name={sender.name}
+                        avatar={sender.avatar}
+                        partnerId={note.senderId}
+                        size="xs"
                       />
                       <span className="text-[11px] font-semibold text-stone-700">
                         {isSenderMe ? 'Écrit par toi' : `De ${sender.name}`}
@@ -481,10 +489,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/60 hover:bg-rose-50/30 transition-colors flex items-start justify-between gap-3"
               >
                 <div className="flex items-start gap-3">
-                  <img
-                    src={author.avatar}
-                    alt={author.name}
-                    className="w-9 h-9 rounded-full object-cover mt-0.5 border border-stone-200"
+                  <PartnerAvatar
+                    name={author.name}
+                    avatar={author.avatar}
+                    partnerId={grat.authorId}
+                    size="md"
+                    className="mt-0.5 border border-stone-200"
                   />
                   <div>
                     <div className="flex items-center gap-2">

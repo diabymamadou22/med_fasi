@@ -32,6 +32,7 @@ import {
   BucketItem,
 } from '../../types';
 import { soundEffects } from '../../lib/audio';
+import { PartnerAvatar } from '../PartnerAvatar';
 import { triggerHeartConfetti } from '../../lib/confetti';
 
 export type GallerySourceType =
@@ -347,18 +348,22 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left">
             {/* Avatars Duo */}
             <div className="flex items-center -space-x-3 shrink-0">
-              <img
-                src={profile.partner1?.avatar}
-                alt={p1Name}
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-white shadow-md"
+              <PartnerAvatar
+                name={p1Name}
+                avatar={profile.partner1?.avatar}
+                partnerId="p1"
+                size="lg"
+                className="border-2 border-white shadow-md"
               />
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white text-rose-600 flex items-center justify-center shadow-md z-10 -mx-1">
                 <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-rose-500 text-rose-500" />
               </div>
-              <img
-                src={profile.partner2?.avatar}
-                alt={p2Name}
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-white shadow-md"
+              <PartnerAvatar
+                name={p2Name}
+                avatar={profile.partner2?.avatar}
+                partnerId="p2"
+                size="lg"
+                className="border-2 border-white shadow-md"
               />
             </div>
 
@@ -457,10 +462,11 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                <img
-                  src={profile.partner1?.avatar}
-                  alt={p1Name}
-                  className="w-3.5 h-3.5 rounded-full object-cover"
+                <PartnerAvatar
+                  name={p1Name}
+                  avatar={profile.partner1?.avatar}
+                  partnerId="p1"
+                  size="xs"
                 />
                 <span>{p1Name}</span>
               </button>
@@ -475,10 +481,11 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                <img
-                  src={profile.partner2?.avatar}
-                  alt={p2Name}
-                  className="w-3.5 h-3.5 rounded-full object-cover"
+                <PartnerAvatar
+                  name={p2Name}
+                  avatar={profile.partner2?.avatar}
+                  partnerId="p2"
+                  size="xs"
                 />
                 <span>{p2Name}</span>
               </button>
@@ -652,10 +659,11 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                         className="flex items-center gap-1 px-1.5 py-0.8 rounded-full bg-black/40 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
                         title={`Partagé par ${author.name}`}
                       >
-                        <img
-                          src={author.avatar}
-                          alt={author.name}
-                          className="w-4 h-4 rounded-full object-cover"
+                        <PartnerAvatar
+                          name={author.name}
+                          avatar={author.avatar}
+                          partnerId={author.id}
+                          size="xs"
                         />
                         <span className="hidden group-hover:inline pr-0.5">
                           {author.name}
