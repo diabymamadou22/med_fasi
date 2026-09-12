@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Heart } from 'lucide-react';
 import { Header } from './components/Header';
 import { Navigation, MainTab } from './components/Navigation';
 import { MoodAndNeedsBar } from './components/MoodAndNeedsBar';
@@ -147,36 +148,36 @@ export default function App() {
   const [memories, setMemories] = useState<TimelineMemory[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.MEMORIES);
-      return saved ? JSON.parse(saved) : INITIAL_MEMORIES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_MEMORIES;
+      return [];
     }
   });
 
   const [capsules, setCapsules] = useState<TimeCapsule[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.CAPSULES);
-      return saved ? JSON.parse(saved) : INITIAL_CAPSULES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_CAPSULES;
+      return [];
     }
   });
 
   const [locations, setLocations] = useState<MemoryLocation[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.LOCATIONS);
-      return saved ? JSON.parse(saved) : INITIAL_LOCATIONS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_LOCATIONS;
+      return [];
     }
   });
 
   const [notes, setNotes] = useState<SweetNote[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.NOTES);
-      return saved ? JSON.parse(saved) : INITIAL_NOTES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_NOTES;
+      return [];
     }
   });
 
@@ -210,27 +211,27 @@ export default function App() {
   const [bucketList, setBucketList] = useState<BucketItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.BUCKET);
-      return saved ? JSON.parse(saved) : INITIAL_BUCKET_LIST;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_BUCKET_LIST;
+      return [];
     }
   });
 
   const [vouchers, setVouchers] = useState<LoveVoucher[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.VOUCHERS);
-      return saved ? JSON.parse(saved) : INITIAL_VOUCHERS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_VOUCHERS;
+      return [];
     }
   });
 
   const [gratitudes, setGratitudes] = useState<DailyGratitude[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.GRATITUDES);
-      return saved ? JSON.parse(saved) : INITIAL_GRATITUDES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_GRATITUDES;
+      return [];
     }
   });
 
@@ -275,6 +276,19 @@ export default function App() {
   // Real-time Miss You Pulse state
   const [activeMissYouPulse, setActiveMissYouPulse] = useState<MissYouPulse | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(true);
+
+  // Protection contre le reset des données sur un nouvel appareil ou rafraîchissement
+  const [isInitialRemoteLoaded, setIsInitialRemoteLoaded] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem(STORAGE_KEYS.PROFILE));
+  });
+
+  // Sécurité pour débloquer l'interface même si la connexion est lente ou hors ligne
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialRemoteLoaded(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Modals state
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -327,9 +341,13 @@ export default function App() {
         if (remoteProfile) {
           setProfile(remoteProfile);
           setIsCloudSynced(true);
+          setIsInitialRemoteLoaded(true);
         }
       },
-      () => setIsCloudSynced(false)
+      () => {
+        setIsCloudSynced(false);
+        setIsInitialRemoteLoaded(true);
+      }
     );
 
     const unsubMemories = subscribeCollection<TimelineMemory>(
@@ -338,9 +356,13 @@ export default function App() {
         if (Array.isArray(remoteMemories)) {
           setMemories(remoteMemories);
           setIsCloudSynced(true);
+          setIsInitialRemoteLoaded(true);
         }
       },
-      () => setIsCloudSynced(false)
+      () => {
+        setIsCloudSynced(false);
+        setIsInitialRemoteLoaded(true);
+      }
     );
 
     const unsubCapsules = subscribeCollection<TimeCapsule>(
@@ -465,58 +487,70 @@ export default function App() {
     };
   }, [activePartnerId]);
 
-  // Sync state to localStorage as offline fallback
+  // Sync state to localStorage as offline fallback (uniquement après chargement initial)
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_PARTNER, activePartnerId);
   }, [activePartnerId]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
-  }, [profile]);
+  }, [profile, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(memories));
-  }, [memories]);
+  }, [memories, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.CAPSULES, JSON.stringify(capsules));
-  }, [capsules]);
+  }, [capsules, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(locations));
-  }, [locations]);
+  }, [locations, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
-  }, [notes]);
+  }, [notes, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.QUIZZES, JSON.stringify(quizzes));
-  }, [quizzes]);
+  }, [quizzes, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.DATES, JSON.stringify(dateIdeas));
-  }, [dateIdeas]);
+  }, [dateIdeas, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.CHALLENGES, JSON.stringify(challenges));
-  }, [challenges]);
+  }, [challenges, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.BUCKET, JSON.stringify(bucketList));
-  }, [bucketList]);
+  }, [bucketList, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.VOUCHERS, JSON.stringify(vouchers));
-  }, [vouchers]);
+  }, [vouchers, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.GRATITUDES, JSON.stringify(gratitudes));
-  }, [gratitudes]);
+  }, [gratitudes, isInitialRemoteLoaded]);
 
   useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-  }, [settings]);
+  }, [settings, isInitialRemoteLoaded]);
 
   // Export full JSON backup
   const handleExportBackup = () => {
@@ -1178,6 +1212,23 @@ export default function App() {
     activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner =
     activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
+
+  if (!isInitialRemoteLoaded) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F5] flex flex-col items-center justify-center p-6 text-center">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mb-4 text-rose-500 shadow-sm"
+        >
+          <Heart className="w-8 h-8 fill-rose-500 animate-pulse" />
+        </motion.div>
+        <h2 className="text-xl font-bold text-gray-800 mb-1">Notre Nid d'Amour</h2>
+        <p className="text-sm text-gray-500">Connexion et synchronisation en direct...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF7F5] flex flex-col justify-between selection:bg-rose-200">

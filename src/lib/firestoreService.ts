@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -41,7 +42,10 @@ const COLLECTIONS = {
   SETTINGS: 'couple_settings',
 };
 
-// Initialisation / Seed des données si la base est vide
+// Variable pour éviter les vérifications répétées en cours d'exécution
+let isSeedChecked = false;
+
+// Initialisation / Seed des données UNIQUEMENT si la base est totalement vierge
 export async function seedInitialDataIfEmpty(defaults: {
   profile: CoupleProfile;
   memories: TimelineMemory[];
@@ -56,85 +60,103 @@ export async function seedInitialDataIfEmpty(defaults: {
   challenges?: CoupleChallenge[];
   settings?: CoupleSettings;
 }) {
+  if (isSeedChecked) return;
+  isSeedChecked = true;
+
   try {
     const profileRef = doc(db, COLLECTIONS.PROFILE, 'main_profile');
-    const memoriesCol = collection(db, COLLECTIONS.MEMORIES);
-    const snap = await getDocs(memoriesCol);
+    const profileSnap = await getDoc(profileRef);
 
-    if (snap.empty) {
-      const batch = writeBatch(db);
-
-      // Seed profile
-      batch.set(profileRef, { ...defaults.profile, id: 'main_profile' });
-
-      // Seed memories
-      defaults.memories.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.MEMORIES, item.id), item);
-      });
-
-      // Seed capsules
-      defaults.capsules.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.CAPSULES, item.id), item);
-      });
-
-      // Seed locations
-      defaults.locations.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.LOCATIONS, item.id), item);
-      });
-
-      // Seed notes
-      defaults.notes.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.NOTES, item.id), item);
-      });
-
-      // Seed gratitudes
-      defaults.gratitudes.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.GRATITUDES, item.id), item);
-      });
-
-      // Seed vouchers
-      defaults.vouchers.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.VOUCHERS, item.id), item);
-      });
-
-      // Seed bucket list
-      defaults.bucketList.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.BUCKET_LIST, item.id), item);
-      });
-
-      // Seed quizzes
-      if (defaults.quizzes) {
-        defaults.quizzes.forEach((item) => {
-          batch.set(doc(db, COLLECTIONS.QUIZZES, item.id), item);
-        });
-      }
-
-      // Seed dates
-      if (defaults.dateIdeas) {
-        defaults.dateIdeas.forEach((item) => {
-          batch.set(doc(db, COLLECTIONS.DATES, item.id), item);
-        });
-      }
-
-      // Seed challenges
-      if (defaults.challenges) {
-        defaults.challenges.forEach((item) => {
-          batch.set(doc(db, COLLECTIONS.CHALLENGES, item.id), item);
-        });
-      }
-
-      // Seed settings
-      if (defaults.settings) {
-        batch.set(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), {
-          ...defaults.settings,
-          id: 'main_settings',
-        });
-      }
-
-      await batch.commit();
+    // SÉCURITÉ ABSOLUE : Si le profil existe déjà dans Firestore, la base est DÉJÀ INITIALISÉE
+    // Ne JAMAIS réécrire, écraser ou réinitialiser les données réelles du couple !
+    if (profileSnap.exists()) {
+      return;
     }
+
+    // Double vérification : si l'une des collections contient déjà des documents
+    const [memoriesSnap, notesSnap, capsSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.MEMORIES)),
+      getDocs(collection(db, COLLECTIONS.NOTES)),
+      getDocs(collection(db, COLLECTIONS.CAPSULES)),
+    ]);
+
+    if (!memoriesSnap.empty || !notesSnap.empty || !capsSnap.empty) {
+      return;
+    }
+
+    // Uniquement dans le cas d'une base 100% neuve et vide
+    const batch = writeBatch(db);
+
+    // Seed profile
+    batch.set(profileRef, { ...defaults.profile, id: 'main_profile', isInitialized: true });
+
+    // Seed memories
+    defaults.memories.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.MEMORIES, item.id), item);
+    });
+
+    // Seed capsules
+    defaults.capsules.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.CAPSULES, item.id), item);
+    });
+
+    // Seed locations
+    defaults.locations.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.LOCATIONS, item.id), item);
+    });
+
+    // Seed notes
+    defaults.notes.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.NOTES, item.id), item);
+    });
+
+    // Seed gratitudes
+    defaults.gratitudes.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.GRATITUDES, item.id), item);
+    });
+
+    // Seed vouchers
+    defaults.vouchers.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.VOUCHERS, item.id), item);
+    });
+
+    // Seed bucket list
+    defaults.bucketList.forEach((item) => {
+      batch.set(doc(db, COLLECTIONS.BUCKET_LIST, item.id), item);
+    });
+
+    // Seed quizzes
+    if (defaults.quizzes) {
+      defaults.quizzes.forEach((item) => {
+        batch.set(doc(db, COLLECTIONS.QUIZZES, item.id), item);
+      });
+    }
+
+    // Seed dates
+    if (defaults.dateIdeas) {
+      defaults.dateIdeas.forEach((item) => {
+        batch.set(doc(db, COLLECTIONS.DATES, item.id), item);
+      });
+    }
+
+    // Seed challenges
+    if (defaults.challenges) {
+      defaults.challenges.forEach((item) => {
+        batch.set(doc(db, COLLECTIONS.CHALLENGES, item.id), item);
+      });
+    }
+
+    // Seed settings
+    if (defaults.settings) {
+      batch.set(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), {
+        ...defaults.settings,
+        id: 'main_settings',
+      });
+    }
+
+    await batch.commit();
   } catch (error) {
-    console.error('Erreur lors de l’initialisation des données Firebase :', error);
+    console.error('Erreur lors de la vérification initiale des données Firebase :', error);
   }
 }
 
