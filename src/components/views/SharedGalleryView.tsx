@@ -703,11 +703,11 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                           soundEffects.playTrashDelete();
                           onDeleteMediaItem(item);
                         }}
-                        className="p-1.5 rounded-full bg-black/50 hover:bg-rose-600 text-white backdrop-blur-md transition-all shadow-xs border border-white/20 hover:scale-110 cursor-pointer"
-                        title="Supprimer ce média"
-                        aria-label="Supprimer ce média"
+                        className="p-2 sm:p-1.5 rounded-full bg-black/60 hover:bg-rose-600 active:bg-rose-700 text-white backdrop-blur-md transition-all shadow-md border border-white/30 hover:scale-110 active:scale-95 cursor-pointer"
+                        title="Supprimer ce média de la galerie"
+                        aria-label="Supprimer ce média de la galerie"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>

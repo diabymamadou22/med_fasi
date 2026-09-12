@@ -1298,6 +1298,8 @@ export default function App() {
               }}
               onEditMemory={(mem) => setEditingMemory(mem)}
               onDeleteMemory={handleDeleteMemory}
+              onDeleteMediaItem={handleDeleteMediaItem}
+              onRemovePhotoOnly={handleRemovePhotoOnly}
             />
           )}
 

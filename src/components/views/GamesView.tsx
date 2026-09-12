@@ -16,7 +16,6 @@ import {
   Compass,
   DollarSign,
   CloudSun,
-  Bot,
   Shuffle,
   Smile,
   MessageCircle,
@@ -74,7 +73,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
 
   // Quiz States
   const [activeQuizIndex, setActiveQuizIndex] = useState(0);
-  const [isGeneratingAIQuiz, setIsGeneratingAIQuiz] = useState(false);
 
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -152,38 +150,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
       setPickedDate(random);
     } finally {
       setIsGeneratingAIDates(false);
-    }
-  };
-
-  // Generate Quiz Question with Gemini AI
-  const handleGenerateAIQuiz = async () => {
-    setIsGeneratingAIQuiz(true);
-    try {
-      const res = await fetch('/api/gemini/generate-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          theme: 'Complicité, fous rires et intimité du couple',
-        }),
-      });
-      const data = await res.json();
-      if (data.data?.questions && data.data.questions.length > 0) {
-        const q = data.data.questions[0];
-        const newQ: QuizQuestion = {
-          id: `ai-quiz-${Date.now()}`,
-          question: q.question,
-          category: (q.category as any) || 'Complicité',
-          options: q.options || ['Option A', 'Option B', 'Option C', 'Option D'],
-          discussionPrompt: q.funFactPrompt || 'Discutez de vos réponses en amoureux !',
-        };
-        onAddNewQuiz(newQ);
-        setActiveQuizIndex(quizzes.length);
-        triggerHeartConfetti();
-      }
-    } catch (e) {
-      console.warn(e);
-    } finally {
-      setIsGeneratingAIQuiz(false);
     }
   };
 
@@ -269,17 +235,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 <p className="text-xs sm:text-sm text-stone-600">
                   Chacun répond secrètement sans regarder, puis découvrez vos réponses et lancez la discussion !
                 </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleGenerateAIQuiz}
-                  disabled={isGeneratingAIQuiz}
-                  className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
-                >
-                  <Bot className="w-3.5 h-3.5 text-purple-600" />
-                  <span>{isGeneratingAIQuiz ? 'Création IA...' : 'Nouvelle question IA'}</span>
-                </button>
               </div>
             </div>
 
@@ -441,7 +396,7 @@ export const GamesView: React.FC<GamesViewProps> = ({
                   disabled={isGeneratingAIDates}
                   className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                 >
-                  <Bot className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4" />
                   <span>
                     {isGeneratingAIDates ? 'Génération IA...' : 'Idée Sur-Mesure Gemini'}
                   </span>
