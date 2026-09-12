@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Sparkles, Settings, ArrowLeftRight, Bell, Camera, MapPin, Lock, Images, Cloud, CloudCheck, Download, Smartphone } from 'lucide-react';
+import { Heart, Sparkles, Settings, ArrowLeftRight, Camera, MapPin, Lock, Cloud, CloudCheck, Download, Smartphone } from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
 import { PartnerAvatar } from './PartnerAvatar';
@@ -121,10 +121,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <h1 className="font-serif-romantic text-base sm:text-xl font-bold tracking-tight text-stone-800 truncate">
                   {profile.relationshipTitle}
                 </h1>
-                <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
-                  <span className="hidden xs:inline">Mali</span>
-                  <span>🇲🇱</span>
-                </span>
                 <span
                   className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
                     isFirebaseConnected
@@ -153,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{daysTogether} jours d'amour</span>
                 <span className="hidden sm:inline text-rose-300">•</span>
                 <span className="hidden sm:inline text-stone-500 text-[11px]">
-                  Bamako & au-delà
+                  Chaque jour à tes côtés
                 </span>
                 <span className="hidden md:inline text-rose-300">•</span>
                 <span className="hidden md:inline text-rose-600/80 font-handwriting text-sm">
@@ -165,31 +161,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick action buttons on mobile */}
           <div className="flex items-center gap-1 sm:hidden">
-            {unreadNotesCount > 0 && (
-              <button
-                onClick={onGoToNotes}
-                className="relative p-2 rounded-full bg-rose-100/80 text-rose-700 transition-colors cursor-pointer"
-                title={`${unreadNotesCount} billet(s) doux`}
-                id="btn-unread-notes-mobile"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center animate-bounce shadow-xs">
-                  {unreadNotesCount}
-                </span>
-              </button>
-            )}
-
-            {onGoToGallery && (
-              <button
-                onClick={onGoToGallery}
-                className="text-stone-500 hover:text-rose-600 p-2 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
-                title="Galerie partagée"
-                id="btn-header-gallery-mobile"
-              >
-                <Images className="w-4 h-4" />
-              </button>
-            )}
-
             {isPinEnabled && onLockApp && (
               <button
                 onClick={onLockApp}
@@ -247,20 +218,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <Download className="w-3 h-3 text-rose-500" />
               </button>
             )}
-            {onGoToGallery && (
-              <button
-                onClick={onGoToGallery}
-                className="text-stone-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
-                title="Galerie partagée de toutes nos photos"
-                id="btn-header-gallery"
-              >
-                <Images className="w-4 h-4" />
-              </button>
-            )}
             <button
               onClick={onOpenSettings}
               className="text-stone-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
-              title="Paramètres du couple, musique & sauvegarde"
+              title="Paramètres du couple & personnalisation"
               id="btn-settings"
             >
               <Settings className="w-4 h-4" />
@@ -273,19 +234,6 @@ export const Header: React.FC<HeaderProps> = ({
                 id="btn-quick-lock"
               >
                 <Lock className="w-4 h-4" />
-              </button>
-            )}
-            {unreadNotesCount > 0 && (
-              <button
-                onClick={onGoToNotes}
-                className="relative p-2 rounded-full bg-rose-100/70 hover:bg-rose-200/80 text-rose-700 transition-colors ml-1 cursor-pointer"
-                title={`${unreadNotesCount} billet(s) doux non lu(s)`}
-                id="btn-unread-notes"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center animate-bounce shadow-xs">
-                  {unreadNotesCount}
-                </span>
               </button>
             )}
           </div>

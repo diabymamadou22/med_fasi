@@ -69,7 +69,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             const isActive = activeTab === tab.id;
             return (
               <button
-                key={tab.id}
+                key={`desktop-tab-${tab.id}`}
                 onClick={() => handleTabClick(tab.id)}
                 className={`relative flex items-center justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   isActive
@@ -107,7 +107,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           const isActive = activeTab === tab.id;
           return (
             <button
-              key={tab.id}
+              key={`mobile-tab-${tab.id}`}
               onClick={() => handleTabClick(tab.id)}
               className={`relative flex-1 flex flex-col items-center justify-center py-1 px-1 min-h-[48px] rounded-xl transition-all cursor-pointer ${
                 isActive

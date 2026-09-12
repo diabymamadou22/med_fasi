@@ -36,7 +36,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const maliCities = ['Bamako', 'Siby', 'Sélingué', 'Ségou', 'Koulikoro'];
+  const quickLocations = ['Notre ville', 'En vacances', 'Cocon douillet', 'Au restaurant', 'En plein air'];
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,7 +64,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
         name: name.trim(),
         city: city.trim(),
         category,
-        description: description.trim() || 'Lieu inoubliable de notre histoire au Mali.',
+        description: description.trim() || 'Lieu inoubliable de notre histoire.',
         date: date.trim(),
         photoUrl: photoUrl.trim() || undefined,
       });
@@ -78,7 +78,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
         name: name.trim(),
         city: city.trim(),
         category,
-        description: description.trim() || 'Lieu inoubliable de notre histoire au Mali.',
+        description: description.trim() || 'Lieu inoubliable de notre histoire.',
         date: date.trim(),
         photoUrl: photoUrl.trim() || undefined,
         xPercent,
@@ -118,7 +118,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
             <p className="text-xs text-stone-500">
               {isEditing
                 ? 'Mettre à jour les informations de ce lieu romantique'
-                : 'Ajouter un repère sur la carte de notre histoire au Mali'}
+                : 'Ajouter un repère sur la carte de nos moments inoubliables'}
             </p>
           </div>
         </div>
@@ -132,7 +132,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Parc National du Mali, Les rives du Djoliba, Arche de Kamadjan..."
+              placeholder="Ex: Notre restaurant préféré, La plage du premier baiser, Notre café secret..."
               className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm text-stone-800 focus:outline-hidden focus:ring-2 focus:ring-sky-400"
               required
             />
@@ -141,20 +141,20 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-stone-700 block mb-1">
-                Ville / Région *
+                Ville / Lieu *
               </label>
               <input
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Ex: Bamako, Siby, Sélingué..."
+                placeholder="Ex: Notre ville, notre quartier..."
                 className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"
                 required
               />
               <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                {maliCities.map((c) => (
+                {quickLocations.map((c) => (
                   <button
-                    key={c}
+                    key={`quick-loc-${c}`}
                     type="button"
                     onClick={() => setCity(c)}
                     className="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 font-semibold transition-colors cursor-pointer"

@@ -199,7 +199,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
 
             {/* Vouchers Grid Styled Like Vintage/Modern Tickets */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredVouchers.map((v) => {
+              {filteredVouchers.map((v, vIdx) => {
                 const giver =
                   v.giverId === 'p1' ? profile.partner1 : profile.partner2;
                 const receiver =
@@ -207,7 +207,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
 
                 return (
                   <div
-                    key={v.id}
+                    key={v.id ? `${v.id}-${vIdx}` : `vouch-${vIdx}`}
                     className={`relative rounded-3xl border overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
                       v.isRedeemed
                         ? 'bg-stone-100/90 border-stone-200 opacity-75'
@@ -395,13 +395,13 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
 
             {/* Bucket List Items */}
             <div className="space-y-3.5">
-              {filteredBucket.map((item) => {
+              {filteredBucket.map((item, itemIdx) => {
                 const addedByPartner =
                   item.addedBy === 'p1' ? profile.partner1 : profile.partner2;
 
                 return (
                   <div
-                    key={item.id}
+                    key={item.id ? `${item.id}-${itemIdx}` : `bucket-${itemIdx}`}
                     className={`p-4 sm:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
                       item.status === 'done'
                         ? 'bg-emerald-50/60 border-emerald-200'

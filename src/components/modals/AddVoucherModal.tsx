@@ -108,9 +108,9 @@ export const AddVoucherModal: React.FC<AddVoucherModalProps> = ({
         <div className="mb-3">
           <span className="text-[11px] font-bold text-stone-500 block mb-1">Idées rapides :</span>
           <div className="flex flex-col gap-1.5">
-            {presetIdeas.map((idea) => (
+            {presetIdeas.map((idea, idx) => (
               <button
-                key={idea.title}
+                key={`preset-${idx}-${idea.title}`}
                 type="button"
                 onClick={() => {
                   setTitle(idea.title);

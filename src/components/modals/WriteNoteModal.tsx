@@ -164,9 +164,9 @@ export const WriteNoteModal: React.FC<WriteNoteModalProps> = ({
         {/* Preset Prompt chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 text-[11px]">
           <span className="text-stone-400 font-medium shrink-0">Début :</span>
-          {prompts.map((p) => (
+          {prompts.map((p, pIdx) => (
             <button
-              key={p}
+              key={`prompt-chip-${pIdx}-${p.slice(0, 10)}`}
               type="button"
               onClick={() => setContent((prev) => (prev ? `${prev} ${p}` : p))}
               className="px-2.5 py-1 bg-stone-100 hover:bg-rose-50 hover:text-rose-700 text-stone-600 rounded-full shrink-0 transition-colors"

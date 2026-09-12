@@ -97,7 +97,7 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                 <div className="flex items-center gap-0.5 text-amber-500" title={`Énergie: ${profile.partner1.mood.energy}/5`}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Zap
-                      key={star}
+                      key={`p1-star-${star}`}
                       className={`w-3 h-3 ${
                         star <= profile.partner1.mood.energy
                           ? 'fill-amber-400 text-amber-400'
@@ -163,7 +163,7 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                 <div className="flex items-center gap-0.5 text-amber-500" title={`Énergie: ${profile.partner2.mood.energy}/5`}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Zap
-                      key={star}
+                      key={`p2-star-${star}`}
                       className={`w-3 h-3 ${
                         star <= profile.partner2.mood.energy
                           ? 'fill-amber-400 text-amber-400'
@@ -234,7 +234,7 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                   <div className="flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((lvl) => (
                       <button
-                        key={lvl}
+                        key={`modal-energy-${lvl}`}
                         type="button"
                         onClick={() => setSelectedEnergy(lvl)}
                         className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
@@ -260,7 +260,7 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                       const isSelected = selectedStatus === mood.label;
                       return (
                         <button
-                          key={mood.label}
+                          key={`mood-opt-${mood.label}`}
                           type="button"
                           onClick={() => setSelectedStatus(mood.label)}
                           className={`px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-2 border transition-all text-left ${
@@ -283,11 +283,11 @@ export const MoodAndNeedsBar: React.FC<MoodAndNeedsBarProps> = ({
                     Mon besoin essentiel pour aujourd'hui :
                   </label>
                   <div className="flex flex-wrap gap-1.5">
-                    {NEED_OPTIONS.map((need) => {
+                    {NEED_OPTIONS.map((need, nIdx) => {
                       const isSelected = selectedNeed === need;
                       return (
                         <button
-                          key={need}
+                          key={`need-opt-${nIdx}-${need}`}
                           type="button"
                           onClick={() => setSelectedNeed(need)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${

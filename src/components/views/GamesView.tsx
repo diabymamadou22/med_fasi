@@ -304,7 +304,7 @@ export const GamesView: React.FC<GamesViewProps> = ({
 
                 return (
                   <button
-                    key={optIdx}
+                    key={`${currentQuiz.id}-opt-${optIdx}`}
                     onClick={() => {
                       onAnswerQuiz(currentQuiz.id, activePartnerId, optIdx);
                       soundEffects.playHeartPulse();
@@ -634,9 +634,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
 
             {/* Challenges Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {challenges.map((chal) => (
+              {challenges.map((chal, cIdx) => (
                 <div
-                  key={chal.id}
+                  key={chal.id ? `${chal.id}-${cIdx}` : `chal-${cIdx}`}
                   className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
                     chal.isCompleted
                       ? 'bg-emerald-50/70 border-emerald-200'

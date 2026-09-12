@@ -111,7 +111,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         title: `Portrait de ${profile.partner1.name}`,
         photoUrl: profile.partner1.avatar,
         date: profile.anniversaryDate,
-        locationName: 'Bamako, Mali',
+        locationName: 'Notre cocon',
         description: `Photo de profil de ${profile.partner1.name} (${profile.partner1.nickname || 'Chérie'}).`,
         authorId: 'p1',
         tags: ['Profil', profile.partner1.name],
@@ -126,7 +126,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         title: `Portrait de ${profile.partner2.name}`,
         photoUrl: profile.partner2.avatar,
         date: profile.anniversaryDate,
-        locationName: 'Bamako, Mali',
+        locationName: 'Notre cocon',
         description: `Photo de profil de ${profile.partner2.name} (${profile.partner2.nickname || 'Mon amour'}).`,
         authorId: 'p2',
         tags: ['Profil', profile.partner2.name],
@@ -394,7 +394,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                 </span>
               </div>
               <p className="text-rose-100 text-xs sm:text-sm mt-1 max-w-xl">
-                Toutes vos photos de profils, souvenirs de couple, escapades au Mali et défis réunis en une vue unique.
+                Toutes vos photos de profils, souvenirs de couple, escapades et défis réunis en une vue unique.
               </p>
             </div>
           </div>
@@ -1005,7 +1005,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                   <div className="flex items-center gap-1.5 flex-wrap pt-1">
                     {activePhoto.tags.map((t, idx) => (
                       <span
-                        key={idx}
+                        key={`${t}-${idx}`}
                         className="text-[11px] px-2 py-0.5 rounded-md bg-white/10 text-stone-300 flex items-center gap-1"
                       >
                         <Tag className="w-2.5 h-2.5 text-rose-400" />

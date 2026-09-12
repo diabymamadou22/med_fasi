@@ -67,7 +67,7 @@ export const INITIAL_MEMORIES: TimelineMemory[] = [
     category: 'rencard',
     description: 'On devait juste boire un thé de 30 minutes face au coucher de soleil sur le Djoliba... On est restés à parler sous la brise fraîche jusqu\'à la nuit tombée. C\'est là que tout a commencé.',
     photoUrl: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=800&auto=format&fit=crop&q=80',
-    locationName: 'Les Rives du Djoliba, Bamako (Mali)',
+    locationName: 'Les Rives du Djoliba, Bamako',
     coordinates: { lat: 12.6392, lng: -7.9982 },
     audioDuration: '0:42',
     tags: ['Premier regard', 'Fleuve Niger', 'Bamako', 'Magique'],
@@ -81,7 +81,7 @@ export const INITIAL_MEMORIES: TimelineMemory[] = [
     category: 'voyage',
     description: 'Randonnée main dans la main jusqu\'à l\'Arche majestueuse de Kamadjan. La vue sur les monts Mandingues et notre premier pique-nique sous les arbres étaient inoubliables.',
     photoUrl: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80',
-    locationName: 'Arche de Kamadjan, Siby (Mali)',
+    locationName: 'Arche de Kamadjan, Siby',
     coordinates: { lat: 12.3833, lng: -8.3333 },
     audioDuration: '1:15',
     tags: ['Siby', 'Monts Mandingues', 'Aventure à deux'],
@@ -107,7 +107,7 @@ export const INITIAL_MEMORIES: TimelineMemory[] = [
     category: 'etape',
     description: 'Premier carton déposé au milieu du salon vide, un verre de bissap frais pour trinquer et nos deux sourires jusqu\'aux oreilles. Le début officiel de notre nid d\'amour à Bamako.',
     photoUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop&q=80',
-    locationName: 'Notre nid à Bamako (Mali)',
+    locationName: 'Notre nid d\'amour',
     tags: ['Étape clé', 'Emménagement', 'Notre Nid'],
     likes: ['p1', 'p2'],
     authorId: 'p1',
@@ -122,7 +122,7 @@ export const INITIAL_CAPSULES: TimeCapsule[] = [
     createdAt: '2025-05-18',
     authorId: 'p2',
     recipientId: 'p1',
-    message: 'Si tu lis ceci, cela fait exactement 2 ans qu\'on partage nos vies au Mali. J\'espère qu\'on est en train de fêter ça avec un weekend au bord du lac de Sélingué ou sous les étoiles du Mandé. Je t\'aime chaque jour davantage.',
+    message: 'Si tu lis ceci, cela fait exactement 2 ans qu\'on partage nos vies. J\'espère qu\'on est en train de fêter ça avec un weekend au bord de l\'eau ou sous les étoiles du Mandé. Je t\'aime chaque jour davantage.',
     photoUrl: 'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=800&auto=format&fit=crop&q=80',
     sealTheme: 'gold',
     isOpened: false,
@@ -168,7 +168,7 @@ export const INITIAL_LOCATIONS: MemoryLocation[] = [
   },
   {
     id: 'loc-2',
-    name: 'Le Parc National du Mali',
+    name: 'Le Grand Parc National',
     category: 'Balade Romantique',
     city: 'Bamako',
     description: 'Notre banc préféré ombragé par les manguiers géants et le jardin botanique apaisant.',
@@ -267,11 +267,11 @@ export const INITIAL_NOTES: SweetNote[] = [
 export const INITIAL_QUIZZES: QuizQuestion[] = [
   {
     id: 'q-1',
-    question: 'Pour une soirée en amoureux parfaite le vendredi soir au Mali :',
+    question: 'Pour une soirée en amoureux parfaite le vendredi soir :',
     category: 'Quotidien',
     options: [
       'Thé à la menthe sous les étoiles dans la cour ou sur le balcon avec douce brise',
-      'Dîner romantique en terrasse au bord du fleuve Niger avec poisson braisé',
+      'Dîner romantique en terrasse au bord de l\'eau avec poisson braisé',
       'Cuisiner ensemble un nouveau plat délicieux avec musique douce à la maison',
       'Balade nocturne spontanée pour aller déguster des glaces ou fruits frais',
     ],
@@ -287,7 +287,7 @@ export const INITIAL_QUIZZES: QuizQuestion[] = [
     options: [
       'Un weekend paisible au bord de l\'eau au Lac de Sélingué',
       'Une belle aventure et pique-nique perché à l\'Arche de Kamadjan à Siby',
-      'Un voyage culturel fascinant vers Djenné et le pays Dogon',
+      'Un voyage culturel fascinant à la découverte de nouveaux horizons',
       'Un grand voyage romantique au bord de l\'océan',
     ],
     partner1Answer: 1,
@@ -312,7 +312,7 @@ export const INITIAL_QUIZZES: QuizQuestion[] = [
     question: 'Quelle musique nous fait immédiatement penser à notre histoire ?',
     category: 'Sensibilité',
     options: [
-      'Une mélodie douce de kora ou guitare acoustique malienne',
+      'Une mélodie douce de kora ou guitare acoustique chaleureuse',
       'Le morceau romantique sur lequel on a dansé dans le salon un soir',
       'La chanson rythmée qu\'on chante ensemble en voiture ou en cuisinant',
       'La musique du générique de notre première série partagée',
@@ -335,7 +335,7 @@ export const INITIAL_DATE_IDEAS: DateIdea[] = [
   {
     id: 'date-2',
     title: 'La Cérémonie du Thé des Amoureux sous les Étoiles',
-    description: 'Installez des nattes et coussins confortables sur la terrasse ou dans la cour. Préparez ensemble le thé à la menthe traditionnel malien en savourant les trois verres : le 1er amer comme la mort, le 2ème doux comme la vie, le 3ème sucré comme l\'amour.',
+    description: 'Installez des nattes et coussins confortables sur la terrasse ou dans la cour. Préparez ensemble le thé à la menthe traditionnel en savourant les trois verres : le 1er amer comme la mort, le 2ème doux comme la vie, le 3ème sucré comme l\'amour.',
     budget: 'Gratuit',
     weather: 'Indifférent',
     category: 'Maison',
@@ -344,7 +344,7 @@ export const INITIAL_DATE_IDEAS: DateIdea[] = [
   },
   {
     id: 'date-3',
-    title: 'Pique-nique ombragé au Parc National du Mali',
+    title: 'Pique-nique ombragé au Grand Parc National',
     description: 'Emportez un panier garni de fruits locaux (mangues fraîches, papayes), jus naturels et petits sandwichs. Marchez le long des allées fleuries et installez-vous sur une nappe au pied de grands arbres.',
     budget: '€',
     weather: 'Plein air',
@@ -375,11 +375,11 @@ export const INITIAL_DATE_IDEAS: DateIdea[] = [
   {
     id: 'date-6',
     title: 'Dîner aux Chandelles & Saveurs du Terroir',
-    description: 'Cuisinez à quatre mains une spécialité malienne raffinée (Foutou de bananes, Tiguadèguèna soigné ou Riz au gras parfumé) dans une ambiance tamisée aux bougies parfumées.',
+    description: 'Cuisinez à quatre mains une délicieuse spécialité raffinée (Foutou de bananes, sauce gourmande ou Riz au gras parfumé) dans une ambiance tamisée aux bougies parfumées.',
     budget: '€',
     weather: 'Indifférent',
     category: 'Gourmand',
-    prepTip: 'Lancez une playlist acoustique de Salif Keïta, Toumani Diabaté ou Oumou Sangaré.',
+    prepTip: 'Lancez une playlist acoustique douce et chaleureuse.',
     isSaved: false,
   },
 ];
@@ -405,7 +405,7 @@ export const INITIAL_CHALLENGES: CoupleChallenge[] = [
   },
   {
     id: 'chal-3',
-    title: 'Recette Malienne à 4 Mains avec Ingrédient Surprise',
+    title: 'Recette Gourmande à 4 Mains avec Ingrédient Surprise',
     description: 'Chacun choisit un ingrédient mystère pour cuisiner ensemble un nouveau plat savoureux.',
     category: 'Créatif',
     points: 75,

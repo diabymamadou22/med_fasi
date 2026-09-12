@@ -24,6 +24,11 @@ import {
   Flame,
   CheckCircle2,
   Smartphone,
+  Trash2,
+  Palette,
+  Sparkles,
+  Zap,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../../types';
 import { soundEffects } from '../../lib/audio';
@@ -68,6 +73,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [partner1Name, setPartner1Name] = useState(profile.partner1.name);
   const [partner1Nickname, setPartner1Nickname] = useState(profile.partner1.nickname);
   const [partner1Avatar, setPartner1Avatar] = useState(profile.partner1.avatar);
+  const [partner1Color, setPartner1Color] = useState(profile.partner1.color || '#F43F5E');
+  const [partner1MoodStatus, setPartner1MoodStatus] = useState(profile.partner1.mood?.status || 'Rayonnant');
+  const [partner1MoodNeed, setPartner1MoodNeed] = useState(profile.partner1.mood?.need || "Besoin d'un câlin");
+  const [partner1MoodEnergy, setPartner1MoodEnergy] = useState<number>(profile.partner1.mood?.energy ?? 5);
   const [isP1LoadingPhoto, setIsP1LoadingPhoto] = useState(false);
   const [showP1UrlInput, setShowP1UrlInput] = useState(false);
   const [p1Error, setP1Error] = useState<string | null>(null);
@@ -75,12 +84,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [partner2Name, setPartner2Name] = useState(profile.partner2.name);
   const [partner2Nickname, setPartner2Nickname] = useState(profile.partner2.nickname);
   const [partner2Avatar, setPartner2Avatar] = useState(profile.partner2.avatar);
+  const [partner2Color, setPartner2Color] = useState(profile.partner2.color || '#0284C7');
+  const [partner2MoodStatus, setPartner2MoodStatus] = useState(profile.partner2.mood?.status || 'Zen');
+  const [partner2MoodNeed, setPartner2MoodNeed] = useState(profile.partner2.mood?.need || 'Surprise-moi');
+  const [partner2MoodEnergy, setPartner2MoodEnergy] = useState<number>(profile.partner2.mood?.energy ?? 5);
   const [isP2LoadingPhoto, setIsP2LoadingPhoto] = useState(false);
   const [showP2UrlInput, setShowP2UrlInput] = useState(false);
   const [p2Error, setP2Error] = useState<string | null>(null);
 
   const [anniversaryDate, setAnniversaryDate] = useState(profile.anniversaryDate);
   const [relationshipTitle, setRelationshipTitle] = useState(profile.relationshipTitle);
+  const [themeColor, setThemeColor] = useState(profile.themeColor || '#F43F5E');
 
   // Security / PIN states
   const [isPinEnabled, setIsPinEnabled] = useState(settings.isPinEnabled);
@@ -90,22 +104,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   // File refs
   const p1FileInputRef = useRef<HTMLInputElement>(null);
+  const p1CameraInputRef = useRef<HTMLInputElement>(null);
   const p2FileInputRef = useRef<HTMLInputElement>(null);
+  const p2CameraInputRef = useRef<HTMLInputElement>(null);
   const backupImportInputRef = useRef<HTMLInputElement>(null);
-
-  const suggestedAvatarsP1 = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop&q=80',
-  ];
-
-  const suggestedAvatarsP2 = [
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80',
-  ];
 
   const handleP1FileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,6 +123,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     } finally {
       setIsP1LoadingPhoto(false);
       if (p1FileInputRef.current) p1FileInputRef.current.value = '';
+      if (p1CameraInputRef.current) p1CameraInputRef.current.value = '';
     }
   };
 
@@ -138,6 +141,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     } finally {
       setIsP2LoadingPhoto(false);
       if (p2FileInputRef.current) p2FileInputRef.current.value = '';
+      if (p2CameraInputRef.current) p2CameraInputRef.current.value = '';
     }
   };
 
@@ -200,16 +204,33 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         name: partner1Name.trim() || 'Safi',
         nickname: partner1Nickname.trim(),
         avatar: partner1Avatar.trim(),
+        color: partner1Color,
+        mood: {
+          ...profile.partner1.mood,
+          status: partner1MoodStatus,
+          need: partner1MoodNeed,
+          energy: partner1MoodEnergy,
+          lastUpdated: new Date().toISOString(),
+        },
       },
       partner2: {
         ...profile.partner2,
         name: partner2Name.trim() || 'Med',
         nickname: partner2Nickname.trim(),
         avatar: partner2Avatar.trim(),
+        color: partner2Color,
+        mood: {
+          ...profile.partner2.mood,
+          status: partner2MoodStatus,
+          need: partner2MoodNeed,
+          energy: partner2MoodEnergy,
+          lastUpdated: new Date().toISOString(),
+        },
       },
       anniversaryDate,
       relationshipTitle:
         relationshipTitle.trim() || `${partner1Name} & ${partner2Name}`,
+      themeColor,
     });
 
     soundEffects.playSuccessSparkle();
@@ -239,17 +260,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <Settings className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-serif-romantic text-xl sm:text-2xl font-bold text-stone-900">
-                Paramètres & Personnalisation
-              </h3>
-              <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-emerald-600" />
-                <span>Mali 🇲🇱</span>
-              </span>
-            </div>
+            <h3 className="font-serif-romantic text-xl sm:text-2xl font-bold text-stone-900">
+              Paramètres & Personnalisation
+            </h3>
             <p className="text-xs text-stone-500">
-              Photos de profil, sécurité par code PIN et sauvegarde complète.
+              Photos de profil, couleurs, humeurs, sécurité PIN et synchronisation.
             </p>
           </div>
         </div>
@@ -355,22 +370,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
 
               <form onSubmit={handleSubmitProfile} className="space-y-5">
-                {/* Partner 1 (Safi) Section */}
+                {/* Partner 1 Section */}
                 {(activePartnerSubTab === 'both' || activePartnerSubTab === 'p1') && (
                   <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-serif-romantic text-sm font-bold text-rose-900 flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                        <span>Partenaire 1 ({partner1Name || 'Safi'})</span>
+                        <span
+                          className="w-3 h-3 rounded-full border border-white shadow-xs"
+                          style={{ backgroundColor: partner1Color }}
+                        />
+                        <span>Partenaire 1 ({partner1Name || 'Partenaire 1'})</span>
                       </h4>
                       <span className="text-[11px] font-medium text-rose-600 bg-rose-100/60 px-2 py-0.5 rounded-full">
-                        Couleur : Rose doux
+                        Profil & Humeur
                       </span>
                     </div>
 
-                    {/* Photo Upload & Preview for Partner 1 */}
+                    {/* Photo Upload for Partner 1 - Direct from Phone */}
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/80 p-3.5 rounded-2xl border border-rose-200/60">
-                      <div className="relative group">
+                      <div className="relative group shrink-0">
                         <PartnerAvatar
                           name={partner1Name}
                           avatar={partner1Avatar}
@@ -379,91 +397,101 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           className="border-3 border-white shadow-md ring-3 ring-rose-400"
                         />
                         {isP1LoadingPhoto && (
-                          <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
-                            Chargement...
+                          <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center text-white text-[10px] font-bold animate-pulse text-center px-1">
+                            Traitement...
                           </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => p1FileInputRef.current?.click()}
-                          className="absolute -bottom-1 -right-1 p-2 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-md transition-transform group-hover:scale-110"
-                          title="Choisir une photo"
-                        >
-                          <Camera className="w-4 h-4" />
-                        </button>
                       </div>
 
-                      <div className="flex-1 text-center sm:text-left space-y-2">
+                      <div className="flex-1 text-center sm:text-left space-y-2 w-full">
                         <div>
                           <p className="text-xs font-bold text-stone-800">
-                            Photo de profil de {partner1Name || 'Safi'}
+                            Photo de profil de {partner1Name || 'Partenaire 1'}
                           </p>
                           <p className="text-[11px] text-stone-500">
-                            Importez directement depuis votre appareil.
+                            Prenez une photo ou choisissez directement dans votre téléphone.
                           </p>
                         </div>
 
+                        {/* Hidden file and camera inputs */}
+                        <input
+                          ref={p1FileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleP1FileChange}
+                          className="hidden"
+                        />
+                        <input
+                          ref={p1CameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          onChange={handleP1FileChange}
+                          className="hidden"
+                        />
+
+                        {/* Direct action buttons */}
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                          <input
-                            ref={p1FileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleP1FileChange}
-                            className="hidden"
-                          />
                           <button
                             type="button"
                             onClick={() => p1FileInputRef.current?.click()}
                             disabled={isP1LoadingPhoto}
-                            className="px-3.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                            className="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
                           >
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>{isP1LoadingPhoto ? 'Compression...' : 'Téléverser ma photo'}</span>
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            <span>Galerie / Fichiers</span>
                           </button>
 
                           <button
                             type="button"
+                            onClick={() => p1CameraInputRef.current?.click()}
+                            disabled={isP1LoadingPhoto}
+                            className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Prendre une photo</span>
+                          </button>
+
+                          {partner1Avatar && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPartner1Avatar('');
+                                soundEffects.playNoteClick();
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium flex items-center gap-1 transition-colors"
+                              title="Retirer la photo actuelle"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Retirer</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
                             onClick={() => setShowP1UrlInput(!showP1UrlInput)}
-                            className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium flex items-center gap-1"
+                            className="px-2.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium flex items-center gap-1"
                           >
                             <LinkIcon className="w-3 h-3" />
-                            <span>Lien web</span>
+                            <span>Lien URL</span>
                           </button>
-                        </div>
-
-                        {/* Sample avatars */}
-                        <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start">
-                          <span className="text-[10px] text-stone-400 font-medium">Suggestions :</span>
-                          <div className="flex items-center gap-1.5">
-                            {suggestedAvatarsP1.map((url, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setPartner1Avatar(url)}
-                                className={`w-6 h-6 rounded-full overflow-hidden border-2 transition-transform hover:scale-110 ${
-                                  partner1Avatar === url ? 'border-rose-500 scale-110' : 'border-transparent'
-                                }`}
-                              >
-                                <img src={url} alt="avatar" className="w-full h-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
                         </div>
 
                         {showP1UrlInput && (
                           <input
                             type="url"
-                            placeholder="https://..."
+                            placeholder="https://exemple.com/photo.jpg"
                             value={partner1Avatar}
                             onChange={(e) => setPartner1Avatar(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white border border-rose-200 rounded-xl text-xs mt-1"
+                            className="w-full px-3 py-1.5 bg-white border border-rose-200 rounded-xl text-xs mt-1 text-stone-800"
                           />
                         )}
 
-                        {p1Error && <p className="text-xs text-red-600">{p1Error}</p>}
+                        {p1Error && <p className="text-xs text-red-600 font-medium">{p1Error}</p>}
                       </div>
                     </div>
 
+                    {/* Name & Nickname */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs font-bold text-stone-700 block mb-1">Prénom :</label>
@@ -481,30 +509,136 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           type="text"
                           value={partner1Nickname}
                           onChange={(e) => setPartner1Nickname(e.target.value)}
-                          placeholder="Ex: Mon étoile ✨, Safi djou"
+                          placeholder="Ex: Mon cœur, Mon ange"
                           className="w-full px-3 py-2 bg-white border border-rose-200 rounded-xl text-xs font-medium text-stone-800"
                         />
+                      </div>
+                    </div>
+
+                    {/* Partner 1 Color & Mood Settings */}
+                    <div className="p-3 bg-white/70 rounded-xl border border-rose-100 space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-1.5">
+                          <Palette className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Couleur de {partner1Name || 'Partenaire 1'} :</span>
+                        </label>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {[
+                            { label: 'Rose', color: '#F43F5E' },
+                            { label: 'Framboise', color: '#E11D48' },
+                            { label: 'Violet', color: '#8B5CF6' },
+                            { label: 'Lilas', color: '#EC4899' },
+                            { label: 'Corail', color: '#F97316' },
+                            { label: 'Ambre', color: '#F59E0B' },
+                            { label: 'Bleu', color: '#0284C7' },
+                            { label: 'Émeraude', color: '#10B981' },
+                          ].map((c) => (
+                            <button
+                              key={`p1-color-${c.color}`}
+                              type="button"
+                              onClick={() => setPartner1Color(c.color)}
+                              className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                                partner1Color.toLowerCase() === c.color.toLowerCase()
+                                  ? 'border-stone-900 scale-110 ring-2 ring-stone-400'
+                                  : 'border-white'
+                              }`}
+                              style={{ backgroundColor: c.color }}
+                              title={c.label}
+                            />
+                          ))}
+                          <div className="flex items-center gap-1 ml-auto">
+                            <span className="text-[10px] text-stone-400">Libre :</span>
+                            <input
+                              type="color"
+                              value={partner1Color}
+                              onChange={(e) => setPartner1Color(e.target.value)}
+                              className="w-7 h-7 rounded-lg border border-stone-200 p-0.5 cursor-pointer bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-stone-100">
+                        <div>
+                          <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                            Humeur par défaut :
+                          </label>
+                          <select
+                            value={partner1MoodStatus}
+                            onChange={(e) => setPartner1MoodStatus(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-rose-200 rounded-xl text-xs text-stone-800"
+                          >
+                            <option value="Rayonnant">✨ Rayonnant(e)</option>
+                            <option value="Zen">🌿 Zen</option>
+                            <option value="Câlin">🧸 Câlin(e)</option>
+                            <option value="Amoureux">❤️ Fou amoureux</option>
+                            <option value="Fatigué">😴 Fatigué(e)</option>
+                            <option value="Stressé">⚡ Stressé(e)</option>
+                            <option value="Créatif">🎨 Créatif(ve)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                            Besoin d'amour :
+                          </label>
+                          <select
+                            value={partner1MoodNeed}
+                            onChange={(e) => setPartner1MoodNeed(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-rose-200 rounded-xl text-xs text-stone-800"
+                          >
+                            <option value="Besoin d'un câlin">🤗 Un gros câlin</option>
+                            <option value="Envie d'être tranquille">🧘 Être au calme</option>
+                            <option value="Prêt à sortir">🎉 Prêt(e) à sortir</option>
+                            <option value="Besoin d'écoute">💬 Discuter & écoute</option>
+                            <option value="Surprise-moi">🎁 Surprise-moi !</option>
+                            <option value="Un mot doux">💌 Un petit mot doux</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                            Énergie ({partner1MoodEnergy}/5) :
+                          </label>
+                          <div className="flex items-center gap-1 pt-1">
+                            {[1, 2, 3, 4, 5].map((lvl) => (
+                              <button
+                                key={`p1-energy-${lvl}`}
+                                type="button"
+                                onClick={() => setPartner1MoodEnergy(lvl)}
+                                className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${
+                                  partner1MoodEnergy >= lvl
+                                    ? 'bg-rose-500 text-white shadow-2xs'
+                                    : 'bg-stone-100 text-stone-400'
+                                }`}
+                              >
+                                {lvl}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Partner 2 (Med) Section */}
+                {/* Partner 2 Section */}
                 {(activePartnerSubTab === 'both' || activePartnerSubTab === 'p2') && (
                   <div className="p-4 bg-sky-50/50 rounded-2xl border border-sky-100 space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-serif-romantic text-sm font-bold text-sky-900 flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
-                        <span>Partenaire 2 ({partner2Name || 'Med'})</span>
+                        <span
+                          className="w-3 h-3 rounded-full border border-white shadow-xs"
+                          style={{ backgroundColor: partner2Color }}
+                        />
+                        <span>Partenaire 2 ({partner2Name || 'Partenaire 2'})</span>
                       </h4>
                       <span className="text-[11px] font-medium text-sky-600 bg-sky-100/60 px-2 py-0.5 rounded-full">
-                        Couleur : Bleu roi
+                        Profil & Humeur
                       </span>
                     </div>
 
-                    {/* Photo Upload & Preview for Partner 2 */}
+                    {/* Photo Upload for Partner 2 - Direct from Phone */}
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/80 p-3.5 rounded-2xl border border-sky-200/60">
-                      <div className="relative group">
+                      <div className="relative group shrink-0">
                         <PartnerAvatar
                           name={partner2Name}
                           avatar={partner2Avatar}
@@ -513,91 +647,101 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           className="border-3 border-white shadow-md ring-3 ring-sky-400"
                         />
                         {isP2LoadingPhoto && (
-                          <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
-                            Chargement...
+                          <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center text-white text-[10px] font-bold animate-pulse text-center px-1">
+                            Traitement...
                           </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => p2FileInputRef.current?.click()}
-                          className="absolute -bottom-1 -right-1 p-2 bg-sky-600 hover:bg-sky-700 text-white rounded-full shadow-md transition-transform group-hover:scale-110"
-                          title="Choisir une photo"
-                        >
-                          <Camera className="w-4 h-4" />
-                        </button>
                       </div>
 
-                      <div className="flex-1 text-center sm:text-left space-y-2">
+                      <div className="flex-1 text-center sm:text-left space-y-2 w-full">
                         <div>
                           <p className="text-xs font-bold text-stone-800">
-                            Photo de profil de {partner2Name || 'Med'}
+                            Photo de profil de {partner2Name || 'Partenaire 2'}
                           </p>
                           <p className="text-[11px] text-stone-500">
-                            Importez directement depuis votre appareil.
+                            Prenez une photo ou choisissez directement dans votre téléphone.
                           </p>
                         </div>
 
+                        {/* Hidden file and camera inputs */}
+                        <input
+                          ref={p2FileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleP2FileChange}
+                          className="hidden"
+                        />
+                        <input
+                          ref={p2CameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          onChange={handleP2FileChange}
+                          className="hidden"
+                        />
+
+                        {/* Direct action buttons */}
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                          <input
-                            ref={p2FileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleP2FileChange}
-                            className="hidden"
-                          />
                           <button
                             type="button"
                             onClick={() => p2FileInputRef.current?.click()}
                             disabled={isP2LoadingPhoto}
-                            className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                            className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
                           >
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>{isP2LoadingPhoto ? 'Compression...' : 'Téléverser ma photo'}</span>
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            <span>Galerie / Fichiers</span>
                           </button>
 
                           <button
                             type="button"
+                            onClick={() => p2CameraInputRef.current?.click()}
+                            disabled={isP2LoadingPhoto}
+                            className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Prendre une photo</span>
+                          </button>
+
+                          {partner2Avatar && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPartner2Avatar('');
+                                soundEffects.playNoteClick();
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium flex items-center gap-1 transition-colors"
+                              title="Retirer la photo actuelle"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Retirer</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
                             onClick={() => setShowP2UrlInput(!showP2UrlInput)}
-                            className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium flex items-center gap-1"
+                            className="px-2.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium flex items-center gap-1"
                           >
                             <LinkIcon className="w-3 h-3" />
-                            <span>Lien web</span>
+                            <span>Lien URL</span>
                           </button>
-                        </div>
-
-                        {/* Sample avatars */}
-                        <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start">
-                          <span className="text-[10px] text-stone-400 font-medium">Suggestions :</span>
-                          <div className="flex items-center gap-1.5">
-                            {suggestedAvatarsP2.map((url, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setPartner2Avatar(url)}
-                                className={`w-6 h-6 rounded-full overflow-hidden border-2 transition-transform hover:scale-110 ${
-                                  partner2Avatar === url ? 'border-sky-500 scale-110' : 'border-transparent'
-                                }`}
-                              >
-                                <img src={url} alt="avatar" className="w-full h-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
                         </div>
 
                         {showP2UrlInput && (
                           <input
                             type="url"
-                            placeholder="https://..."
+                            placeholder="https://exemple.com/photo.jpg"
                             value={partner2Avatar}
                             onChange={(e) => setPartner2Avatar(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white border border-sky-200 rounded-xl text-xs mt-1"
+                            className="w-full px-3 py-1.5 bg-white border border-sky-200 rounded-xl text-xs mt-1 text-stone-800"
                           />
                         )}
 
-                        {p2Error && <p className="text-xs text-red-600">{p2Error}</p>}
+                        {p2Error && <p className="text-xs text-red-600 font-medium">{p2Error}</p>}
                       </div>
                     </div>
 
+                    {/* Name & Nickname */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs font-bold text-stone-700 block mb-1">Prénom :</label>
@@ -615,20 +759,123 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           type="text"
                           value={partner2Nickname}
                           onChange={(e) => setPartner2Nickname(e.target.value)}
-                          placeholder="Ex: Mon cœur ❤️, Med chéri"
+                          placeholder="Ex: Mon cœur, Mon chéri"
                           className="w-full px-3 py-2 bg-white border border-sky-200 rounded-xl text-xs font-medium text-stone-800"
                         />
+                      </div>
+                    </div>
+
+                    {/* Partner 2 Color & Mood Settings */}
+                    <div className="p-3 bg-white/70 rounded-xl border border-sky-100 space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-1.5">
+                          <Palette className="w-3.5 h-3.5 text-sky-600" />
+                          <span>Couleur de {partner2Name || 'Partenaire 2'} :</span>
+                        </label>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {[
+                            { label: 'Bleu roi', color: '#0284C7' },
+                            { label: 'Ciel', color: '#0EA5E9' },
+                            { label: 'Indigo', color: '#6366F1' },
+                            { label: 'Émeraude', color: '#10B981' },
+                            { label: 'Turquoise', color: '#14B8A6' },
+                            { label: 'Ambre', color: '#F59E0B' },
+                            { label: 'Violet', color: '#8B5CF6' },
+                            { label: 'Rose', color: '#F43F5E' },
+                          ].map((c) => (
+                            <button
+                              key={`p2-color-${c.color}`}
+                              type="button"
+                              onClick={() => setPartner2Color(c.color)}
+                              className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                                partner2Color.toLowerCase() === c.color.toLowerCase()
+                                  ? 'border-stone-900 scale-110 ring-2 ring-stone-400'
+                                  : 'border-white'
+                              }`}
+                              style={{ backgroundColor: c.color }}
+                              title={c.label}
+                            />
+                          ))}
+                          <div className="flex items-center gap-1 ml-auto">
+                            <span className="text-[10px] text-stone-400">Libre :</span>
+                            <input
+                              type="color"
+                              value={partner2Color}
+                              onChange={(e) => setPartner2Color(e.target.value)}
+                              className="w-7 h-7 rounded-lg border border-stone-200 p-0.5 cursor-pointer bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-stone-100">
+                        <div>
+                          <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                            Humeur par défaut :
+                          </label>
+                          <select
+                            value={partner2MoodStatus}
+                            onChange={(e) => setPartner2MoodStatus(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-sky-200 rounded-xl text-xs text-stone-800"
+                          >
+                            <option value="Rayonnant">✨ Rayonnant(e)</option>
+                            <option value="Zen">🌿 Zen</option>
+                            <option value="Câlin">🧸 Câlin(e)</option>
+                            <option value="Amoureux">❤️ Fou amoureux</option>
+                            <option value="Fatigué">😴 Fatigué(e)</option>
+                            <option value="Stressé">⚡ Stressé(e)</option>
+                            <option value="Créatif">🎨 Créatif(ve)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                            Besoin d'amour :
+                          </label>
+                          <select
+                            value={partner2MoodNeed}
+                            onChange={(e) => setPartner2MoodNeed(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-sky-200 rounded-xl text-xs text-stone-800"
+                          >
+                            <option value="Surprise-moi">🎁 Surprise-moi !</option>
+                            <option value="Besoin d'un câlin">🤗 Un gros câlin</option>
+                            <option value="Envie d'être tranquille">🧘 Être au calme</option>
+                            <option value="Prêt à sortir">🎉 Prêt(e) à sortir</option>
+                            <option value="Besoin d'écoute">💬 Discuter & écoute</option>
+                            <option value="Un mot doux">💌 Un petit mot doux</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                            Énergie ({partner2MoodEnergy}/5) :
+                          </label>
+                          <div className="flex items-center gap-1 pt-1">
+                            {[1, 2, 3, 4, 5].map((lvl) => (
+                              <button
+                                key={`p2-energy-${lvl}`}
+                                type="button"
+                                onClick={() => setPartner2MoodEnergy(lvl)}
+                                className={`flex-1 py-1 rounded-lg text-xs font-bold transition-all ${
+                                  partner2MoodEnergy >= lvl
+                                    ? 'bg-sky-600 text-white shadow-2xs'
+                                    : 'bg-stone-100 text-stone-400'
+                                }`}
+                              >
+                                {lvl}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Anniversary & Title */}
+                {/* Anniversary, Title & Global Theme */}
                 <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/80 space-y-3">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-rose-500" />
                     <h4 className="font-serif-romantic text-xs sm:text-sm font-bold text-stone-800">
-                      Notre Histoire & Titre
+                      Notre Histoire, Titre & Thème de l'Application
                     </h4>
                   </div>
 
@@ -649,9 +896,40 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         type="text"
                         value={relationshipTitle}
                         onChange={(e) => setRelationshipTitle(e.target.value)}
-                        placeholder="Ex: Med & Safi"
-                        className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs text-stone-800"
+                        placeholder="Ex: Med & Safi, Notre Duo d'Amour"
+                        className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs text-stone-800 font-medium"
                       />
+                    </div>
+                  </div>
+
+                  {/* App Color Theme */}
+                  <div className="pt-2 border-t border-stone-200/60">
+                    <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5 mb-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Thème de couleur principal :</span>
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { label: 'Rose Romantique', color: '#F43F5E', bg: 'bg-rose-50 border-rose-200 text-rose-900' },
+                        { label: 'Rubis Passion', color: '#E11D48', bg: 'bg-red-50 border-red-200 text-red-900' },
+                        { label: 'Bleu Océan', color: '#0284C7', bg: 'bg-sky-50 border-sky-200 text-sky-900' },
+                        { label: 'Émeraude Royale', color: '#10B981', bg: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
+                        { label: 'Violet Mystique', color: '#8B5CF6', bg: 'bg-purple-50 border-purple-200 text-purple-900' },
+                      ].map((th) => (
+                        <button
+                          key={`theme-color-${th.color}`}
+                          type="button"
+                          onClick={() => setThemeColor(th.color)}
+                          className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all ${
+                            themeColor.toLowerCase() === th.color.toLowerCase()
+                              ? 'ring-2 ring-stone-900 shadow-xs scale-[1.02] ' + th.bg
+                              : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                          }`}
+                        >
+                          <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: th.color }} />
+                          <span className="text-[11px] font-bold truncate">{th.label}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -660,7 +938,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm('Réinitialiser avec les données d’origine (Med & Safi au Mali) ?')) {
+                      if (confirm('Réinitialiser toutes les données avec les valeurs par défaut ?')) {
                         onResetToDefault();
                         onClose();
                       }
@@ -676,7 +954,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     className="px-5 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition-all hover:scale-[1.02] cursor-pointer"
                   >
                     <Check className="w-4 h-4 text-emerald-400" />
-                    <span>Enregistrer le profil</span>
+                    <span>Enregistrer tous les paramètres</span>
                   </button>
                 </div>
               </form>

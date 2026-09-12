@@ -54,13 +54,6 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const samplePhotos = [
-    { label: 'Sortie / Restaurant', url: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Coucher de soleil', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Fous rires complices', url: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=800&auto=format&fit=crop&q=80' },
-    { label: 'Thé & Douceur', url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800&auto=format&fit=crop&q=80' },
-  ];
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -308,23 +301,6 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
                 placeholder="https://..."
                 className="w-full px-3 py-2 bg-white border border-stone-200 rounded-xl text-xs mt-1"
               />
-            )}
-
-            {/* Quick sample photos */}
-            {!photoUrl && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-[10px] text-stone-400 font-medium">Suggestions d'images :</span>
-                {samplePhotos.map((sp) => (
-                  <button
-                    key={sp.label}
-                    type="button"
-                    onClick={() => setPhotoUrl(sp.url)}
-                    className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-white border border-rose-100 hover:bg-rose-50 text-rose-700 transition-colors"
-                  >
-                    {sp.label}
-                  </button>
-                ))}
-              </div>
             )}
           </div>
 
