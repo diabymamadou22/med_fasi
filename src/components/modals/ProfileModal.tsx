@@ -29,6 +29,7 @@ import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../.
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti } from '../../lib/confetti';
 import { processImageFile } from '../../lib/imageUtils';
+import { getPartnerAvatar } from '../../data/initialData';
 
 interface ProfileModalProps {
   profile: CoupleProfile;
@@ -57,7 +58,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLockApp,
   isFirebaseConnected = true,
 }) => {
-  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'music' | 'backup' | 'firebase' | 'app_mobile'>('profile');
+  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'backup' | 'firebase' | 'app_mobile'>('profile');
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [activePartnerSubTab, setActivePartnerSubTab] = useState<'both' | 'p1' | 'p2'>(
     initialFocusPartner === 'p2' ? 'p2' : initialFocusPartner === 'p1' ? 'p1' : 'both'
@@ -86,11 +87,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [pinCode, setPinCode] = useState(settings.pinCode || '1234');
   const [confirmPinCode, setConfirmPinCode] = useState(settings.pinCode || '1234');
   const [pinSaveFeedback, setPinSaveFeedback] = useState<string | null>(null);
-
-  // Music states
-  const [songTitle, setSongTitle] = useState(settings.songTitle || 'Notre Douce Sérénade');
-  const [songAudioUrl, setSongAudioUrl] = useState(settings.songAudioUrl || '');
-  const [ambientTrackId, setAmbientTrackId] = useState(settings.ambientTrackId);
 
   // File refs
   const p1FileInputRef = useRef<HTMLInputElement>(null);
@@ -195,18 +191,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setTimeout(() => setPinSaveFeedback(null), 3000);
   };
 
-  const handleSaveMusicSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSaveSettings({
-      ...settings,
-      songTitle: songTitle.trim() || 'Notre Chanson',
-      songAudioUrl: songAudioUrl.trim() || undefined,
-      ambientTrackId,
-    });
-    soundEffects.playSuccessSparkle();
-    alert('Ambiance musicale mise à jour !');
-  };
-
   const handleSubmitProfile = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveProfile({
@@ -265,7 +249,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </span>
             </div>
             <p className="text-xs text-stone-500">
-              Photos de profil, sécurité par code PIN, ambiance musicale et sauvegarde complète.
+              Photos de profil, sécurité par code PIN et sauvegarde complète.
             </p>
           </div>
         </div>
@@ -295,18 +279,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           >
             <Lock className="w-3.5 h-3.5 text-amber-500" />
             <span>Code PIN Secret</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setModalTab('music')}
-            className={`py-2 px-3 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              modalTab === 'music'
-                ? 'bg-white text-stone-900 shadow-xs'
-                : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            <Music className="w-3.5 h-3.5 text-rose-500" />
-            <span>Notre Chanson</span>
           </button>
           <button
             type="button"
@@ -400,7 +372,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/80 p-3.5 rounded-2xl border border-rose-200/60">
                       <div className="relative group">
                         <img
-                          src={partner1Avatar}
+                          src={getPartnerAvatar(partner1Avatar, 'p1')}
                           alt={partner1Name}
                           className="w-20 h-20 rounded-full object-cover border-3 border-white shadow-md ring-3 ring-rose-400"
                         />
@@ -532,7 +504,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/80 p-3.5 rounded-2xl border border-sky-200/60">
                       <div className="relative group">
                         <img
-                          src={partner2Avatar}
+                          src={getPartnerAvatar(partner2Avatar, 'p2')}
                           alt={partner2Name}
                           className="w-20 h-20 rounded-full object-cover border-3 border-white shadow-md ring-3 ring-sky-400"
                         />
@@ -818,86 +790,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: NOTRE CHANSON & AMBIANCE */}
-          {modalTab === 'music' && (
-            <div className="space-y-4 p-2">
-              <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-rose-100 text-rose-600 rounded-xl mt-0.5">
-                    <Music className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-stone-900">
-                      Ambiance Sonore & Notre Chanson
-                    </h4>
-                    <p className="text-xs text-stone-600 mt-0.5">
-                      Profitez d'un fond musical apaisant pendant que vous parcourez vos souvenirs (généré directement dans votre navigateur) ou configurez le titre fétiche de votre couple.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={handleSaveMusicSettings} className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
-                    Titre de « Notre Chanson » :
-                  </label>
-                  <input
-                    type="text"
-                    value={songTitle}
-                    onChange={(e) => setSongTitle(e.target.value)}
-                    placeholder="Ex: Sidiki Diabaté - C'est bon / Notre mélodie d'amour"
-                    className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
-                    Ambiance sonore par défaut :
-                  </label>
-                  <select
-                    value={ambientTrackId}
-                    onChange={(e) => setAmbientTrackId(e.target.value as any)}
-                    className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs font-medium"
-                  >
-                    <option value="kora_serenade">🪕 Kora & Sérénade Malienne (Arpèges doux)</option>
-                    <option value="river_breeze">🌊 Brise douce sur le Djoliba (Ondes du Niger)</option>
-                    <option value="starry_night">✨ Nuit Étoilée & Piano (Mélodies romantiques)</option>
-                    <option value="soft_rain">🌧️ Pluie Douce & Cocooning (Intimité cosy)</option>
-                    <option value="none">🔇 Silence (Désactivé)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
-                    Lien audio / MP3 personnalisé (facultatif) :
-                  </label>
-                  <input
-                    type="url"
-                    value={songAudioUrl}
-                    onChange={(e) => setSongAudioUrl(e.target.value)}
-                    placeholder="https://exemple.com/notre-chanson.mp3"
-                    className="w-full px-3.5 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs"
-                  />
-                  <p className="text-[11px] text-stone-400 mt-1">
-                    Si aucun lien n'est renseigné, le synthétiseur d'ambiance intégré prend le relais automatiquement.
-                  </p>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>Valider l'ambiance sonore</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* TAB 4: SAUVEGARDE & RESTAURATION */}
+          {/* TAB: SAUVEGARDE & RESTAURATION */}
           {modalTab === 'backup' && (
             <div className="space-y-5 p-2">
               <div className="p-4 bg-sky-50/60 rounded-2xl border border-sky-100 space-y-3">

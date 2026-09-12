@@ -6,8 +6,6 @@ import {
   MapPin,
   Heart,
   Plus,
-  Play,
-  Pause,
   Lock,
   Unlock,
   Sparkles,
@@ -71,7 +69,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 }) => {
   const [subSection, setSubSection] = useState<'timeline' | 'capsules' | 'map'>('timeline');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [selectedCapsule, setSelectedCapsule] = useState<TimeCapsule | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<MemoryLocation | null>(
     locations[0] || null
@@ -84,15 +81,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     if (selectedCategory === 'all') return true;
     return m.category === selectedCategory;
   });
-
-  const handleToggleAudio = (memId: string) => {
-    if (playingAudioId === memId) {
-      setPlayingAudioId(null);
-    } else {
-      setPlayingAudioId(memId);
-      soundEffects.playSuccessSparkle();
-    }
-  };
 
   const handleOpenCapsule = (cap: TimeCapsule) => {
     const isReady = new Date(cap.targetUnlockDate).getTime() <= Date.now();
@@ -226,7 +214,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               const author =
                 mem.authorId === 'p1' ? profile.partner1 : profile.partner2;
               const hasLiked = mem.likes.includes(activePartnerId);
-              const isPlaying = playingAudioId === mem.id;
 
               return (
                 <motion.div
@@ -292,7 +279,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     </div>
 
                     {/* Photo if available */}
-                    {mem.photoUrl && (
+                    {mem.photoUrl && mem.photoUrl.trim() !== '' && (
                       <div className="rounded-2xl overflow-hidden max-h-72 w-full bg-stone-100">
                         <img
                           src={mem.photoUrl}
@@ -306,51 +293,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-normal">
                       {mem.description}
                     </p>
-
-                    {/* Voice Note / Audio Player Simulator */}
-                    {mem.audioDuration && (
-                      <div className="p-3 rounded-2xl bg-rose-50/70 border border-rose-100 flex items-center gap-3">
-                        <button
-                          onClick={() => handleToggleAudio(mem.id)}
-                          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                            isPlaying
-                              ? 'bg-rose-600 text-white shadow-xs scale-105'
-                              : 'bg-white text-rose-600 hover:bg-rose-100'
-                          }`}
-                          title="Écouter la note vocale"
-                        >
-                          {isPlaying ? (
-                            <Pause className="w-4 h-4" />
-                          ) : (
-                            <Play className="w-4 h-4 ml-0.5" />
-                          )}
-                        </button>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-[11px] font-semibold text-rose-900 mb-1">
-                            <span>Note vocale d'amour enregistrée</span>
-                            <span>{mem.audioDuration}</span>
-                          </div>
-                          {/* Animated Waveform */}
-                          <div className="flex items-center gap-1 h-3">
-                            {Array.from({ length: 24 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className={`flex-1 rounded-full transition-all duration-200 ${
-                                  isPlaying
-                                    ? 'bg-rose-500 animate-pulse'
-                                    : 'bg-rose-300'
-                                }`}
-                                style={{
-                                  height: isPlaying
-                                    ? `${Math.sin(i + Date.now() / 300) * 8 + 10}px`
-                                    : `${(i % 5) * 2 + 4}px`,
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Tags & Likes Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-stone-100 flex-wrap gap-2">
@@ -567,7 +509,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
                   {selectedCapsule.isOpened ? (
                     <div className="space-y-4">
-                      {selectedCapsule.photoUrl && (
+                      {selectedCapsule.photoUrl && selectedCapsule.photoUrl.trim() !== '' && (
                         <img
                           src={selectedCapsule.photoUrl}
                           alt="Souvenir scellé"
@@ -697,7 +639,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 className="mt-4 p-4 sm:p-5 rounded-2xl bg-stone-50 border border-stone-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
               >
                 <div className="flex items-start gap-3.5">
-                  {selectedLocation.photoUrl ? (
+                  {selectedLocation.photoUrl && selectedLocation.photoUrl.trim() !== '' ? (
                     <img
                       src={selectedLocation.photoUrl}
                       alt={selectedLocation.name}

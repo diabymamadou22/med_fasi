@@ -228,7 +228,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
               )}
             </label>
 
-            {photoUrl ? (
+            {photoUrl && photoUrl.trim() !== '' ? (
               <div className="relative rounded-xl overflow-hidden border border-sky-200 max-h-48 bg-black/5">
                 <img src={photoUrl} alt="Aperçu du lieu" className="w-full h-40 object-cover" />
                 <button

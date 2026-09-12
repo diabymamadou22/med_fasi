@@ -4,7 +4,6 @@ import {
   X,
   Image as ImageIcon,
   MapPin,
-  Mic,
   Calendar,
   Heart,
   Plus,
@@ -52,9 +51,6 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [locationName, setLocationName] = useState(initialMemory?.locationName || '');
   const [tagsInput, setTagsInput] = useState(initialMemory?.tags?.join(', ') || '');
-  const [includeVoiceNote, setIncludeVoiceNote] = useState(
-    Boolean(initialMemory?.audioDuration)
-  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,7 +95,6 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         description: description.trim(),
         photoUrl: photoUrl.trim() || undefined,
         locationName: locationName.trim() || undefined,
-        audioDuration: includeVoiceNote ? (initialMemory.audioDuration || '0:35') : undefined,
         tags: tags.length > 0 ? tags : ['Moment précieux', 'Amour'],
       });
       soundEffects.playSuccessSparkle();
@@ -111,7 +106,6 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         description: description.trim(),
         photoUrl: photoUrl.trim() || undefined,
         locationName: locationName.trim() || undefined,
-        audioDuration: includeVoiceNote ? '0:35' : undefined,
         tags: tags.length > 0 ? tags : ['Moment précieux', 'Amour'],
         authorId: activePartnerId,
       });
@@ -264,7 +258,7 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
               )}
             </label>
 
-            {photoUrl ? (
+            {photoUrl && photoUrl.trim() !== '' ? (
               <div className="relative rounded-xl overflow-hidden border border-rose-200 max-h-48 bg-black/5">
                 <img src={photoUrl} alt="Aperçu du souvenir" className="w-full h-44 object-cover" />
                 <button
@@ -332,22 +326,6 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Voice note simulation toggle */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mic className="w-4 h-4 text-rose-500" />
-              <span className="text-xs font-semibold text-stone-700">
-                Attacher un extrait audio / note vocale
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              checked={includeVoiceNote}
-              onChange={(e) => setIncludeVoiceNote(e.target.checked)}
-              className="w-4 h-4 text-rose-500 rounded-sm focus:ring-rose-400 cursor-pointer"
-            />
           </div>
 
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-100">

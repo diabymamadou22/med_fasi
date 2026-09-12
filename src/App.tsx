@@ -19,7 +19,6 @@ import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { ProfileModal } from './components/modals/ProfileModal';
 import { PinLockModal } from './components/modals/PinLockModal';
 import { PWAInstallModal } from './components/modals/PWAInstallModal';
-import { RomanticMusicBar } from './components/RomanticMusicBar';
 import { soundEffects } from './lib/audio';
 import { triggerCelebrationConfetti } from './lib/confetti';
 import {
@@ -274,6 +273,7 @@ export default function App() {
 
   // Real-time Miss You Pulse state
   const [activeMissYouPulse, setActiveMissYouPulse] = useState<MissYouPulse | null>(null);
+  const [isCloudSynced, setIsCloudSynced] = useState<boolean>(true);
 
   // Modals state
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -321,23 +321,31 @@ export default function App() {
 
   // Real-time Firestore subscriptions
   useEffect(() => {
-    const unsubProfile = subscribeProfile((remoteProfile) => {
-      if (remoteProfile) setProfile(remoteProfile);
-    });
+    const unsubProfile = subscribeProfile(
+      (remoteProfile) => {
+        if (remoteProfile) {
+          setProfile(remoteProfile);
+          setIsCloudSynced(true);
+        }
+      },
+      () => setIsCloudSynced(false)
+    );
 
     const unsubMemories = subscribeCollection<TimelineMemory>(
       COLLECTIONS.MEMORIES,
       (remoteMemories) => {
-        if (remoteMemories && remoteMemories.length > 0) {
+        if (Array.isArray(remoteMemories)) {
           setMemories(remoteMemories);
+          setIsCloudSynced(true);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubCapsules = subscribeCollection<TimeCapsule>(
       COLLECTIONS.CAPSULES,
       (remoteCapsules) => {
-        if (remoteCapsules && remoteCapsules.length > 0) {
+        if (Array.isArray(remoteCapsules)) {
           setCapsules(remoteCapsules);
         }
       }
@@ -346,7 +354,7 @@ export default function App() {
     const unsubLocations = subscribeCollection<MemoryLocation>(
       COLLECTIONS.LOCATIONS,
       (remoteLocations) => {
-        if (remoteLocations && remoteLocations.length > 0) {
+        if (Array.isArray(remoteLocations)) {
           setLocations(remoteLocations);
         }
       }
@@ -355,7 +363,7 @@ export default function App() {
     const unsubNotes = subscribeCollection<SweetNote>(
       COLLECTIONS.NOTES,
       (remoteNotes) => {
-        if (remoteNotes && remoteNotes.length > 0) {
+        if (Array.isArray(remoteNotes)) {
           // Sort newest first
           const sorted = [...remoteNotes].sort((a, b) => b.id.localeCompare(a.id));
           setNotes(sorted);
@@ -366,7 +374,7 @@ export default function App() {
     const unsubGratitudes = subscribeCollection<DailyGratitude>(
       COLLECTIONS.GRATITUDES,
       (remoteGratitudes) => {
-        if (remoteGratitudes && remoteGratitudes.length > 0) {
+        if (Array.isArray(remoteGratitudes)) {
           const sorted = [...remoteGratitudes].sort((a, b) => b.id.localeCompare(a.id));
           setGratitudes(sorted);
         }
@@ -376,7 +384,7 @@ export default function App() {
     const unsubVouchers = subscribeCollection<LoveVoucher>(
       COLLECTIONS.VOUCHERS,
       (remoteVouchers) => {
-        if (remoteVouchers && remoteVouchers.length > 0) {
+        if (Array.isArray(remoteVouchers)) {
           setVouchers(remoteVouchers);
         }
       }
@@ -385,7 +393,7 @@ export default function App() {
     const unsubBucket = subscribeCollection<BucketItem>(
       COLLECTIONS.BUCKET_LIST,
       (remoteBucket) => {
-        if (remoteBucket && remoteBucket.length > 0) {
+        if (Array.isArray(remoteBucket)) {
           setBucketList(remoteBucket);
         }
       }
@@ -394,7 +402,7 @@ export default function App() {
     const unsubQuizzes = subscribeCollection<QuizQuestion>(
       COLLECTIONS.QUIZZES,
       (remoteQuizzes) => {
-        if (remoteQuizzes && remoteQuizzes.length > 0) {
+        if (Array.isArray(remoteQuizzes)) {
           setQuizzes(remoteQuizzes);
         }
       }
@@ -403,7 +411,7 @@ export default function App() {
     const unsubDates = subscribeCollection<DateIdea>(
       COLLECTIONS.DATES,
       (remoteDates) => {
-        if (remoteDates && remoteDates.length > 0) {
+        if (Array.isArray(remoteDates)) {
           setDateIdeas(remoteDates);
         }
       }
@@ -412,22 +420,25 @@ export default function App() {
     const unsubChallenges = subscribeCollection<CoupleChallenge>(
       COLLECTIONS.CHALLENGES,
       (remoteChallenges) => {
-        if (remoteChallenges && remoteChallenges.length > 0) {
+        if (Array.isArray(remoteChallenges)) {
           setChallenges(remoteChallenges);
         }
       }
     );
 
-    const unsubSettings = subscribeSettings((remoteSettings) => {
-      if (remoteSettings) {
-        setSettings((prev) => ({
-          ...prev,
-          ...remoteSettings,
-          // Preserve local playing audio flag so sound doesn't auto-start abruptly
-          isMusicPlaying: prev.isMusicPlaying,
-        }));
-      }
-    });
+    const unsubSettings = subscribeSettings(
+      (remoteSettings) => {
+        if (remoteSettings) {
+          setSettings((prev) => ({
+            ...prev,
+            ...remoteSettings,
+            // Preserve local playing audio flag so sound doesn't auto-start abruptly
+            isMusicPlaying: prev.isMusicPlaying,
+          }));
+        }
+      },
+      () => setIsCloudSynced(false)
+    );
 
     const unsubPulse = subscribeLatestPulse((pulse) => {
       if (pulse && pulse.senderId !== activePartnerId) {
@@ -1034,26 +1045,12 @@ export default function App() {
         onGoToGallery={() => setActiveTab('gallery')}
         isPinEnabled={settings.isPinEnabled}
         onLockApp={() => setIsAppLocked(true)}
-        isFirebaseConnected={true}
+        isFirebaseConnected={isCloudSynced}
         onOpenInstallModal={() => setShowInstallModal(true)}
       />
 
-      {/* Romantic Music and Soundscape Bar */}
-      <RomanticMusicBar settings={settings} onUpdateSettings={handleUpdateSettings} />
-
       {/* Main Body */}
-      <main className="flex-1 pb-28 sm:pb-12">
-        {/* Real-time Mood & Needs Bar */}
-        <MoodAndNeedsBar
-          profile={profile}
-          activePartnerId={activePartnerId}
-          onUpdateMood={handleUpdateMood}
-          onOpenPhotoPicker={(pId) => {
-            setProfileFocusPartner(pId);
-            setShowProfileModal(true);
-          }}
-        />
-
+      <main className="flex-1 pb-24 sm:pb-12">
         {/* Tab Navigation */}
         <Navigation
           activeTab={activeTab}
@@ -1064,24 +1061,36 @@ export default function App() {
         {/* Views */}
         <div className="transition-opacity duration-200">
           {activeTab === 'journal' && (
-            <JournalView
-              profile={profile}
-              activePartnerId={activePartnerId}
-              notes={notes}
-              gratitudes={gratitudes}
-              onOpenWriteNoteModal={() => {
-                setEditingNote(null);
-                setShowWriteNoteModal(true);
-              }}
-              onMarkNoteAsRead={handleMarkNoteAsRead}
-              onToggleFavoriteNote={handleToggleFavoriteNote}
-              onReactNote={handleReactNote}
-              onAddGratitude={handleAddGratitude}
-              onLikeGratitude={handleLikeGratitude}
-              onEditNote={(note) => setEditingNote(note)}
-              onDeleteNote={handleDeleteNote}
-              onDeleteGratitude={handleDeleteGratitude}
-            />
+            <>
+              {/* Real-time Mood & Needs Bar for Journal & Douceurs */}
+              <MoodAndNeedsBar
+                profile={profile}
+                activePartnerId={activePartnerId}
+                onUpdateMood={handleUpdateMood}
+                onOpenPhotoPicker={(pId) => {
+                  setProfileFocusPartner(pId);
+                  setShowProfileModal(true);
+                }}
+              />
+              <JournalView
+                profile={profile}
+                activePartnerId={activePartnerId}
+                notes={notes}
+                gratitudes={gratitudes}
+                onOpenWriteNoteModal={() => {
+                  setEditingNote(null);
+                  setShowWriteNoteModal(true);
+                }}
+                onMarkNoteAsRead={handleMarkNoteAsRead}
+                onToggleFavoriteNote={handleToggleFavoriteNote}
+                onReactNote={handleReactNote}
+                onAddGratitude={handleAddGratitude}
+                onLikeGratitude={handleLikeGratitude}
+                onEditNote={(note) => setEditingNote(note)}
+                onDeleteNote={handleDeleteNote}
+                onDeleteGratitude={handleDeleteGratitude}
+              />
+            </>
           )}
 
           {activeTab === 'timeline' && (
