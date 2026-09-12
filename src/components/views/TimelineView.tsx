@@ -19,6 +19,8 @@ import {
   Filter,
   Pencil,
   Trash2,
+  X,
+  Eye,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -43,10 +45,13 @@ interface TimelineViewProps {
   onUnlockCapsule: (capsuleId: string) => void;
   onEditMemory?: (memory: TimelineMemory) => void;
   onDeleteMemory?: (memoryId: string) => void;
+  onRemoveMemoryPhoto?: (memoryId: string) => void;
   onEditCapsule?: (capsule: TimeCapsule) => void;
   onDeleteCapsule?: (capsuleId: string) => void;
+  onRemoveCapsulePhoto?: (capsuleId: string) => void;
   onEditLocation?: (location: MemoryLocation) => void;
   onDeleteLocation?: (locationId: string) => void;
+  onRemoveLocationPhoto?: (locationId: string) => void;
 }
 
 export const TimelineView: React.FC<TimelineViewProps> = ({
@@ -62,10 +67,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   onUnlockCapsule,
   onEditMemory,
   onDeleteMemory,
+  onRemoveMemoryPhoto,
   onEditCapsule,
   onDeleteCapsule,
+  onRemoveCapsulePhoto,
   onEditLocation,
   onDeleteLocation,
+  onRemoveLocationPhoto,
 }) => {
   const [subSection, setSubSection] = useState<'timeline' | 'capsules' | 'map'>('timeline');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -73,6 +81,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const [selectedLocation, setSelectedLocation] = useState<MemoryLocation | null>(
     locations[0] || null
   );
+  const [previewMemory, setPreviewMemory] = useState<TimelineMemory | null>(null);
 
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
 
@@ -258,20 +267,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                             <button
                               type="button"
                               onClick={() => onEditMemory(mem)}
-                              className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                               title="Modifier ce souvenir"
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Pencil className="w-4 h-4" />
                             </button>
                           )}
                           {onDeleteMemory && (
                             <button
                               type="button"
                               onClick={() => onDeleteMemory(mem.id)}
-                              className="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                               title="Supprimer ce souvenir"
+                              aria-label="Supprimer ce souvenir"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -280,12 +290,47 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
                     {/* Photo if available */}
                     {mem.photoUrl && mem.photoUrl.trim() !== '' && (
-                      <div className="rounded-2xl overflow-hidden max-h-72 w-full bg-stone-100">
+                      <div className="relative group/photo rounded-2xl overflow-hidden max-h-72 w-full bg-stone-100 cursor-pointer">
                         <img
                           src={mem.photoUrl}
                           alt={mem.title}
-                          className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+                          onClick={() => {
+                            soundEffects.playNoteClick();
+                            setPreviewMemory(mem);
+                          }}
+                          className="w-full h-full object-cover group-hover/photo:scale-[1.01] transition-transform duration-300"
                         />
+                        {/* Overlay with View and Remove buttons */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover/photo:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              soundEffects.playNoteClick();
+                              setPreviewMemory(mem);
+                            }}
+                            className="p-1.5 px-2.5 rounded-xl bg-black/60 hover:bg-black/80 text-white text-xs font-semibold backdrop-blur-md transition-all shadow-md flex items-center gap-1 cursor-pointer"
+                            title="Agrandir la photo"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline text-[11px]">Agrandir</span>
+                          </button>
+                          {onRemoveMemoryPhoto && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                soundEffects.playTrashDelete();
+                                onRemoveMemoryPhoto(mem.id);
+                              }}
+                              className="p-1.5 px-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-semibold backdrop-blur-md transition-all shadow-md flex items-center gap-1 cursor-pointer"
+                              title="Retirer la photo de ce souvenir"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline text-[11px]">Retirer photo</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -510,11 +555,27 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   {selectedCapsule.isOpened ? (
                     <div className="space-y-4">
                       {selectedCapsule.photoUrl && selectedCapsule.photoUrl.trim() !== '' && (
-                        <img
-                          src={selectedCapsule.photoUrl}
-                          alt="Souvenir scellé"
-                          className="w-full h-48 object-cover rounded-2xl"
-                        />
+                        <div className="relative group rounded-2xl overflow-hidden">
+                          <img
+                            src={selectedCapsule.photoUrl}
+                            alt="Souvenir scellé"
+                            className="w-full h-48 object-cover rounded-2xl"
+                          />
+                          {onRemoveCapsulePhoto && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onRemoveCapsulePhoto(selectedCapsule.id);
+                                setSelectedCapsule({ ...selectedCapsule, photoUrl: '' });
+                              }}
+                              className="absolute top-2 right-2 px-2.5 py-1 bg-black/60 hover:bg-rose-600 text-white rounded-lg text-xs font-semibold backdrop-blur-xs flex items-center gap-1 transition-colors"
+                              title="Retirer la photo de cette capsule"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Retirer photo</span>
+                            </button>
+                          )}
+                        </div>
                       )}
                       <div className="p-4 bg-[#FFFDF9] rounded-2xl border border-rose-100">
                         <p className="font-handwriting text-2xl text-stone-800 leading-relaxed">
@@ -536,10 +597,25 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     </div>
                   )}
 
-                  <div className="mt-6 text-center">
+                  <div className="mt-6 flex items-center justify-center gap-3">
+                    {onDeleteCapsule && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const capId = selectedCapsule.id;
+                          setSelectedCapsule(null);
+                          onDeleteCapsule(capId);
+                        }}
+                        className="px-4 py-2 rounded-full border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Supprimer cette capsule"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Supprimer la capsule</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => setSelectedCapsule(null)}
-                      className="px-6 py-2 rounded-full bg-stone-900 text-white text-xs font-bold hover:bg-stone-800"
+                      className="px-6 py-2 rounded-full bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 transition-colors cursor-pointer"
                     >
                       Fermer
                     </button>
@@ -666,7 +742,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-center">
+                <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                   {onEditLocation && (
                     <button
                       type="button"
@@ -675,6 +751,20 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       <span>Modifier</span>
+                    </button>
+                  )}
+                  {onRemoveLocationPhoto && selectedLocation.photoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onRemoveLocationPhoto(selectedLocation.id);
+                        setSelectedLocation({ ...selectedLocation, photoUrl: '' });
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-amber-200 hover:bg-amber-50 text-amber-800 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Retirer la photo de ce lieu"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Retirer photo</span>
                     </button>
                   )}
                   {onDeleteLocation && (
@@ -696,6 +786,119 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Memory Photo & Actions Fullscreen Modal */}
+      <AnimatePresence>
+        {previewMemory && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md"
+            onClick={() => setPreviewMemory(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewMemory(null)}
+              className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors cursor-pointer"
+              title="Fermer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {previewMemory.photoUrl && (
+                <div className="relative w-full max-h-[60vh] sm:max-h-[70vh] flex items-center justify-center overflow-hidden rounded-2xl">
+                  <img
+                    src={previewMemory.photoUrl}
+                    alt={previewMemory.title}
+                    className="max-w-full max-h-[60vh] sm:max-h-[70vh] object-contain rounded-2xl shadow-2xl"
+                  />
+                </div>
+              )}
+
+              {/* Memory Info & Actions Bar */}
+              <div className="w-full mt-3 bg-stone-900/90 border border-white/10 p-4 sm:p-5 rounded-2xl text-white backdrop-blur-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-rose-300">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{previewMemory.date}</span>
+                    {previewMemory.locationName && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5" />
+                          {previewMemory.locationName}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <h3 className="font-serif-romantic text-lg sm:text-xl font-bold text-white">
+                    {previewMemory.title}
+                  </h3>
+                  {previewMemory.description && (
+                    <p className="text-xs sm:text-sm text-stone-300 line-clamp-2">
+                      {previewMemory.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                  {onEditMemory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = previewMemory;
+                        setPreviewMemory(null);
+                        onEditMemory(target);
+                      }}
+                      className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Modifier</span>
+                    </button>
+                  )}
+
+                  {onRemoveMemoryPhoto && previewMemory.photoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetId = previewMemory.id;
+                        setPreviewMemory(null);
+                        onRemoveMemoryPhoto(targetId);
+                      }}
+                      className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Retirer la photo mais garder le souvenir"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Retirer photo</span>
+                    </button>
+                  )}
+
+                  {onDeleteMemory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetId = previewMemory.id;
+                        setPreviewMemory(null);
+                        onDeleteMemory(targetId);
+                      }}
+                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Supprimer ce souvenir"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Supprimer</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

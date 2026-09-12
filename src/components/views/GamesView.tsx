@@ -20,6 +20,7 @@ import {
   Shuffle,
   Smile,
   MessageCircle,
+  Trash2,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -42,6 +43,8 @@ interface GamesViewProps {
   onToggleChallenge: (challengeId: string) => void;
   onAddNewQuiz: (quiz: QuizQuestion) => void;
   onAddNewDateIdea: (idea: DateIdea) => void;
+  onDeleteChallenge?: (challengeId: string) => void;
+  onRemoveChallengePhoto?: (challengeId: string) => void;
 }
 
 export const GamesView: React.FC<GamesViewProps> = ({
@@ -55,6 +58,8 @@ export const GamesView: React.FC<GamesViewProps> = ({
   onToggleChallenge,
   onAddNewQuiz,
   onAddNewDateIdea,
+  onDeleteChallenge,
+  onRemoveChallengePhoto,
 }) => {
   const [subTab, setSubTab] = useState<'quiz' | 'date_picker' | 'challenges'>('quiz');
   
@@ -654,32 +659,69 @@ export const GamesView: React.FC<GamesViewProps> = ({
                     <p className="text-xs text-stone-600 leading-relaxed">
                       {chal.description}
                     </p>
+
+                    {chal.photoProof && chal.photoProof.trim() !== '' && (
+                      <div className="relative group/chalphoto mt-3 rounded-2xl overflow-hidden max-h-48 w-full bg-stone-100 border border-stone-200">
+                        <img
+                          src={chal.photoProof}
+                          alt={`Preuve: ${chal.title}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {onRemoveChallengePhoto && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveChallengePhoto(chal.id);
+                            }}
+                            className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 hover:bg-rose-600 text-white text-xs font-semibold backdrop-blur-xs flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Retirer la photo de ce défi"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Retirer photo</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-stone-200/60 flex items-center justify-between">
+                  <div className="mt-4 pt-3 border-t border-stone-200/60 flex items-center justify-between gap-2 flex-wrap">
                     <span className="text-[11px] text-stone-500">
                       {chal.isCompleted
                         ? `Accompli ${chal.completedDate || 'récemment'} 🎉`
                         : 'Défi en attente'}
                     </span>
 
-                    <button
-                      onClick={() => {
-                        onToggleChallenge(chal.id);
-                        if (!chal.isCompleted) {
-                          soundEffects.playSuccessSparkle();
-                          triggerCelebrationConfetti();
-                        }
-                      }}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        chal.isCompleted
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-stone-900 hover:bg-stone-800 text-white'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>{chal.isCompleted ? 'Validé !' : 'Marquer comme fait'}</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      {onDeleteChallenge && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteChallenge(chal.id)}
+                          className="p-1.5 rounded-xl border border-stone-200 hover:border-rose-300 text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Supprimer ce défi"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          onToggleChallenge(chal.id);
+                          if (!chal.isCompleted) {
+                            soundEffects.playSuccessSparkle();
+                            triggerCelebrationConfetti();
+                          }
+                        }}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          chal.isCompleted
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-stone-900 hover:bg-stone-800 text-white'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{chal.isCompleted ? 'Validé !' : 'Marquer comme fait'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

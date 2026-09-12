@@ -37,6 +37,7 @@ interface VouchersAndBucketViewProps {
   onDeleteVoucher?: (voucherId: string) => void;
   onEditBucketItem?: (item: BucketItem) => void;
   onDeleteBucketItem?: (itemId: string) => void;
+  onRemoveBucketPhoto?: (itemId: string) => void;
 }
 
 export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
@@ -52,6 +53,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
   onDeleteVoucher,
   onEditBucketItem,
   onDeleteBucketItem,
+  onRemoveBucketPhoto,
 }) => {
   const [subTab, setSubTab] = useState<'vouchers' | 'bucket'>('vouchers');
   const [voucherFilter, setVoucherFilter] = useState<'all' | 'available' | 'used'>('available');
@@ -454,11 +456,34 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                             {item.notes}
                           </p>
                         )}
+
+                        {item.photoUrl && item.photoUrl.trim() !== '' && (
+                          <div className="relative group/bphoto mt-2.5 rounded-xl overflow-hidden w-24 h-20 sm:w-32 sm:h-24 bg-stone-100 border border-stone-200">
+                            <img
+                              src={item.photoUrl}
+                              alt={item.title}
+                              className="w-full h-full object-cover"
+                            />
+                            {onRemoveBucketPhoto && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemoveBucketPhoto(item.id);
+                                }}
+                                className="absolute top-1 right-1 p-1 rounded-md bg-black/60 hover:bg-rose-600 text-white transition-colors cursor-pointer"
+                                title="Retirer la photo"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Status Select / Switch */}
-                    <div className="flex items-center gap-2 self-end sm:self-center">
+                    <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                       <select
                         value={item.status}
                         onChange={(e) => {
@@ -490,6 +515,17 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                           title="Modifier ce souhait"
                         >
                           <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {onRemoveBucketPhoto && item.photoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveBucketPhoto(item.id)}
+                          className="p-1.5 rounded-xl border border-amber-200 hover:bg-amber-50 text-amber-700 hover:border-amber-300 transition-colors cursor-pointer"
+                          title="Retirer la photo de ce souhait"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
 

@@ -6,7 +6,8 @@ import { soundEffects } from '../../lib/audio';
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message?: string;
+  itemType?: string;
   itemName?: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -17,7 +18,8 @@ interface ConfirmDeleteModalProps {
 export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   isOpen,
   title,
-  message,
+  message = 'Cette action est irréversible. Êtes-vous sûr de vouloir supprimer cet élément ?',
+  itemType,
   itemName,
   onConfirm,
   onCancel,

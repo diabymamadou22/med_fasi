@@ -72,6 +72,8 @@ interface SharedGalleryViewProps {
   onOpenProfileModal: (pId?: PartnerId) => void;
   onEditMemory?: (memory: TimelineMemory) => void;
   onDeleteMemory?: (memoryId: string) => void;
+  onDeleteMediaItem?: (item: GalleryItem) => void;
+  onRemovePhotoOnly?: (item: GalleryItem) => void;
 }
 
 export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
@@ -87,6 +89,8 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   onOpenProfileModal,
   onEditMemory,
   onDeleteMemory,
+  onDeleteMediaItem,
+  onRemovePhotoOnly,
 }) => {
   const [selectedSource, setSelectedSource] = useState<GallerySourceType>('all');
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState<'all' | 'p1' | 'p2'>('all');
@@ -664,8 +668,8 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     </span>
                   </div>
 
-                  {/* Author Avatar Pill */}
-                  <div className="absolute top-2.5 right-2.5">
+                  {/* Author Avatar Pill & Delete Button */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
                     {author ? (
                       <div
                         className="flex items-center gap-1 px-1.5 py-0.8 rounded-full bg-black/40 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
@@ -689,6 +693,22 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                         <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
                         <span className="hidden group-hover:inline pr-0.5">En duo</span>
                       </div>
+                    )}
+
+                    {onDeleteMediaItem && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          soundEffects.playTrashDelete();
+                          onDeleteMediaItem(item);
+                        }}
+                        className="p-1.5 rounded-full bg-black/50 hover:bg-rose-600 text-white backdrop-blur-md transition-all shadow-xs border border-white/20 hover:scale-110 cursor-pointer"
+                        title="Supprimer ce média"
+                        aria-label="Supprimer ce média"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     )}
                   </div>
 
@@ -881,62 +901,95 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                         </button>
                       )}
 
-                    {activePhoto.sourceType === 'memory' &&
-                      activePhoto.originalEntityId && (
-                        <div className="flex items-center gap-1.5">
-                          {onEditMemory && (
-                            <button
-                              onClick={() => {
-                                const mem = memories.find(
-                                  (m) => m.id === activePhoto.originalEntityId
-                                );
-                                if (mem) {
-                                  setActiveLightboxIndex(null);
-                                  onEditMemory(mem);
-                                }
-                              }}
-                              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                              title="Modifier ce souvenir"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Modifier</span>
-                            </button>
-                          )}
-                          {onDeleteMemory && (
-                            <button
-                              onClick={() => {
-                                if (activePhoto.originalEntityId) {
-                                  const memId = activePhoto.originalEntityId;
-                                  setActiveLightboxIndex(null);
-                                  onDeleteMemory(memId);
-                                }
-                              }}
-                              className="px-3 py-2 bg-white/10 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                              title="Supprimer ce souvenir"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Supprimer</span>
-                            </button>
-                          )}
-                        </div>
+                    {/* Media Actions for Lightbox */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {onRemovePhotoOnly && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = activePhoto;
+                            setActiveLightboxIndex(null);
+                            onRemovePhotoOnly(target);
+                          }}
+                          className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          title="Supprimer uniquement cette photo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Retirer photo</span>
+                        </button>
                       )}
 
-                    {activePhoto.sourceType === 'profile' && (
-                      <button
-                        onClick={() => {
-                          setActiveLightboxIndex(null);
-                          onOpenProfileModal(
-                            activePhoto.authorId === 'p1' || activePhoto.authorId === 'p2'
-                              ? activePhoto.authorId
-                              : undefined
-                          );
-                        }}
-                        className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>Changer la photo</span>
-                      </button>
-                    )}
+                      {onDeleteMediaItem ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = activePhoto;
+                            setActiveLightboxIndex(null);
+                            onDeleteMediaItem(target);
+                          }}
+                          className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          title="Supprimer ce média"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Supprimer</span>
+                        </button>
+                      ) : (
+                        activePhoto.sourceType === 'memory' &&
+                        activePhoto.originalEntityId &&
+                        onDeleteMemory && (
+                          <button
+                            onClick={() => {
+                              const memId = activePhoto.originalEntityId!;
+                              setActiveLightboxIndex(null);
+                              onDeleteMemory(memId);
+                            }}
+                            className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                            title="Supprimer ce souvenir"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Supprimer</span>
+                          </button>
+                        )
+                      )}
+
+                      {activePhoto.sourceType === 'memory' &&
+                        activePhoto.originalEntityId &&
+                        onEditMemory && (
+                          <button
+                            onClick={() => {
+                              const mem = memories.find(
+                                (m) => m.id === activePhoto.originalEntityId
+                              );
+                              if (mem) {
+                                setActiveLightboxIndex(null);
+                                onEditMemory(mem);
+                              }
+                            }}
+                            className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                            title="Modifier ce souvenir"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Modifier</span>
+                          </button>
+                        )}
+
+                      {activePhoto.sourceType === 'profile' && (
+                        <button
+                          onClick={() => {
+                            setActiveLightboxIndex(null);
+                            onOpenProfileModal(
+                              activePhoto.authorId === 'p1' || activePhoto.authorId === 'p2'
+                                ? activePhoto.authorId
+                                : undefined
+                            );
+                          }}
+                          className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Changer photo</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -6,7 +6,7 @@ import { MoodAndNeedsBar } from './components/MoodAndNeedsBar';
 import { MissYouModal } from './components/MissYouModal';
 import { JournalView } from './components/views/JournalView';
 import { TimelineView } from './components/views/TimelineView';
-import { SharedGalleryView } from './components/views/SharedGalleryView';
+import { SharedGalleryView, GalleryItem } from './components/views/SharedGalleryView';
 import { GamesView } from './components/views/GamesView';
 import { VouchersAndBucketView } from './components/views/VouchersAndBucketView';
 import { WriteNoteModal } from './components/modals/WriteNoteModal';
@@ -75,6 +75,7 @@ import {
   saveQuiz,
   saveDateIdea,
   saveChallenge,
+  deleteChallengeFromDb,
   saveSettings,
   sendMissYouPulse,
   COLLECTIONS,
@@ -997,6 +998,160 @@ export default function App() {
         deleteBucketItemFromDb(itemId).catch(console.error);
       },
     });
+  };
+
+  const handleDeleteChallenge = (challengeId: string) => {
+    const chal = challenges.find((c) => c.id === challengeId);
+    setDeleteTarget({
+      title: 'Supprimer ce défi ?',
+      itemType: 'défi',
+      itemName: chal?.title,
+      onConfirm: () => {
+        setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
+        deleteChallengeFromDb(challengeId).catch(console.error);
+      },
+    });
+  };
+
+  const handleRemoveMemoryPhoto = (memoryId: string) => {
+    const mem = memories.find((m) => m.id === memoryId);
+    if (!mem) return;
+    setDeleteTarget({
+      title: 'Supprimer la photo de ce souvenir ?',
+      itemType: 'photo de souvenir',
+      itemName: mem.title,
+      message: 'La photo sera retirée du souvenir, mais votre texte et vos anecdotes restent conservés.',
+      onConfirm: () => {
+        const updated = { ...mem, photoUrl: '' };
+        setMemories((prev) => prev.map((m) => (m.id === memoryId ? updated : m)));
+        saveMemory(updated).catch(console.error);
+      },
+    });
+  };
+
+  const handleRemoveLocationPhoto = (locationId: string) => {
+    const loc = locations.find((l) => l.id === locationId);
+    if (!loc) return;
+    setDeleteTarget({
+      title: 'Supprimer la photo de ce lieu ?',
+      itemType: 'photo de lieu',
+      itemName: loc.name,
+      message: 'La photo sera supprimée du lieu, mais vos notes sur cet endroit restent enregistrées.',
+      onConfirm: () => {
+        const updated = { ...loc, photoUrl: '' };
+        setLocations((prev) => prev.map((l) => (l.id === locationId ? updated : l)));
+        saveLocation(updated).catch(console.error);
+      },
+    });
+  };
+
+  const handleRemoveCapsulePhoto = (capsuleId: string) => {
+    const cap = capsules.find((c) => c.id === capsuleId);
+    if (!cap) return;
+    setDeleteTarget({
+      title: 'Supprimer la photo de cette capsule ?',
+      itemType: 'photo de capsule',
+      itemName: cap.title,
+      message: 'La photo sera retirée, mais votre message scellé restera préservé.',
+      onConfirm: () => {
+        const updated = { ...cap, photoUrl: '' };
+        setCapsules((prev) => prev.map((c) => (c.id === capsuleId ? updated : c)));
+        saveCapsule(updated).catch(console.error);
+      },
+    });
+  };
+
+  const handleRemoveBucketPhoto = (itemId: string) => {
+    const item = bucketList.find((b) => b.id === itemId);
+    if (!item) return;
+    setDeleteTarget({
+      title: 'Supprimer la photo de ce souhait ?',
+      itemType: 'photo de souhait',
+      itemName: item.title,
+      message: 'La photo d’illustration sera retirée de ce souhait de la Bucket List.',
+      onConfirm: () => {
+        const updated = { ...item, photoUrl: '' };
+        setBucketList((prev) => prev.map((b) => (b.id === itemId ? updated : b)));
+        saveBucketItem(updated).catch(console.error);
+      },
+    });
+  };
+
+  const handleRemoveChallengePhoto = (challengeId: string) => {
+    const chal = challenges.find((c) => c.id === challengeId);
+    if (!chal) return;
+    setDeleteTarget({
+      title: 'Supprimer la photo de ce défi ?',
+      itemType: 'photo de preuve',
+      itemName: chal.title,
+      message: 'La photo de preuve sera retirée de ce défi de couple.',
+      onConfirm: () => {
+        const updated = challenges.map((c) =>
+          c.id === challengeId ? { ...c, photoProof: '' } : c
+        );
+        setChallenges(updated);
+        const itemToSave = updated.find((c) => c.id === challengeId);
+        if (itemToSave) saveChallenge(itemToSave).catch(console.error);
+      },
+    });
+  };
+
+  const handleRemoveProfilePhoto = (partnerId: PartnerId) => {
+    const partnerKey = partnerId === 'p1' ? 'partner1' : 'partner2';
+    const partnerName = profile[partnerKey]?.name || 'Profil';
+    setDeleteTarget({
+      title: 'Retirer la photo de profil ?',
+      itemType: 'photo de profil',
+      itemName: partnerName,
+      message: 'La photo sera retirée et remplacée par la jolie initiale par défaut.',
+      onConfirm: () => {
+        const updatedProfile: CoupleProfile = {
+          ...profile,
+          [partnerKey]: {
+            ...profile[partnerKey],
+            avatar: '',
+          },
+        };
+        setProfile(updatedProfile);
+        saveProfile(updatedProfile).catch(console.error);
+      },
+    });
+  };
+
+  // Delete media item from Gallery
+  const handleDeleteMediaItem = (item: GalleryItem) => {
+    if (item.sourceType === 'memory' && item.originalEntityId) {
+      handleDeleteMemory(item.originalEntityId);
+    } else if (item.sourceType === 'location' && item.originalEntityId) {
+      handleDeleteLocation(item.originalEntityId);
+    } else if (item.sourceType === 'capsule' && item.originalEntityId) {
+      handleDeleteCapsule(item.originalEntityId);
+    } else if (item.sourceType === 'bucket' && item.originalEntityId) {
+      handleDeleteBucketItem(item.originalEntityId);
+    } else if (item.sourceType === 'challenge' && item.originalEntityId) {
+      handleRemoveChallengePhoto(item.originalEntityId);
+    } else if (item.sourceType === 'profile') {
+      const pId = item.authorId === 'p1' || item.authorId === 'p2' ? item.authorId : 'p1';
+      handleRemoveProfilePhoto(pId as PartnerId);
+    }
+  };
+
+  // Remove photo only from Gallery item
+  const handleRemovePhotoOnly = (item: GalleryItem) => {
+    if (item.sourceType === 'memory' && item.originalEntityId) {
+      handleRemoveMemoryPhoto(item.originalEntityId);
+    } else if (item.sourceType === 'location' && item.originalEntityId) {
+      handleRemoveLocationPhoto(item.originalEntityId);
+    } else if (item.sourceType === 'capsule' && item.originalEntityId) {
+      handleRemoveCapsulePhoto(item.originalEntityId);
+    } else if (item.sourceType === 'bucket' && item.originalEntityId) {
+      handleRemoveBucketPhoto(item.originalEntityId);
+    } else if (item.sourceType === 'challenge' && item.originalEntityId) {
+      handleRemoveChallengePhoto(item.originalEntityId);
+    } else if (item.sourceType === 'profile') {
+      const pId = item.authorId === 'p1' || item.authorId === 'p2' ? item.authorId : 'p1';
+      handleRemoveProfilePhoto(pId as PartnerId);
+    }
   };
 
   // Reset to default

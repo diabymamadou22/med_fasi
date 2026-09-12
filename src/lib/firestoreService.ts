@@ -264,6 +264,10 @@ export async function saveChallenge(challenge: CoupleChallenge) {
   await setDoc(ref, challenge, { merge: true });
 }
 
+export async function deleteChallengeFromDb(id: string) {
+  await deleteDoc(doc(db, COLLECTIONS.CHALLENGES, id));
+}
+
 export async function saveSettings(settings: CoupleSettings) {
   const ref = doc(db, COLLECTIONS.SETTINGS, 'main_settings');
   await setDoc(ref, { ...settings, id: 'main_settings' }, { merge: true });
