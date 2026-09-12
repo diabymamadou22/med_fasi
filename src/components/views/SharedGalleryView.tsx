@@ -222,7 +222,19 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       }
     });
 
-    return items;
+    const seenIds = new Set<string>();
+    const uniqueItems: GalleryItem[] = [];
+    for (const item of items) {
+      let uniqueId = item.id;
+      let counter = 1;
+      while (seenIds.has(uniqueId)) {
+        uniqueId = `${item.id}-${counter++}`;
+      }
+      seenIds.add(uniqueId);
+      uniqueItems.push({ ...item, id: uniqueId });
+    }
+
+    return uniqueItems;
   }, [profile, memories, locations, capsules, challenges, bucketList]);
 
   // Filtered & Sorted items
@@ -620,7 +632,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
 
             return (
               <motion.div
-                key={item.id}
+                key={`${item.id}-${index}`}
                 layout
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}

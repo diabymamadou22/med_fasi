@@ -12,6 +12,19 @@ import {
   DailyGratitude,
 } from '../types';
 
+export const DEFAULT_AVATARS = {
+  p1: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+  p2: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+};
+
+export function getPartnerAvatar(avatar?: string | null, partnerId: 'p1' | 'p2' | string = 'p1'): string {
+  if (avatar && typeof avatar === 'string' && avatar.trim() !== '') {
+    return avatar.trim();
+  }
+  const key = partnerId === 'p2' ? 'p2' : 'p1';
+  return DEFAULT_AVATARS[key];
+}
+
 export const INITIAL_PROFILE: CoupleProfile = {
   partner1: {
     id: 'p1',

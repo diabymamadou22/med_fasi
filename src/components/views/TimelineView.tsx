@@ -217,7 +217,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
               return (
                 <motion.div
-                  key={mem.id}
+                  key={mem.id ? `${mem.id}-${idx}` : `mem-${idx}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.08 }}
@@ -297,9 +297,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     {/* Tags & Likes Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-stone-100 flex-wrap gap-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {mem.tags.map((tag) => (
+                        {mem.tags.map((tag, tagIdx) => (
                           <span
-                            key={tag}
+                            key={`${tag}-${tagIdx}`}
                             className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-stone-100 text-stone-600"
                           >
                             #{tag}
@@ -362,7 +362,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
           {/* Capsules Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {capsules.map((cap) => {
+            {capsules.map((cap, capIdx) => {
               const daysLeft = getDaysRemaining(cap.targetUnlockDate);
               const isUnlocked = daysLeft === 0 || cap.isOpened;
               const author =
@@ -379,7 +379,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
               return (
                 <div
-                  key={cap.id}
+                  key={cap.id ? `${cap.id}-${capIdx}` : `cap-${capIdx}`}
                   onClick={() => handleOpenCapsule(cap)}
                   className={`bg-white rounded-3xl border p-5 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between group ${
                     isUnlocked
@@ -595,11 +595,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               </svg>
 
               {/* Map Pins */}
-              {locations.map((loc) => {
+              {locations.map((loc, locIdx) => {
                 const isSelected = selectedLocation?.id === loc.id;
                 return (
                   <motion.button
-                    key={loc.id}
+                    key={loc.id ? `${loc.id}-${locIdx}` : `loc-${locIdx}`}
                     whileHover={{ scale: 1.2 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {

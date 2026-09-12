@@ -347,14 +347,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {filteredNotes.map((note) => {
+            {filteredNotes.map((note, idx) => {
               const isSenderMe = note.senderId === activePartnerId;
               const sender =
                 note.senderId === 'p1' ? profile.partner1 : profile.partner2;
 
               return (
                 <div
-                  key={note.id}
+                  key={note.id ? `${note.id}-${idx}` : `note-${idx}`}
                   onClick={() => setSelectedNote(note)}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5 relative group ${
                     backgroundStyles[note.backgroundStyle] || backgroundStyles.cream
@@ -478,14 +478,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
         {/* Gratitude Timeline items */}
         <div className="space-y-3">
-          {gratitudes.map((grat) => {
+          {gratitudes.map((grat, idx) => {
             const author =
               grat.authorId === 'p1' ? profile.partner1 : profile.partner2;
             const hasLiked = grat.likes.includes(activePartnerId);
 
             return (
               <div
-                key={grat.id}
+                key={grat.id ? `${grat.id}-${idx}` : `grat-${idx}`}
                 className="p-4 rounded-2xl bg-stone-50/70 border border-stone-200/60 hover:bg-rose-50/30 transition-colors flex items-start justify-between gap-3"
               >
                 <div className="flex items-start gap-3">

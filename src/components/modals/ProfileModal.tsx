@@ -29,7 +29,7 @@ import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../.
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti } from '../../lib/confetti';
 import { processImageFile } from '../../lib/imageUtils';
-import { getPartnerAvatar } from '../../data/initialData';
+import { PartnerAvatar } from '../PartnerAvatar';
 
 interface ProfileModalProps {
   profile: CoupleProfile;
@@ -371,10 +371,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     {/* Photo Upload & Preview for Partner 1 */}
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/80 p-3.5 rounded-2xl border border-rose-200/60">
                       <div className="relative group">
-                        <img
-                          src={getPartnerAvatar(partner1Avatar, 'p1')}
-                          alt={partner1Name}
-                          className="w-20 h-20 rounded-full object-cover border-3 border-white shadow-md ring-3 ring-rose-400"
+                        <PartnerAvatar
+                          name={partner1Name}
+                          avatar={partner1Avatar}
+                          partnerId="p1"
+                          size="xl"
+                          className="border-3 border-white shadow-md ring-3 ring-rose-400"
                         />
                         {isP1LoadingPhoto && (
                           <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
@@ -503,10 +505,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     {/* Photo Upload & Preview for Partner 2 */}
                     <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/80 p-3.5 rounded-2xl border border-sky-200/60">
                       <div className="relative group">
-                        <img
-                          src={getPartnerAvatar(partner2Avatar, 'p2')}
-                          alt={partner2Name}
-                          className="w-20 h-20 rounded-full object-cover border-3 border-white shadow-md ring-3 ring-sky-400"
+                        <PartnerAvatar
+                          name={partner2Name}
+                          avatar={partner2Avatar}
+                          partnerId="p2"
+                          size="xl"
+                          className="border-3 border-white shadow-md ring-3 ring-sky-400"
                         />
                         {isP2LoadingPhoto && (
                           <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
