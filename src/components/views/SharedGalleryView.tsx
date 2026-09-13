@@ -18,6 +18,7 @@ import {
   Sparkles,
   Camera,
   Layers,
+  LayoutGrid,
   ArrowUpDown,
   Pencil,
   Trash2,
@@ -29,7 +30,6 @@ import {
   MemoryLocation,
   TimeCapsule,
   CoupleChallenge,
-  BucketItem,
 } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { PartnerAvatar } from '../PartnerAvatar';
@@ -41,12 +41,11 @@ export type GallerySourceType =
   | 'profile'
   | 'location'
   | 'capsule'
-  | 'challenge'
-  | 'bucket';
+  | 'challenge';
 
 export interface GalleryItem {
   id: string;
-  sourceType: 'memory' | 'profile' | 'location' | 'capsule' | 'challenge' | 'bucket';
+  sourceType: 'memory' | 'profile' | 'location' | 'capsule' | 'challenge';
   sourceLabel: string;
   title: string;
   photoUrl: string;
@@ -66,7 +65,6 @@ interface SharedGalleryViewProps {
   locations: MemoryLocation[];
   capsules: TimeCapsule[];
   challenges: CoupleChallenge[];
-  bucketList: BucketItem[];
   onLikeMemory?: (memoryId: string) => void;
   onOpenAddMemoryModal: () => void;
   onOpenProfileModal: (pId?: PartnerId) => void;
@@ -83,7 +81,6 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   locations,
   capsules,
   challenges,
-  bucketList,
   onLikeMemory,
   onOpenAddMemoryModal,
   onOpenProfileModal,
@@ -96,6 +93,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState<'all' | 'p1' | 'p2'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [galleryLayout, setGalleryLayout] = useState<'fit' | 'natural'>('fit');
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
 
   // Compile all photos across the application into unified items
@@ -208,24 +206,6 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       }
     });
 
-    // 6. Bucket List with photo
-    bucketList.forEach((bkt) => {
-      if (bkt.photoUrl && bkt.photoUrl.trim().length > 0) {
-        items.push({
-          id: `bkt-${bkt.id}`,
-          sourceType: 'bucket',
-          sourceLabel: 'Projet Bucket List',
-          title: bkt.title,
-          photoUrl: bkt.photoUrl,
-          date: bkt.targetDate,
-          description: bkt.notes,
-          authorId: bkt.addedBy,
-          tags: ['Projet', bkt.category],
-          originalEntityId: bkt.id,
-        });
-      }
-    });
-
     const seenIds = new Set<string>();
     const uniqueItems: GalleryItem[] = [];
     for (const item of items) {
@@ -239,7 +219,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     }
 
     return uniqueItems;
-  }, [profile, memories, locations, capsules, challenges, bucketList]);
+  }, [profile, memories, locations, capsules, challenges]);
 
   // Filtered & Sorted items
   const filteredItems = useMemo(() => {
@@ -339,11 +319,6 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           label: 'Défi',
           bg: 'bg-blue-50 text-blue-700 border-blue-200',
         };
-      case 'bucket':
-        return {
-          label: 'Bucket List',
-          bg: 'bg-teal-50 text-teal-700 border-teal-200',
-        };
       default:
         return {
           label: 'Photo',
@@ -410,7 +385,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
               id="btn-gallery-add-memory"
             >
               <Plus className="w-4 h-4 text-rose-600" />
-              <span>Nouveau Souvenir</span>
+              <span>Ajouter une photo</span>
             </button>
             <button
               onClick={() => {
@@ -507,13 +482,49 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
               </button>
             </div>
 
+            {/* Layout Mode Toggle */}
+            <div className="flex items-center bg-stone-100 p-0.5 rounded-xl border border-stone-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setGalleryLayout('fit');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  galleryLayout === 'fit'
+                    ? 'bg-white text-stone-900 shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+                title="Grille avec photos entières (aucun recadrage, fond doux)"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Grille entière</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setGalleryLayout('natural');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  galleryLayout === 'natural'
+                    ? 'bg-white text-stone-900 shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+                title="Format naturel libre (hauteur réelle originale)"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Format libre</span>
+              </button>
+            </div>
+
             {/* Sort Order */}
             <button
               onClick={() => {
                 soundEffects.playNoteClick();
                 setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'));
               }}
-              className="flex items-center gap-1 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors shrink-0"
+              className="flex items-center gap-1 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors shrink-0 cursor-pointer"
               title="Changer l'ordre de tri"
             >
               <ArrowUpDown className="w-3.5 h-3.5 text-stone-500" />
@@ -617,16 +628,15 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
               className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Ajouter un souvenir</span>
+              <span>Ajouter une photo</span>
             </button>
           </div>
         </div>
-      ) : (
+      ) : galleryLayout === 'fit' ? (
+        /* Fit Grid: Square frames with 100% full uncropped image and soft ambient blur */
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {filteredItems.map((item, index) => {
             const badge = getSourceBadgeInfo(item.sourceType);
-            const isLiked =
-              item.likes && item.likes.includes(activePartnerId);
             const author =
               item.authorId === 'p1'
                 ? profile.partner1
@@ -636,7 +646,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
 
             return (
               <motion.div
-                key={`${item.id}-${index}`}
+                key={item.id}
                 layout
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -647,22 +657,28 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                 }}
                 className="group relative bg-white rounded-2xl overflow-hidden border border-stone-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all cursor-pointer flex flex-col"
               >
-                {/* Image Container with fixed aspect ratio */}
-                <div className="relative aspect-4/3 sm:aspect-square overflow-hidden bg-stone-100">
+                {/* Image Container with 100% uncropped display */}
+                <div className="relative aspect-square w-full overflow-hidden bg-stone-900/5 flex items-center justify-center p-2">
+                  {/* Soft ambient blur in background */}
+                  <img
+                    src={item.photoUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover blur-xl opacity-20 scale-125 select-none pointer-events-none"
+                  />
+
+                  {/* Main Full Image: Exactly in full, never cropped */}
                   <img
                     src={item.photoUrl}
                     alt={item.title}
                     loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="relative max-w-full max-h-full w-auto h-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-[1.02] select-none"
                   />
 
-                  {/* Gradient Overlay on Hover */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 opacity-80 group-hover:opacity-100 transition-opacity" />
-
-                  {/* Top Badge: Source Type */}
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                  {/* Top Badges */}
+                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.8 rounded-full border backdrop-blur-md shadow-xs ${badge.bg}`}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md shadow-2xs ${badge.bg}`}
                     >
                       {badge.label}
                     </span>
@@ -672,7 +688,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                   <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
                     {author ? (
                       <div
-                        className="flex items-center gap-1 px-1.5 py-0.8 rounded-full bg-black/40 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
                         title={`Partagé par ${author.name}`}
                       >
                         <PartnerAvatar
@@ -687,7 +703,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                       </div>
                     ) : (
                       <div
-                        className="flex items-center gap-1 px-1.5 py-0.8 rounded-full bg-black/40 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
                         title="Souvenir de couple"
                       >
                         <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
@@ -703,7 +719,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                           soundEffects.playTrashDelete();
                           onDeleteMediaItem(item);
                         }}
-                        className="p-2 sm:p-1.5 rounded-full bg-black/60 hover:bg-rose-600 active:bg-rose-700 text-white backdrop-blur-md transition-all shadow-md border border-white/30 hover:scale-110 active:scale-95 cursor-pointer"
+                        className="p-1.5 rounded-full bg-black/60 hover:bg-rose-600 active:bg-rose-700 text-white backdrop-blur-md transition-all shadow-md border border-white/30 hover:scale-110 active:scale-95 cursor-pointer"
                         title="Supprimer ce média de la galerie"
                         aria-label="Supprimer ce média de la galerie"
                       >
@@ -711,48 +727,191 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                       </button>
                     )}
                   </div>
+                </div>
 
-                  {/* Bottom details on image */}
-                  <div className="absolute bottom-2.5 inset-x-2.5 text-white">
-                    <h4 className="font-serif font-bold text-sm text-white line-clamp-1 drop-shadow-xs">
+                {/* Card Details below image (never covers photo) */}
+                <div className="p-3 sm:p-3.5 bg-white flex-1 flex flex-col justify-between border-t border-stone-100">
+                  <div>
+                    <h4 className="font-serif font-bold text-sm text-stone-800 line-clamp-1 group-hover:text-rose-600 transition-colors">
                       {item.title}
                     </h4>
-                    <div className="flex items-center justify-between text-[11px] text-stone-200 mt-0.5">
-                      {item.locationName ? (
-                        <span className="flex items-center gap-1 truncate max-w-[70%]">
-                          <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
-                          <span className="truncate">{item.locationName}</span>
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-rose-300" />
-                          <span>{item.date || 'Moment précieux'}</span>
-                        </span>
-                      )}
+                    {item.description && (
+                      <p className="text-xs text-stone-500 line-clamp-2 mt-1 leading-relaxed">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
 
-                      {/* Like indicator if memory */}
-                      {item.sourceType === 'memory' && item.likes && (
-                        <span className="flex items-center gap-1 text-[11px] font-bold text-rose-300">
-                          <Heart
-                            className={`w-3 h-3 ${
-                              item.likes.length > 0
-                                ? 'fill-rose-400 text-rose-400'
-                                : 'text-stone-300'
-                            }`}
-                          />
-                          {item.likes.length}
-                        </span>
+                  <div className="flex items-center justify-between text-[11px] text-stone-400 mt-2.5 pt-2 border-t border-stone-100">
+                    <div className="flex items-center gap-1 truncate max-w-[70%]">
+                      {item.locationName ? (
+                        <>
+                          <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                          <span className="truncate text-stone-600 font-medium">
+                            {item.locationName}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
+                          <span className="truncate text-stone-500">
+                            {item.date || 'Moment précieux'}
+                          </span>
+                        </>
                       )}
                     </div>
+
+                    {item.sourceType === 'memory' && item.likes && (
+                      <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500">
+                        <Heart
+                          className={`w-3 h-3 ${
+                            item.likes.length > 0
+                              ? 'fill-rose-500 text-rose-500'
+                              : 'text-stone-300'
+                          }`}
+                        />
+                        {item.likes.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Natural Masonry: Each photo in its 100% natural height and aspect ratio */
+        <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
+          {filteredItems.map((item, index) => {
+            const badge = getSourceBadgeInfo(item.sourceType);
+            const author =
+              item.authorId === 'p1'
+                ? profile.partner1
+                : item.authorId === 'p2'
+                ? profile.partner2
+                : null;
+
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: index * 0.02 }}
+                onClick={() => {
+                  soundEffects.playNoteClick();
+                  setActiveLightboxIndex(index);
+                }}
+                className="break-inside-avoid group relative bg-white rounded-2xl overflow-hidden border border-stone-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all cursor-pointer flex flex-col"
+              >
+                {/* Natural Image View */}
+                <div className="relative w-full bg-stone-100 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={item.photoUrl}
+                    alt={item.title}
+                    loading="lazy"
+                    className="w-full h-auto object-contain block transition-transform duration-300 group-hover:scale-[1.01]"
+                  />
+
+                  {/* Top Badges */}
+                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md shadow-2xs ${badge.bg}`}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  {/* Author Avatar Pill & Delete Button */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+                    {author ? (
+                      <div
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
+                        title={`Partagé par ${author.name}`}
+                      >
+                        <PartnerAvatar
+                          name={author.name}
+                          avatar={author.avatar}
+                          partnerId={author.id}
+                          size="xs"
+                        />
+                        <span className="hidden group-hover:inline pr-0.5">
+                          {author.name}
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
+                        title="Souvenir de couple"
+                      >
+                        <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
+                        <span className="hidden group-hover:inline pr-0.5">En duo</span>
+                      </div>
+                    )}
+
+                    {onDeleteMediaItem && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          soundEffects.playTrashDelete();
+                          onDeleteMediaItem(item);
+                        }}
+                        className="p-1.5 rounded-full bg-black/60 hover:bg-rose-600 active:bg-rose-700 text-white backdrop-blur-md transition-all shadow-md border border-white/30 hover:scale-110 active:scale-95 cursor-pointer"
+                        title="Supprimer ce média de la galerie"
+                        aria-label="Supprimer ce média de la galerie"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Subtle caption bottom panel */}
-                {item.description && (
-                  <div className="p-3 bg-white text-xs text-stone-600 line-clamp-2 leading-relaxed border-t border-stone-100">
-                    {item.description}
+                {/* Card Details below image */}
+                <div className="p-3 sm:p-3.5 bg-white flex-1 flex flex-col justify-between border-t border-stone-100">
+                  <div>
+                    <h4 className="font-serif font-bold text-sm text-stone-800 line-clamp-1 group-hover:text-rose-600 transition-colors">
+                      {item.title}
+                    </h4>
+                    {item.description && (
+                      <p className="text-xs text-stone-500 line-clamp-2 mt-1 leading-relaxed">
+                        {item.description}
+                      </p>
+                    )}
                   </div>
-                )}
+
+                  <div className="flex items-center justify-between text-[11px] text-stone-400 mt-2.5 pt-2 border-t border-stone-100">
+                    <div className="flex items-center gap-1 truncate max-w-[70%]">
+                      {item.locationName ? (
+                        <>
+                          <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                          <span className="truncate text-stone-600 font-medium">
+                            {item.locationName}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
+                          <span className="truncate text-stone-500">
+                            {item.date || 'Moment précieux'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {item.sourceType === 'memory' && item.likes && (
+                      <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500">
+                        <Heart
+                          className={`w-3 h-3 ${
+                            item.likes.length > 0
+                              ? 'fill-rose-500 text-rose-500'
+                              : 'text-stone-300'
+                          }`}
+                        />
+                        {item.likes.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             );
           })}

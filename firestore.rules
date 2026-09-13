@@ -42,5 +42,11 @@ service cloud.firestore {
     match /couple_settings/{document} {
       allow read, write: if true;
     }
+    match /chat_messages/{document} {
+      allow read, write: if true;
+    }
+    match /chat_status/{document} {
+      allow read, write: if true;
+    }
   }
 }

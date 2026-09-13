@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Clock,
@@ -85,11 +85,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
 
-  // Filter memories
-  const filteredMemories = memories.filter((m) => {
-    if (selectedCategory === 'all') return true;
-    return m.category === selectedCategory;
-  });
+  // Filter memories with deduplication
+  const filteredMemories = useMemo(() => {
+    const seen = new Set<string>();
+    return memories.filter((m) => {
+      if (!m || !m.id || seen.has(m.id)) return false;
+      seen.add(m.id);
+      if (selectedCategory === 'all') return true;
+      return m.category === selectedCategory;
+    });
+  }, [memories, selectedCategory]);
 
   const handleOpenCapsule = (cap: TimeCapsule) => {
     const isReady = new Date(cap.targetUnlockDate).getTime() <= Date.now();
@@ -158,11 +163,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         {subSection === 'timeline' && (
           <button
             onClick={onOpenAddMemoryModal}
-            className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+            className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             id="btn-add-memory"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Ajouter un moment</span>
+            <span>Ajouter une photo</span>
           </button>
         )}
         {subSection === 'capsules' && (
@@ -226,7 +231,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
               return (
                 <motion.div
-                  key={mem.id ? `${mem.id}-${idx}` : `mem-${idx}`}
+                  key={mem.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.08 }}
@@ -288,20 +293,29 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Photo if available */}
+                    {/* Photo if available - ALWAYS FULL AND UNCROPPED */}
                     {mem.photoUrl && mem.photoUrl.trim() !== '' && (
-                      <div className="relative group/photo rounded-2xl overflow-hidden max-h-72 w-full bg-stone-100 cursor-pointer">
+                      <div
+                        onClick={() => {
+                          soundEffects.playNoteClick();
+                          setPreviewMemory(mem);
+                        }}
+                        className="relative group/photo rounded-2xl overflow-hidden min-h-[180px] max-h-96 w-full bg-stone-900/5 flex items-center justify-center cursor-pointer p-1.5"
+                      >
+                        {/* Soft ambient background */}
+                        <img
+                          src={mem.photoUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-xl opacity-20 scale-125 select-none pointer-events-none"
+                        />
                         <img
                           src={mem.photoUrl}
                           alt={mem.title}
-                          onClick={() => {
-                            soundEffects.playNoteClick();
-                            setPreviewMemory(mem);
-                          }}
-                          className="w-full h-full object-cover group-hover/photo:scale-[1.01] transition-transform duration-300"
+                          className="relative max-h-92 w-auto max-w-full object-contain rounded-xl drop-shadow-xs group-hover/photo:scale-[1.01] transition-transform duration-300 select-none"
                         />
                         {/* Overlay with View and Remove buttons */}
-                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover/photo:opacity-100 transition-opacity">
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-90 sm:opacity-0 sm:group-hover/photo:opacity-100 transition-opacity z-10">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -335,14 +349,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     )}
 
                     {/* Anecdote Description */}
-                    <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-normal">
-                      {mem.description}
-                    </p>
+                    {mem.description && (
+                      <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-normal">
+                        {mem.description}
+                      </p>
+                    )}
 
                     {/* Tags & Likes Footer */}
                     <div className="flex items-center justify-between pt-2 border-t border-stone-100 flex-wrap gap-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {mem.tags.map((tag, tagIdx) => (
+                        {mem.tags && mem.tags.length > 0 && mem.tags.map((tag, tagIdx) => (
                           <span
                             key={`${tag}-${tagIdx}`}
                             className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-stone-100 text-stone-600"
@@ -424,7 +440,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
               return (
                 <div
-                  key={cap.id ? `${cap.id}-${capIdx}` : `cap-${capIdx}`}
+                  key={cap.id}
                   onClick={() => handleOpenCapsule(cap)}
                   className={`bg-white rounded-3xl border p-5 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between group ${
                     isUnlocked
@@ -675,7 +691,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 const isSelected = selectedLocation?.id === loc.id;
                 return (
                   <motion.button
-                    key={loc.id ? `${loc.id}-${locIdx}` : `loc-${locIdx}`}
+                    key={loc.id}
                     whileHover={{ scale: 1.2 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {

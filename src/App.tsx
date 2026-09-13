@@ -10,6 +10,7 @@ import { TimelineView } from './components/views/TimelineView';
 import { SharedGalleryView, GalleryItem } from './components/views/SharedGalleryView';
 import { GamesView } from './components/views/GamesView';
 import { VouchersAndBucketView } from './components/views/VouchersAndBucketView';
+import { WhatsAppChatView } from './components/views/WhatsAppChatView';
 import { WriteNoteModal } from './components/modals/WriteNoteModal';
 import { AddMemoryModal } from './components/modals/AddMemoryModal';
 import { AddCapsuleModal } from './components/modals/AddCapsuleModal';
@@ -148,7 +149,15 @@ export default function App() {
   const [memories, setMemories] = useState<TimelineMemory[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.MEMORIES);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      const seen = new Set<string>();
+      return parsed.filter((m: any) => {
+        if (!m || !m.id || seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
     } catch {
       return [];
     }
@@ -354,7 +363,13 @@ export default function App() {
       COLLECTIONS.MEMORIES,
       (remoteMemories) => {
         if (Array.isArray(remoteMemories)) {
-          setMemories(remoteMemories);
+          const seen = new Set<string>();
+          const deduped = remoteMemories.filter((m) => {
+            if (!m || !m.id || seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+          });
+          setMemories(deduped);
           setIsCloudSynced(true);
           setIsInitialRemoteLoaded(true);
         }
@@ -734,11 +749,11 @@ export default function App() {
   // Memory actions
   const handleAddMemory = (memData: Omit<TimelineMemory, 'id' | 'likes'>) => {
     const newMem: TimelineMemory = {
-      id: `mem-${Date.now()}`,
+      id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       ...memData,
       likes: [activePartnerId],
     };
-    setMemories((prev) => [newMem, ...prev]);
+    setMemories((prev) => [newMem, ...prev.filter((m) => m.id !== newMem.id)]);
     saveMemory(newMem).catch(console.error);
   };
 
@@ -1160,8 +1175,6 @@ export default function App() {
       handleDeleteLocation(item.originalEntityId);
     } else if (item.sourceType === 'capsule' && item.originalEntityId) {
       handleDeleteCapsule(item.originalEntityId);
-    } else if (item.sourceType === 'bucket' && item.originalEntityId) {
-      handleDeleteBucketItem(item.originalEntityId);
     } else if (item.sourceType === 'challenge' && item.originalEntityId) {
       handleRemoveChallengePhoto(item.originalEntityId);
     } else if (item.sourceType === 'profile') {
@@ -1178,8 +1191,6 @@ export default function App() {
       handleRemoveLocationPhoto(item.originalEntityId);
     } else if (item.sourceType === 'capsule' && item.originalEntityId) {
       handleRemoveCapsulePhoto(item.originalEntityId);
-    } else if (item.sourceType === 'bucket' && item.originalEntityId) {
-      handleRemoveBucketPhoto(item.originalEntityId);
     } else if (item.sourceType === 'challenge' && item.originalEntityId) {
       handleRemoveChallengePhoto(item.originalEntityId);
     } else if (item.sourceType === 'profile') {
@@ -1337,7 +1348,6 @@ export default function App() {
               locations={locations}
               capsules={capsules}
               challenges={challenges}
-              bucketList={bucketList}
               onLikeMemory={handleLikeMemory}
               onOpenAddMemoryModal={() => {
                 setEditingMemory(null);
@@ -1429,6 +1439,7 @@ export default function App() {
       <AnimatePresence>
         {(showWriteNoteModal || editingNote) && (
           <WriteNoteModal
+            key="modal-write-note"
             profile={profile}
             activePartnerId={activePartnerId}
             initialNote={editingNote || undefined}
@@ -1444,6 +1455,7 @@ export default function App() {
 
         {(showAddMemoryModal || editingMemory) && (
           <AddMemoryModal
+            key="modal-add-memory"
             profile={profile}
             activePartnerId={activePartnerId}
             initialMemory={editingMemory || undefined}
@@ -1459,6 +1471,7 @@ export default function App() {
 
         {(showAddCapsuleModal || editingCapsule) && (
           <AddCapsuleModal
+            key="modal-add-capsule"
             profile={profile}
             activePartnerId={activePartnerId}
             initialCapsule={editingCapsule || undefined}
@@ -1474,6 +1487,7 @@ export default function App() {
 
         {(showAddLocationModal || editingLocation) && (
           <AddLocationModal
+            key="modal-add-location"
             initialLocation={editingLocation || undefined}
             onClose={() => {
               setShowAddLocationModal(false);
@@ -1487,6 +1501,7 @@ export default function App() {
 
         {(showAddVoucherModal || editingVoucher) && (
           <AddVoucherModal
+            key="modal-add-voucher"
             profile={profile}
             activePartnerId={activePartnerId}
             initialVoucher={editingVoucher || undefined}
@@ -1502,6 +1517,7 @@ export default function App() {
 
         {(showAddBucketModal || editingBucketItem) && (
           <AddBucketModal
+            key="modal-add-bucket"
             activePartnerId={activePartnerId}
             initialBucketItem={editingBucketItem || undefined}
             onClose={() => {
@@ -1516,6 +1532,7 @@ export default function App() {
 
         {showProfileModal && (
           <ProfileModal
+            key="modal-profile"
             profile={profile}
             settings={settings}
             initialFocusPartner={profileFocusPartner}
@@ -1541,6 +1558,7 @@ export default function App() {
 
         {deleteTarget && (
           <ConfirmDeleteModal
+            key="modal-confirm-delete"
             isOpen={Boolean(deleteTarget)}
             title={deleteTarget.title}
             itemName={deleteTarget.itemName}
@@ -1554,6 +1572,7 @@ export default function App() {
         )}
 
         <PWAInstallModal
+          key="modal-pwa-install"
           isOpen={showInstallModal}
           onClose={() => setShowInstallModal(false)}
         />

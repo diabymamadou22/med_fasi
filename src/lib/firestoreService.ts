@@ -23,11 +23,14 @@ import {
   DateIdea,
   CoupleChallenge,
   CoupleSettings,
+  ChatMessage,
 } from '../types';
 
 // Collections
 const COLLECTIONS = {
   PROFILE: 'couple_profile',
+  CHAT_MESSAGES: 'chat_messages',
+  CHAT_STATUS: 'chat_status',
   MEMORIES: 'memories',
   CAPSULES: 'capsules',
   LOCATIONS: 'locations',
@@ -41,6 +44,32 @@ const COLLECTIONS = {
   CHALLENGES: 'challenges',
   SETTINGS: 'couple_settings',
 };
+
+/**
+ * Nettoie récursivement un objet pour Firestore:
+ * - Supprime tous les champs avec des valeurs `undefined`
+ * - Protège contre l'erreur Firestore: "Function setDoc() called with invalid data. Unsupported field value: undefined"
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
 
 // Variable pour éviter les vérifications répétées en cours d'exécution
 let isSeedChecked = false;
@@ -88,70 +117,70 @@ export async function seedInitialDataIfEmpty(defaults: {
     const batch = writeBatch(db);
 
     // Seed profile
-    batch.set(profileRef, { ...defaults.profile, id: 'main_profile', isInitialized: true });
+    batch.set(profileRef, sanitizeForFirestore({ ...defaults.profile, id: 'main_profile', isInitialized: true }));
 
     // Seed memories
     defaults.memories.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.MEMORIES, item.id), item);
+      batch.set(doc(db, COLLECTIONS.MEMORIES, item.id), sanitizeForFirestore(item));
     });
 
     // Seed capsules
     defaults.capsules.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.CAPSULES, item.id), item);
+      batch.set(doc(db, COLLECTIONS.CAPSULES, item.id), sanitizeForFirestore(item));
     });
 
     // Seed locations
     defaults.locations.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.LOCATIONS, item.id), item);
+      batch.set(doc(db, COLLECTIONS.LOCATIONS, item.id), sanitizeForFirestore(item));
     });
 
     // Seed notes
     defaults.notes.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.NOTES, item.id), item);
+      batch.set(doc(db, COLLECTIONS.NOTES, item.id), sanitizeForFirestore(item));
     });
 
     // Seed gratitudes
     defaults.gratitudes.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.GRATITUDES, item.id), item);
+      batch.set(doc(db, COLLECTIONS.GRATITUDES, item.id), sanitizeForFirestore(item));
     });
 
     // Seed vouchers
     defaults.vouchers.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.VOUCHERS, item.id), item);
+      batch.set(doc(db, COLLECTIONS.VOUCHERS, item.id), sanitizeForFirestore(item));
     });
 
     // Seed bucket list
     defaults.bucketList.forEach((item) => {
-      batch.set(doc(db, COLLECTIONS.BUCKET_LIST, item.id), item);
+      batch.set(doc(db, COLLECTIONS.BUCKET_LIST, item.id), sanitizeForFirestore(item));
     });
 
     // Seed quizzes
     if (defaults.quizzes) {
       defaults.quizzes.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.QUIZZES, item.id), item);
+        batch.set(doc(db, COLLECTIONS.QUIZZES, item.id), sanitizeForFirestore(item));
       });
     }
 
     // Seed dates
     if (defaults.dateIdeas) {
       defaults.dateIdeas.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.DATES, item.id), item);
+        batch.set(doc(db, COLLECTIONS.DATES, item.id), sanitizeForFirestore(item));
       });
     }
 
     // Seed challenges
     if (defaults.challenges) {
       defaults.challenges.forEach((item) => {
-        batch.set(doc(db, COLLECTIONS.CHALLENGES, item.id), item);
+        batch.set(doc(db, COLLECTIONS.CHALLENGES, item.id), sanitizeForFirestore(item));
       });
     }
 
     // Seed settings
     if (defaults.settings) {
-      batch.set(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), {
+      batch.set(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), sanitizeForFirestore({
         ...defaults.settings,
         id: 'main_settings',
-      });
+      }));
     }
 
     await batch.commit();
@@ -202,15 +231,15 @@ export function subscribeCollection<T extends { id: string }>(
   );
 }
 
-// Fonctions de sauvegarde et suppression
+// Fonctions de sauvegarde et suppression avec assainissement systématique des données
 export async function saveProfile(profile: CoupleProfile) {
   const ref = doc(db, COLLECTIONS.PROFILE, 'main_profile');
-  await setDoc(ref, { ...profile, id: 'main_profile' }, { merge: true });
+  await setDoc(ref, sanitizeForFirestore({ ...profile, id: 'main_profile' }), { merge: true });
 }
 
 export async function saveMemory(memory: TimelineMemory) {
   const ref = doc(db, COLLECTIONS.MEMORIES, memory.id);
-  await setDoc(ref, memory, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(memory), { merge: true });
 }
 
 export async function deleteMemoryFromDb(id: string) {
@@ -219,7 +248,7 @@ export async function deleteMemoryFromDb(id: string) {
 
 export async function saveCapsule(capsule: TimeCapsule) {
   const ref = doc(db, COLLECTIONS.CAPSULES, capsule.id);
-  await setDoc(ref, capsule, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(capsule), { merge: true });
 }
 
 export async function deleteCapsuleFromDb(id: string) {
@@ -228,7 +257,7 @@ export async function deleteCapsuleFromDb(id: string) {
 
 export async function saveLocation(location: MemoryLocation) {
   const ref = doc(db, COLLECTIONS.LOCATIONS, location.id);
-  await setDoc(ref, location, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(location), { merge: true });
 }
 
 export async function deleteLocationFromDb(id: string) {
@@ -237,7 +266,7 @@ export async function deleteLocationFromDb(id: string) {
 
 export async function saveSweetNote(note: SweetNote) {
   const ref = doc(db, COLLECTIONS.NOTES, note.id);
-  await setDoc(ref, note, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(note), { merge: true });
 }
 
 export async function deleteSweetNoteFromDb(id: string) {
@@ -246,7 +275,7 @@ export async function deleteSweetNoteFromDb(id: string) {
 
 export async function saveGratitude(gratitude: DailyGratitude) {
   const ref = doc(db, COLLECTIONS.GRATITUDES, gratitude.id);
-  await setDoc(ref, gratitude, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(gratitude), { merge: true });
 }
 
 export async function deleteGratitudeFromDb(id: string) {
@@ -255,7 +284,7 @@ export async function deleteGratitudeFromDb(id: string) {
 
 export async function saveVoucher(voucher: LoveVoucher) {
   const ref = doc(db, COLLECTIONS.VOUCHERS, voucher.id);
-  await setDoc(ref, voucher, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(voucher), { merge: true });
 }
 
 export async function deleteVoucherFromDb(id: string) {
@@ -264,7 +293,7 @@ export async function deleteVoucherFromDb(id: string) {
 
 export async function saveBucketItem(item: BucketItem) {
   const ref = doc(db, COLLECTIONS.BUCKET_LIST, item.id);
-  await setDoc(ref, item, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(item), { merge: true });
 }
 
 export async function deleteBucketItemFromDb(id: string) {
@@ -273,17 +302,17 @@ export async function deleteBucketItemFromDb(id: string) {
 
 export async function saveQuiz(quiz: QuizQuestion) {
   const ref = doc(db, COLLECTIONS.QUIZZES, quiz.id);
-  await setDoc(ref, quiz, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(quiz), { merge: true });
 }
 
 export async function saveDateIdea(idea: DateIdea) {
   const ref = doc(db, COLLECTIONS.DATES, idea.id);
-  await setDoc(ref, idea, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(idea), { merge: true });
 }
 
 export async function saveChallenge(challenge: CoupleChallenge) {
   const ref = doc(db, COLLECTIONS.CHALLENGES, challenge.id);
-  await setDoc(ref, challenge, { merge: true });
+  await setDoc(ref, sanitizeForFirestore(challenge), { merge: true });
 }
 
 export async function deleteChallengeFromDb(id: string) {
@@ -292,7 +321,7 @@ export async function deleteChallengeFromDb(id: string) {
 
 export async function saveSettings(settings: CoupleSettings) {
   const ref = doc(db, COLLECTIONS.SETTINGS, 'main_settings');
-  await setDoc(ref, { ...settings, id: 'main_settings' }, { merge: true });
+  await setDoc(ref, sanitizeForFirestore({ ...settings, id: 'main_settings' }), { merge: true });
 }
 
 export function subscribeSettings(
@@ -316,7 +345,7 @@ export function subscribeSettings(
 
 export async function sendMissYouPulse(pulse: MissYouPulse) {
   const ref = doc(db, COLLECTIONS.PULSES, pulse.id);
-  await setDoc(ref, pulse);
+  await setDoc(ref, sanitizeForFirestore(pulse));
 }
 
 export function subscribeLatestPulse(
@@ -343,6 +372,111 @@ export function subscribeLatestPulse(
     (err) => {
       console.error('Firestore Pulse sync error:', err);
       if (onError) onError(err);
+    }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp-style Real-time Chat
+// ---------------------------------------------------------------------------
+
+export async function saveChatMessage(message: ChatMessage) {
+  const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, message.id);
+  await setDoc(ref, sanitizeForFirestore(message), { merge: true });
+}
+
+export async function deleteChatMessageFromDb(id: string) {
+  await deleteDoc(doc(db, COLLECTIONS.CHAT_MESSAGES, id));
+}
+
+export async function updateChatMessageReaction(
+  messageId: string,
+  partnerId: string,
+  reaction: string | null
+) {
+  const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, messageId);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    const data = snap.data() as ChatMessage;
+    const reactions = { ...(data.reactions || {}) };
+    if (reaction) {
+      reactions[partnerId] = reaction;
+    } else {
+      delete reactions[partnerId];
+    }
+    await setDoc(ref, sanitizeForFirestore({ reactions }), { merge: true });
+  }
+}
+
+export async function updateChatMessageStatus(
+  messageId: string,
+  status: 'delivered' | 'read'
+) {
+  const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, messageId);
+  await setDoc(ref, { status }, { merge: true });
+}
+
+export async function setChatTypingStatus(partnerId: string, isTyping: boolean) {
+  try {
+    const ref = doc(db, COLLECTIONS.CHAT_STATUS, partnerId);
+    await setDoc(ref, {
+      partnerId,
+      isTyping,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.error('Erreur typing status:', err);
+  }
+}
+
+export function subscribeChatMessages(
+  onUpdate: (messages: ChatMessage[]) => void,
+  onError?: (error: Error) => void
+) {
+  const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const messages: ChatMessage[] = [];
+      snap.forEach((docSnap) => {
+        messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      // Sort chronologically
+      messages.sort((a, b) => {
+        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+      });
+      onUpdate(messages);
+    },
+    (err) => {
+      console.error('Firestore Chat messages sync error:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+export function subscribeChatTypingStatus(
+  onUpdate: (statusMap: Record<string, { isTyping: boolean; updatedAt: string }>) => void
+) {
+  const colRef = collection(db, COLLECTIONS.CHAT_STATUS);
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const map: Record<string, { isTyping: boolean; updatedAt: string }> = {};
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.updatedAt) {
+          // Check if typing signal is fresh (within last 8 seconds)
+          const isFresh = Date.now() - new Date(data.updatedAt).getTime() < 8000;
+          map[docSnap.id] = {
+            isTyping: Boolean(data.isTyping && isFresh),
+            updatedAt: data.updatedAt,
+          };
+        }
+      });
+      onUpdate(map);
+    },
+    (err) => {
+      console.error('Firestore typing status error:', err);
     }
   );
 }

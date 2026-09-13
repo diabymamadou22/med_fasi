@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Sparkles, Settings, ArrowLeftRight, Camera, MapPin, Lock, Cloud, CloudCheck, Download, Smartphone } from 'lucide-react';
+import { Heart, Sparkles, Settings, ArrowLeftRight, Camera, MapPin, Lock, Cloud, CloudCheck, Download, Smartphone, MessageCircle } from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
 import { PartnerAvatar } from './PartnerAvatar';
@@ -13,8 +13,10 @@ interface HeaderProps {
   onOpenPhotoPicker?: (partnerId: PartnerId) => void;
   onSendMissYou: (vibe: MissYouPulse['vibe'], message: string) => void;
   unreadNotesCount: number;
+  unreadChatCount?: number;
   onGoToNotes: () => void;
   onGoToGallery?: () => void;
+  onGoToChat?: () => void;
   isPinEnabled?: boolean;
   onLockApp?: () => void;
   isFirebaseConnected?: boolean;
@@ -29,8 +31,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPhotoPicker,
   onSendMissYou,
   unreadNotesCount,
+  unreadChatCount = 0,
   onGoToNotes,
   onGoToGallery,
+  onGoToChat,
   isPinEnabled,
   onLockApp,
   isFirebaseConnected = true,
@@ -161,6 +165,20 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick action buttons on mobile */}
           <div className="flex items-center gap-1 sm:hidden">
+            {onGoToChat && (
+              <button
+                onClick={onGoToChat}
+                className="relative text-emerald-600 hover:text-emerald-700 p-2 rounded-full hover:bg-emerald-50 transition-colors cursor-pointer"
+                title="Ouvrir WhatsApp Duo"
+                id="btn-chat-mobile"
+              >
+                <MessageCircle className="w-4.5 h-4.5" />
+                {unreadChatCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
+                )}
+              </button>
+            )}
+
             {isPinEnabled && onLockApp && (
               <button
                 onClick={onLockApp}
@@ -202,6 +220,23 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-rose-100/60">
           {/* Desktop utility buttons */}
           <div className="hidden sm:flex items-center gap-1">
+            {onGoToChat && (
+              <button
+                onClick={onGoToChat}
+                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
+                title="Ouvrir le chat WhatsApp en direct"
+                id="btn-chat-desktop"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                <span>WhatsApp</span>
+                {unreadChatCount > 0 && (
+                  <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded-full text-[10px] font-bold">
+                    {unreadChatCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {onOpenInstallModal && (
               <button
                 onClick={onOpenInstallModal}

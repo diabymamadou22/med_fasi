@@ -1,21 +1,32 @@
 import React from 'react';
-import { Mail, Clock, Gamepad2, Ticket, Images } from 'lucide-react';
+import { Mail, Clock, Gamepad2, Ticket, Images, MessageCircle } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 
-export type MainTab = 'journal' | 'timeline' | 'gallery' | 'games' | 'vouchers';
+export type MainTab = 'chat' | 'journal' | 'timeline' | 'gallery' | 'games' | 'vouchers';
 
 interface NavigationProps {
   activeTab: MainTab;
   onSelectTab: (tab: MainTab) => void;
   unreadNotesCount: number;
+  unreadChatCount?: number;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   onSelectTab,
   unreadNotesCount,
+  unreadChatCount = 0,
 }) => {
   const tabs = [
+    {
+      id: 'chat' as MainTab,
+      label: 'WhatsApp Duo',
+      shortLabel: 'Chat',
+      sublabel: 'Messages & Vocaux en direct',
+      icon: MessageCircle,
+      badge: unreadChatCount > 0 ? unreadChatCount : undefined,
+      badgeColor: 'bg-emerald-500',
+    },
     {
       id: 'journal' as MainTab,
       label: 'Journal & Douceurs',
@@ -47,9 +58,9 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
     {
       id: 'vouchers' as MainTab,
-      label: 'Bons & Bucket List',
-      shortLabel: 'Projets',
-      sublabel: 'Coupons d\'amour & Souhaits',
+      label: 'Bons d\'amour',
+      shortLabel: 'Bons',
+      sublabel: 'Coupons & Chéquier du Cœur',
       icon: Ticket,
     },
   ];

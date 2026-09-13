@@ -141,12 +141,34 @@
         "message": { "type": "string" }
       },
       "required": ["id", "timestamp", "fromPartnerId"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Message du chat de couple en temps réel style WhatsApp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "audioDuration": { "type": "number" },
+        "reactions": { "type": "object" },
+        "replyTo": { "type": "object" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "senderId", "timestamp"]
     }
   },
   "firestore": {
     "couple_profile": {
       "schema": "CoupleProfile",
       "description": "Profil et humeur du couple"
+    },
+    "chat_messages": {
+      "schema": "ChatMessage",
+      "description": "Messages instantanés en direct type WhatsApp"
     },
     "memories": {
       "schema": "TimelineMemory",

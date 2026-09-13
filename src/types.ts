@@ -170,6 +170,30 @@ export interface CoupleSettings {
   isMusicPlaying: boolean;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: PartnerId;
+  content: string;
+  timestamp: string; // ISO string
+  mediaUrl?: string;
+  mediaType?: 'image' | 'audio';
+  audioDuration?: number; // duration in seconds
+  reactions?: Record<string, string>; // e.g. { p1: '❤️', p2: '😂' }
+  replyTo?: {
+    id: string;
+    senderId: PartnerId;
+    content: string;
+    mediaUrl?: string;
+  };
+  status?: 'sent' | 'delivered' | 'read';
+}
+
+export interface ChatTypingStatus {
+  partnerId: PartnerId;
+  isTyping: boolean;
+  updatedAt: string;
+}
+
 export interface FullCoupleBackup {
   version: string;
   exportedAt: string;
@@ -184,5 +208,6 @@ export interface FullCoupleBackup {
   bucketList: BucketItem[];
   vouchers: LoveVoucher[];
   gratitudes: DailyGratitude[];
+  chatMessages?: ChatMessage[];
   settings?: CoupleSettings;
 }
