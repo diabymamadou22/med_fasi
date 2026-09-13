@@ -10,7 +10,7 @@ import { TimelineView } from './components/views/TimelineView';
 import { SharedGalleryView, GalleryItem } from './components/views/SharedGalleryView';
 import { GamesView } from './components/views/GamesView';
 import { VouchersAndBucketView } from './components/views/VouchersAndBucketView';
-import { WhatsAppChatView } from './components/views/WhatsAppChatView';
+import { ChatView } from './components/views/ChatView';
 import { WriteNoteModal } from './components/modals/WriteNoteModal';
 import { AddMemoryModal } from './components/modals/AddMemoryModal';
 import { AddCapsuleModal } from './components/modals/AddCapsuleModal';
@@ -39,6 +39,7 @@ import {
   MissYouPulse,
   CoupleSettings,
   FullCoupleBackup,
+  ChatMessage,
 } from './types';
 import {
   INITIAL_PROFILE,
@@ -80,6 +81,8 @@ import {
   deleteChallengeFromDb,
   saveSettings,
   sendMissYouPulse,
+  subscribeChatMessages,
+  saveChatMessage,
   COLLECTIONS,
 } from './lib/firestoreService';
 
@@ -97,6 +100,7 @@ const STORAGE_KEYS = {
   GRATITUDES: 'nid_damour_gratitudes',
   ACTIVE_PARTNER: 'nid_damour_active_partner',
   SETTINGS: 'nid_damour_settings',
+  CHAT_MESSAGES: 'nid_damour_chat_messages',
 };
 
 export default function App() {
@@ -107,7 +111,7 @@ export default function App() {
   });
 
   // Main active tab
-  const [activeTab, setActiveTab] = useState<MainTab>('journal');
+  const [activeTab, setActiveTab] = useState<MainTab>('chat');
 
   // Couple Data States with localStorage initialization
   const [profile, setProfile] = useState<CoupleProfile>(() => {
@@ -238,6 +242,15 @@ export default function App() {
   const [gratitudes, setGratitudes] = useState<DailyGratitude[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.GRATITUDES);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -485,6 +498,23 @@ export default function App() {
       }
     });
 
+    const unsubChat = subscribeChatMessages(
+      (remoteMessages) => {
+        if (Array.isArray(remoteMessages)) {
+          setMessages((prev) => {
+            if (prev.length > 0 && remoteMessages.length > prev.length) {
+              const lastMsg = remoteMessages[remoteMessages.length - 1];
+              if (lastMsg && lastMsg.senderId !== activePartnerId) {
+                soundEffects.playMessageReceived();
+              }
+            }
+            return remoteMessages;
+          });
+        }
+      },
+      () => setIsCloudSynced(false)
+    );
+
     return () => {
       unsubProfile();
       unsubMemories();
@@ -499,6 +529,7 @@ export default function App() {
       unsubChallenges();
       unsubSettings();
       unsubPulse();
+      unsubChat();
     };
   }, [activePartnerId]);
 
@@ -567,6 +598,11 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }, [settings, isInitialRemoteLoaded]);
 
+  useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
+    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
+  }, [messages, isInitialRemoteLoaded]);
+
   // Export full JSON backup
   const handleExportBackup = () => {
     const backup: FullCoupleBackup = {
@@ -584,7 +620,8 @@ export default function App() {
       vouchers,
       gratitudes,
       settings,
-    };
+      messages,
+    } as any;
     const dataStr =
       'data:text/json;charset=utf-8,' +
       encodeURIComponent(JSON.stringify(backup, null, 2));
@@ -615,6 +652,7 @@ export default function App() {
     if (backup.vouchers) setVouchers(backup.vouchers);
     if (backup.gratitudes) setGratitudes(backup.gratitudes);
     if (backup.settings) setSettings(backup.settings);
+    if ((backup as any).messages) setMessages((backup as any).messages);
   };
 
   const handleUpdateSettings = (newSettings: Partial<CoupleSettings>) => {
@@ -669,6 +707,30 @@ export default function App() {
     };
     setActiveMissYouPulse(pulse);
     sendMissYouPulse(pulse).catch(console.error);
+  };
+
+  const handleSendMissYouPulseFromChat = (
+    pulseData: Omit<MissYouPulse, 'id' | 'timestamp'>
+  ) => {
+    handleSendMissYou(pulseData.vibe, pulseData.message);
+  };
+
+  const handleSendChatMessage = async (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => {
+    const newMsg: ChatMessage = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      status: 'sent',
+      readStatus: 'sent',
+      ...msgData,
+    };
+    setMessages((prev) => [...prev, newMsg]);
+    try {
+      await saveChatMessage(newMsg);
+    } catch (err) {
+      console.error('Erreur sauvegarde message WhatsApp:', err);
+    }
   };
 
   // Notes actions
@@ -1212,11 +1274,20 @@ export default function App() {
     setBucketList(INITIAL_BUCKET_LIST);
     setVouchers(INITIAL_VOUCHERS);
     setGratitudes(INITIAL_GRATITUDES);
+    setMessages([]);
     localStorage.clear();
   };
 
   const unreadNotesCount = notes.filter(
     (n) => n.recipientId === activePartnerId && !n.isRead
+  ).length;
+
+  const unreadChatCount = messages.filter(
+    (m) =>
+      m.senderId !== activePartnerId &&
+      m.readStatus !== 'read' &&
+      m.readStatus !== true &&
+      m.status !== 'read'
   ).length;
 
   const currentPartner =
@@ -1242,7 +1313,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF7F5] flex flex-col justify-between selection:bg-rose-200">
+    <div
+      className={`min-h-screen bg-[#FAF7F5] flex flex-col justify-between selection:bg-rose-200 ${
+        activeTab === 'chat' ? 'h-screen h-[100dvh] overflow-hidden no-scrollbar' : ''
+      }`}
+    >
       {/* Top Header */}
       <Header
         profile={profile}
@@ -1258,8 +1333,10 @@ export default function App() {
         }}
         onSendMissYou={handleSendMissYou}
         unreadNotesCount={unreadNotesCount}
+        unreadChatCount={unreadChatCount}
         onGoToNotes={() => setActiveTab('journal')}
         onGoToGallery={() => setActiveTab('gallery')}
+        onGoToChat={() => setActiveTab('chat')}
         isPinEnabled={settings.isPinEnabled}
         onLockApp={() => setIsAppLocked(true)}
         isFirebaseConnected={isCloudSynced}
@@ -1267,16 +1344,36 @@ export default function App() {
       />
 
       {/* Main Body */}
-      <main className="flex-1 pb-24 sm:pb-12">
+      <main
+        className={`flex-1 flex flex-col min-h-0 ${
+          activeTab === 'chat' ? 'pb-16 sm:pb-2 overflow-hidden' : 'pb-24 sm:pb-12'
+        }`}
+      >
         {/* Tab Navigation */}
         <Navigation
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           unreadNotesCount={unreadNotesCount}
+          unreadChatCount={unreadChatCount}
         />
 
         {/* Views */}
-        <div className="transition-opacity duration-200">
+        <div
+          className={`transition-opacity duration-200 ${
+            activeTab === 'chat' ? 'flex-1 flex flex-col min-h-0 h-full overflow-hidden' : ''
+          }`}
+        >
+          {activeTab === 'chat' && (
+            <ChatView
+              profile={profile}
+              activePartnerId={activePartnerId}
+              onSwitchPartner={handleSwitchPartner}
+              messages={messages}
+              onSendMessage={handleSendChatMessage}
+              onSendMissYouPulse={handleSendMissYouPulseFromChat}
+            />
+          )}
+
           {activeTab === 'journal' && (
             <>
               {/* Real-time Mood & Needs Bar for Journal & Douceurs */}
@@ -1405,14 +1502,16 @@ export default function App() {
       </main>
 
       {/* Romantic Footer */}
-      <footer className="border-t border-rose-100/70 py-6 text-center text-xs text-stone-500 bg-white/40">
-        <p className="flex items-center justify-center gap-1.5 font-medium">
-          <span>{profile.relationshipTitle}</span>
-          <span>•</span>
-          <span className="text-rose-500">❤️</span>
-          <span>Espace d'Amour & de Complicité</span>
-        </p>
-      </footer>
+      {activeTab !== 'chat' && (
+        <footer className="border-t border-rose-100/70 py-6 text-center text-xs text-stone-500 bg-white/40">
+          <p className="flex items-center justify-center gap-1.5 font-medium">
+            <span>{profile.relationshipTitle}</span>
+            <span>•</span>
+            <span className="text-rose-500">❤️</span>
+            <span>Espace d'Amour & de Complicité</span>
+          </p>
+        </footer>
+      )}
 
       {/* Miss You Modal Pulse Popup */}
       <AnimatePresence>

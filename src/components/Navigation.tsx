@@ -20,12 +20,12 @@ export const Navigation: React.FC<NavigationProps> = ({
   const tabs = [
     {
       id: 'chat' as MainTab,
-      label: 'WhatsApp Duo',
+      label: 'Chat',
       shortLabel: 'Chat',
       sublabel: 'Messages & Vocaux en direct',
       icon: MessageCircle,
       badge: unreadChatCount > 0 ? unreadChatCount : undefined,
-      badgeColor: 'bg-emerald-500',
+      badgeColor: 'bg-rose-500',
     },
     {
       id: 'journal' as MainTab,

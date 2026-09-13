@@ -25,6 +25,17 @@
   background: #F43F5E66;
 }
 
+/* Hide scrollbar utility across all browsers */
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
 @keyframes pulse-heart {
   0% { transform: scale(1); }
   14% { transform: scale(1.15); }

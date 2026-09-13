@@ -223,14 +223,14 @@ export const Header: React.FC<HeaderProps> = ({
             {onGoToChat && (
               <button
                 onClick={onGoToChat}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
-                title="Ouvrir le chat WhatsApp en direct"
+                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
+                title="Ouvrir le chat en direct"
                 id="btn-chat-desktop"
               >
-                <MessageCircle className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-                <span>WhatsApp</span>
+                <MessageCircle className="w-4 h-4 text-rose-600 group-hover:scale-110 transition-transform" />
+                <span>Chat</span>
                 {unreadChatCount > 0 && (
-                  <span className="px-1.5 py-0.2 bg-emerald-600 text-white rounded-full text-[10px] font-bold">
+                  <span className="px-1.5 py-0.2 bg-rose-600 text-white rounded-full text-[10px] font-bold">
                     {unreadChatCount}
                   </span>
                 )}

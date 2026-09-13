@@ -156,7 +156,8 @@
         "audioDuration": { "type": "number" },
         "reactions": { "type": "object" },
         "replyTo": { "type": "object" },
-        "status": { "type": "string" }
+        "status": { "type": "string" },
+        "readStatus": { "type": "string" }
       },
       "required": ["id", "senderId", "timestamp"]
     }

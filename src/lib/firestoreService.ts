@@ -413,7 +413,29 @@ export async function updateChatMessageStatus(
   status: 'delivered' | 'read'
 ) {
   const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, messageId);
-  await setDoc(ref, { status }, { merge: true });
+  await setDoc(
+    ref,
+    {
+      status,
+      readStatus: status === 'read' ? 'read' : 'delivered',
+    },
+    { merge: true }
+  );
+}
+
+export async function updateChatMessageReadStatus(
+  messageId: string,
+  readStatus: 'sent' | 'delivered' | 'read' | 'unread'
+) {
+  const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, messageId);
+  await setDoc(
+    ref,
+    {
+      readStatus,
+      status: readStatus === 'read' ? 'read' : readStatus === 'delivered' ? 'delivered' : 'sent',
+    },
+    { merge: true }
+  );
 }
 
 export async function setChatTypingStatus(partnerId: string, isTyping: boolean) {

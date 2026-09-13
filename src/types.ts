@@ -186,6 +186,7 @@ export interface ChatMessage {
     mediaUrl?: string;
   };
   status?: 'sent' | 'delivered' | 'read';
+  readStatus?: 'sent' | 'delivered' | 'read' | 'unread' | boolean;
 }
 
 export interface ChatTypingStatus {
