@@ -28,6 +28,7 @@ import {
   Square,
   SmilePlus,
   ArrowLeft,
+  Type,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -66,7 +67,75 @@ export interface ChatViewProps {
   onBack?: () => void;
 }
 
-type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
+export type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
+export type SentBubbleColor = 'rose-ruby' | 'emerald-whatsapp' | 'ocean-blue' | 'slate-dark';
+export type ChatFontSize = 'normal' | 'large' | 'xlarge';
+
+export const SENT_BUBBLE_PRESETS: Record<
+  SentBubbleColor,
+  {
+    name: string;
+    description: string;
+    bubbleClass: string;
+    bubbleText: string;
+    metaText: string;
+    swatch: string;
+  }
+> = {
+  'rose-ruby': {
+    name: 'Rose Rubis',
+    description: 'Vibrant, romantique & haut contraste',
+    bubbleClass: 'bg-gradient-to-br from-rose-600 via-rose-600 to-rose-700 text-white shadow-sm shadow-rose-950/20 border border-rose-500/50',
+    bubbleText: 'text-white font-normal antialiased',
+    metaText: 'text-rose-100/95 font-medium',
+    swatch: 'bg-rose-600',
+  },
+  'emerald-whatsapp': {
+    name: 'Vert WhatsApp',
+    description: 'Le standard mondial ultra-lisible',
+    bubbleClass: 'bg-gradient-to-br from-[#005c4b] to-[#025344] text-white shadow-sm shadow-teal-950/25 border border-teal-700/60',
+    bubbleText: 'text-white font-normal antialiased',
+    metaText: 'text-emerald-100/95 font-medium',
+    swatch: 'bg-[#005c4b]',
+  },
+  'ocean-blue': {
+    name: 'Bleu Royal',
+    description: 'Éclatant & confort visuel maximal',
+    bubbleClass: 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm shadow-blue-950/20 border border-blue-500/50',
+    bubbleText: 'text-white font-normal antialiased',
+    metaText: 'text-blue-100/95 font-medium',
+    swatch: 'bg-blue-600',
+  },
+  'slate-dark': {
+    name: 'Gris Anthracite',
+    description: 'Sobre, élégant & reposant',
+    bubbleClass: 'bg-gradient-to-br from-slate-800 to-slate-900 text-white shadow-sm shadow-slate-950/30 border border-slate-700/60',
+    bubbleText: 'text-white font-normal antialiased',
+    metaText: 'text-slate-300 font-medium',
+    swatch: 'bg-slate-800',
+  },
+};
+
+export const CHAT_FONT_SIZES: Record<
+  ChatFontSize,
+  { label: string; textClass: string; inputClass: string }
+> = {
+  normal: {
+    label: 'Normal (15px)',
+    textClass: 'text-[14.5px] sm:text-[15.5px]',
+    inputClass: 'text-[14.5px] sm:text-[15px]',
+  },
+  large: {
+    label: 'Grand (17px)',
+    textClass: 'text-[16.5px] sm:text-[17.5px]',
+    inputClass: 'text-[16px] sm:text-[16.5px]',
+  },
+  xlarge: {
+    label: 'Très grand (19px)',
+    textClass: 'text-[18.5px] sm:text-[19.5px]',
+    inputClass: 'text-[17.5px] sm:text-[18px]',
+  },
+};
 
 interface FloatingHeartParticle {
   id: string;
@@ -117,7 +186,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const handleSelectTheme = (theme: ChatTheme) => {
     setChatTheme(theme);
     localStorage.setItem('nid_amour_chat_theme', theme);
-    setShowThemePicker(false);
+  };
+
+  // Sent bubble color preference
+  const [sentBubbleColor, setSentBubbleColor] = useState<SentBubbleColor>(() => {
+    return (localStorage.getItem('nid_amour_sent_bubble_color') as SentBubbleColor) || 'rose-ruby';
+  });
+
+  const handleSelectSentBubbleColor = (color: SentBubbleColor) => {
+    setSentBubbleColor(color);
+    localStorage.setItem('nid_amour_sent_bubble_color', color);
+  };
+
+  // Chat font size preference for maximum readability
+  const [chatFontSize, setChatFontSize] = useState<ChatFontSize>(() => {
+    return (localStorage.getItem('nid_amour_chat_font_size') as ChatFontSize) || 'normal';
+  });
+
+  const handleSelectChatFontSize = (size: ChatFontSize) => {
+    setChatFontSize(size);
+    localStorage.setItem('nid_amour_chat_font_size', size);
   };
 
   // Input states
@@ -599,6 +687,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
     { text: "Hâte de te retrouver dans mes bras 🥰", label: "Hâte de te voir 🥰" },
   ];
 
+  // Active sent bubble preset for readability
+  const activeSentPreset = SENT_BUBBLE_PRESETS[sentBubbleColor] || SENT_BUBBLE_PRESETS['rose-ruby'];
+
   // Theme styling helpers
   const themeStyles = {
     'rose-powder': {
@@ -606,10 +697,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       cardBg: 'bg-white',
       feedBg: 'bg-gradient-to-b from-[#FFFDFD] via-[#FAF5F5] to-[#FFF9F9]',
       headerBg: 'bg-white/95 backdrop-blur-md border-rose-100',
-      myBubble: 'bg-gradient-to-br from-rose-500 via-rose-500 to-pink-600 text-white shadow-rose-200/50',
-      myBubbleText: 'text-white',
-      myBubbleMeta: 'text-rose-100',
-      partnerBubble: 'bg-white border border-rose-100/90 text-stone-800 shadow-stone-200/40',
+      myBubble: activeSentPreset.bubbleClass,
+      myBubbleText: activeSentPreset.bubbleText,
+      myBubbleMeta: activeSentPreset.metaText,
+      partnerBubble: 'bg-white border border-stone-200/90 text-stone-900 shadow-xs',
       inputBg: 'bg-stone-50 border-stone-200 focus-within:border-rose-300 focus-within:bg-white',
       accentColor: 'text-rose-600',
       badgeBg: 'bg-rose-50 border-rose-200/80 text-rose-700',
@@ -619,10 +710,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       cardBg: 'bg-slate-900 border-rose-950',
       feedBg: 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950',
       headerBg: 'bg-slate-900/95 backdrop-blur-md border-slate-800 text-white',
-      myBubble: 'bg-gradient-to-br from-rose-600 via-pink-600 to-rose-700 text-white shadow-rose-950/60',
-      myBubbleText: 'text-white',
-      myBubbleMeta: 'text-rose-200',
-      partnerBubble: 'bg-slate-800/90 border border-slate-700/80 text-slate-100 shadow-black/40',
+      myBubble: activeSentPreset.bubbleClass,
+      myBubbleText: activeSentPreset.bubbleText,
+      myBubbleMeta: activeSentPreset.metaText,
+      partnerBubble: 'bg-slate-800/95 border border-slate-700/80 text-slate-100 shadow-xs',
       inputBg: 'bg-slate-850 bg-slate-800/80 border-slate-700 text-white focus-within:border-rose-500 focus-within:bg-slate-800',
       accentColor: 'text-rose-400',
       badgeBg: 'bg-rose-950/70 border-rose-800/60 text-rose-300',
@@ -632,10 +723,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       cardBg: 'bg-white border-amber-100',
       feedBg: 'bg-gradient-to-b from-[#FBF9F5] via-[#F6F2EA] to-[#FBF9F5]',
       headerBg: 'bg-[#FDFBF7]/95 backdrop-blur-md border-amber-200/60',
-      myBubble: 'bg-gradient-to-br from-amber-700 via-rose-700 to-amber-800 text-white shadow-amber-900/20',
-      myBubbleText: 'text-white',
-      myBubbleMeta: 'text-amber-100',
-      partnerBubble: 'bg-white border border-amber-200/70 text-stone-800 shadow-amber-100/50',
+      myBubble: activeSentPreset.bubbleClass,
+      myBubbleText: activeSentPreset.bubbleText,
+      myBubbleMeta: activeSentPreset.metaText,
+      partnerBubble: 'bg-white border border-stone-200 text-stone-900 shadow-xs',
       inputBg: 'bg-stone-50 border-stone-200 focus-within:border-amber-400 focus-within:bg-white',
       accentColor: 'text-amber-700',
       badgeBg: 'bg-amber-50 border-amber-200 text-amber-800',
@@ -895,7 +986,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <Search className="w-4.5 h-4.5" />
             </button>
 
-            {/* Theme / Ambiance Palette Selector */}
+            {/* Theme / Ambiance & Readability Palette Selector */}
             <div className="relative">
               <button
                 onClick={() => setShowThemePicker(!showThemePicker)}
@@ -906,7 +997,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
                     : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
                 }`}
-                title="Changer l'ambiance du chat"
+                title="Personnaliser l'affichage & la lisibilité"
               >
                 <Palette className="w-4.5 h-4.5" />
               </button>
@@ -914,41 +1005,125 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <AnimatePresence>
                 {showThemePicker && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    initial={{ opacity: 0, scale: 0.95, y: 8 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className="absolute right-0 top-10 w-48 bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl shadow-xl p-2 z-40 text-xs"
+                    exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                    className="absolute right-0 top-11 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 z-40 text-xs"
                   >
-                    <p className="font-semibold text-stone-500 dark:text-slate-400 px-2 py-1 mb-1">
-                      Ambiance du chat :
-                    </p>
-                    <button
-                      onClick={() => handleSelectTheme('rose-powder')}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer ${
-                        chatTheme === 'rose-powder' ? 'bg-rose-50 text-rose-700 font-bold' : 'hover:bg-stone-50 text-stone-700'
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full bg-rose-400 inline-block" />
-                      <span>🌸 Douceur Poudrée</span>
-                    </button>
-                    <button
-                      onClick={() => handleSelectTheme('velvet-night')}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer ${
-                        chatTheme === 'velvet-night' ? 'bg-slate-800 text-rose-400 font-bold' : 'hover:bg-slate-100 text-stone-700'
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-700 inline-block" />
-                      <span>🌙 Soirée Câline</span>
-                    </button>
-                    <button
-                      onClick={() => handleSelectTheme('ivory-linen')}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer ${
-                        chatTheme === 'ivory-linen' ? 'bg-amber-50 text-amber-800 font-bold' : 'hover:bg-stone-50 text-stone-700'
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full bg-amber-200 inline-block" />
-                      <span>☁️ Cocon de Soie</span>
-                    </button>
+                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-stone-100 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 font-bold text-stone-800 dark:text-slate-200 text-xs">
+                        <Palette className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Lisibilité & Style de la discussion</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowThemePicker(false)}
+                        className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-slate-200 rounded-md cursor-pointer"
+                        title="Fermer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Section 1: Sent Bubble Color */}
+                    <div className="mb-3.5">
+                      <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span>Couleur de mes messages :</span>
+                        <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                          {SENT_BUBBLE_PRESETS[sentBubbleColor]?.name}
+                        </span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(Object.keys(SENT_BUBBLE_PRESETS) as SentBubbleColor[]).map((key) => {
+                          const preset = SENT_BUBBLE_PRESETS[key];
+                          const isSelected = sentBubbleColor === key;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => handleSelectSentBubbleColor(key)}
+                              className={`p-1.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'border-rose-500 bg-rose-50/80 dark:bg-rose-950/40 ring-1 ring-rose-500'
+                                  : 'border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-850'
+                              }`}
+                            >
+                              <span className={`w-4 h-4 rounded-full shrink-0 shadow-2xs ${preset.swatch}`} />
+                              <div className="min-w-0">
+                                <p className="font-bold text-[11px] text-stone-800 dark:text-slate-200 truncate">
+                                  {preset.name}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Section 2: Text Size for Readability */}
+                    <div className="mb-3.5">
+                      <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                        <span>Taille du texte :</span>
+                        <span className="text-[10px] text-stone-500 dark:text-slate-400">
+                          {CHAT_FONT_SIZES[chatFontSize]?.label}
+                        </span>
+                      </p>
+                      <div className="grid grid-cols-3 gap-1 bg-stone-100 dark:bg-slate-800 p-1 rounded-xl">
+                        {(['normal', 'large', 'xlarge'] as ChatFontSize[]).map((size) => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => handleSelectChatFontSize(size)}
+                            className={`py-1.5 px-2 rounded-lg text-center font-semibold text-[11px] transition-all cursor-pointer ${
+                              chatFontSize === size
+                                ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-2xs font-bold'
+                                : 'text-stone-600 dark:text-slate-400 hover:text-stone-900'
+                            }`}
+                          >
+                            {size === 'normal' ? 'Standard' : size === 'large' ? 'Grand' : 'Confort +'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Section 3: Background Theme */}
+                    <div>
+                      <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5">
+                        Fond de discussion :
+                      </p>
+                      <div className="space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTheme('rose-powder')}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                            chatTheme === 'rose-powder' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200/80' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <span className="w-3.5 h-3.5 rounded-full bg-rose-400 inline-block shrink-0" />
+                          <span>🌸 Douceur Poudrée</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTheme('velvet-night')}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                            chatTheme === 'velvet-night' ? 'bg-slate-800 text-rose-400 font-bold border border-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-stone-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <span className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-700 inline-block shrink-0" />
+                          <span>🌙 Soirée Câline (Sombre)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTheme('ivory-linen')}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                            chatTheme === 'ivory-linen' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-200' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <span className="w-3.5 h-3.5 rounded-full bg-amber-200 inline-block shrink-0" />
+                          <span>☁️ Cocon de Soie (Ivoire)</span>
+                        </button>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1139,7 +1314,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                             handleMessageDoubleTap(e, msg);
                           }
                         }}
-                        className={`relative max-w-[85%] sm:max-w-[76%] p-2.5 sm:p-3 shadow-xs transition-all select-none cursor-pointer ${bubbleCorners} ${
+                        className={`relative max-w-[85%] sm:max-w-[76%] px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-sm transition-all select-none cursor-pointer flex flex-col ${bubbleCorners} ${
                           isMe
                             ? themeStyles.myBubble
                             : themeStyles.partnerBubble
@@ -1149,185 +1324,185 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       >
                         {/* Sender name on received message - ONLY ON FIRST IN BURST */}
                         {!isMe && isFirstInBurst && (
-                          <p className="text-[11px] font-bold text-rose-500 mb-1 flex items-center gap-1">
+                          <p className="text-[11.5px] font-bold text-rose-500 mb-1 flex items-center gap-1">
                             <span>{senderName}</span>
-                            <span className="text-[9px] opacity-70">💕</span>
+                            <span className="text-[9.5px] opacity-70">💕</span>
                           </p>
                         )}
 
-                      {/* Quoted Reply if present */}
-                      {msg.replyTo && (
-                        <div
-                          className={`mb-2 p-2 rounded-xl text-xs ${
-                            isMe
-                              ? 'bg-black/15 border-l-3 border-white/90 text-white'
-                              : chatTheme === 'velvet-night'
-                              ? 'bg-slate-700/60 border-l-3 border-rose-400 text-slate-200'
-                              : 'bg-rose-50/80 border-l-3 border-rose-400 text-stone-700'
-                          }`}
-                        >
-                          <p className={`font-bold text-[11px] ${isMe ? 'text-white' : 'text-rose-500'}`}>
-                            {msg.replyTo.senderId === activePartnerId ? 'Vous' : otherPartner.name}
-                          </p>
-                          <p className="truncate text-[11px] opacity-90">{msg.replyTo.content}</p>
-                        </div>
-                      )}
-
-                      {/* Photo Content */}
-                      {msg.mediaType === 'image' && msg.mediaUrl && (
-                        <div className="rounded-xl overflow-hidden mb-1.5 bg-stone-100 cursor-pointer relative group/img">
-                          <img
-                            src={msg.mediaUrl}
-                            alt="Photo partagée"
-                            onClick={() => setLightboxImage(msg.mediaUrl!)}
-                            className="max-h-72 w-auto object-contain rounded-xl hover:opacity-95 transition-opacity"
-                          />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none text-xs font-semibold">
-                            🔍 Cliquer pour agrandir
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Enhanced Voice Note Player */}
-                      {msg.mediaType === 'audio' && (
-                        <div className="flex items-center gap-3 py-1 px-1 min-w-[210px] sm:min-w-[250px]">
-                          <button
-                            onClick={() => togglePlayAudio(msg)}
-                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                        {/* Quoted Reply if present */}
+                        {msg.replyTo && (
+                          <div
+                            className={`mb-2 p-2.5 rounded-xl text-xs ${
                               isMe
-                                ? 'bg-white text-rose-600 hover:bg-rose-50'
-                                : playingAudioId === msg.id
-                                ? 'bg-rose-600 text-white scale-105 shadow-md'
-                                : 'bg-rose-500 hover:bg-rose-600 text-white'
+                                ? 'bg-black/25 backdrop-blur-xs border-l-[3.5px] border-white text-white'
+                                : chatTheme === 'velvet-night'
+                                ? 'bg-slate-700/60 border-l-[3.5px] border-rose-400 text-slate-200'
+                                : 'bg-rose-50/90 border-l-[3.5px] border-rose-400 text-stone-800'
                             }`}
                           >
-                            {playingAudioId === msg.id ? (
-                              <Pause className="w-5 h-5 fill-current" />
-                            ) : (
-                              <Play className="w-5 h-5 fill-current ml-0.5" />
-                            )}
-                          </button>
+                            <p className={`font-bold text-[11.5px] ${isMe ? 'text-white' : 'text-rose-600'}`}>
+                              {msg.replyTo.senderId === activePartnerId ? 'Vous' : otherPartner.name}
+                            </p>
+                            <p className="truncate text-[12px] opacity-90 leading-snug">{msg.replyTo.content}</p>
+                          </div>
+                        )}
 
-                          {/* Animated Dancing Waveform Graphic */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1 h-6">
-                              {[35, 65, 30, 90, 55, 100, 70, 45, 85, 60, 95, 40, 80, 50].map((h, i) => {
-                                const isCurrentPlaying = playingAudioId === msg.id;
-                                return (
-                                  <div
-                                    key={i}
-                                    className={`flex-1 rounded-full transition-all duration-150 ${
-                                      isMe
-                                        ? isCurrentPlaying
-                                          ? 'bg-white animate-pulse'
-                                          : 'bg-white/60'
-                                        : isCurrentPlaying
-                                        ? 'bg-rose-500 animate-pulse'
-                                        : chatTheme === 'velvet-night'
-                                        ? 'bg-slate-600'
-                                        : 'bg-rose-200'
-                                    }`}
-                                    style={{
-                                      height: isCurrentPlaying
-                                        ? `${Math.min(100, Math.max(25, (h * (1 + (i % 3) * 0.2))))}%`
-                                        : `${h}%`,
-                                    }}
-                                  />
-                                );
-                              })}
-                            </div>
-                            <div className={`flex items-center justify-between text-[10px] mt-1.5 ${isMe ? 'text-rose-100' : 'text-stone-500'}`}>
-                              <span className="font-mono">
-                                {playingAudioId === msg.id && audioCurrentTime > 0
-                                  ? `0:${Math.floor(audioCurrentTime).toString().padStart(2, '0')}`
-                                  : msg.audioDuration ? `0:${msg.audioDuration.toString().padStart(2, '0')}` : '0:05'}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const nextSpeed = playbackSpeed === 1 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1;
-                                  setPlaybackSpeed(nextSpeed);
-                                  if (audioRef.current) audioRef.current.playbackRate = nextSpeed;
-                                }}
-                                className={`font-bold text-[10px] px-1.5 py-0.5 rounded-md cursor-pointer ${
-                                  isMe
-                                    ? 'text-white bg-white/20 hover:bg-white/30'
-                                    : 'text-rose-700 bg-rose-100 hover:bg-rose-200'
-                                }`}
-                              >
-                                {playbackSpeed}x
-                              </button>
+                        {/* Photo Content */}
+                        {msg.mediaType === 'image' && msg.mediaUrl && (
+                          <div className="rounded-xl overflow-hidden mb-2 bg-black/10 cursor-pointer relative group/img border border-white/15">
+                            <img
+                              src={msg.mediaUrl}
+                              alt="Photo partagée"
+                              onClick={() => setLightboxImage(msg.mediaUrl!)}
+                              className="max-h-72 w-auto object-contain rounded-xl hover:opacity-95 transition-opacity"
+                            />
+                            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none text-xs font-semibold">
+                              🔍 Cliquer pour agrandir
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Love Note Card format */}
-                      {isLoveNote ? (
-                        <div className="py-1">
-                          <div className="flex items-center gap-1.5 text-rose-700 font-bold text-xs mb-1">
-                            <Heart className="w-3.5 h-3.5 fill-current text-rose-500" />
-                            <span>Billet doux pour toi</span>
+                        {/* Enhanced Voice Note Player */}
+                        {msg.mediaType === 'audio' && (
+                          <div className="flex items-center gap-3 py-1 px-1 min-w-[210px] sm:min-w-[250px]">
+                            <button
+                              onClick={() => togglePlayAudio(msg)}
+                              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                                isMe
+                                  ? 'bg-white text-rose-600 hover:bg-rose-50'
+                                  : playingAudioId === msg.id
+                                  ? 'bg-rose-600 text-white scale-105 shadow-md'
+                                  : 'bg-rose-500 hover:bg-rose-600 text-white'
+                              }`}
+                            >
+                              {playingAudioId === msg.id ? (
+                                <Pause className="w-5 h-5 fill-current" />
+                              ) : (
+                                <Play className="w-5 h-5 fill-current ml-0.5" />
+                              )}
+                            </button>
+
+                            {/* Animated Dancing Waveform Graphic */}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-1 h-6">
+                                {[35, 65, 30, 90, 55, 100, 70, 45, 85, 60, 95, 40, 80, 50].map((h, i) => {
+                                  const isCurrentPlaying = playingAudioId === msg.id;
+                                  return (
+                                    <div
+                                      key={i}
+                                      className={`flex-1 rounded-full transition-all duration-150 ${
+                                        isMe
+                                          ? isCurrentPlaying
+                                            ? 'bg-white animate-pulse'
+                                            : 'bg-white/80'
+                                          : isCurrentPlaying
+                                          ? 'bg-rose-500 animate-pulse'
+                                          : chatTheme === 'velvet-night'
+                                          ? 'bg-slate-600'
+                                          : 'bg-rose-200'
+                                      }`}
+                                      style={{
+                                        height: isCurrentPlaying
+                                          ? `${Math.min(100, Math.max(25, (h * (1 + (i % 3) * 0.2))))}%`
+                                          : `${h}%`,
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                              <div className={`flex items-center justify-between text-[11px] mt-1.5 font-medium ${isMe ? 'text-white/95' : 'text-stone-600 dark:text-slate-400'}`}>
+                                <span className="font-mono">
+                                  {playingAudioId === msg.id && audioCurrentTime > 0
+                                    ? `0:${Math.floor(audioCurrentTime).toString().padStart(2, '0')}`
+                                    : msg.audioDuration ? `0:${msg.audioDuration.toString().padStart(2, '0')}` : '0:05'}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const nextSpeed = playbackSpeed === 1 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1;
+                                    setPlaybackSpeed(nextSpeed);
+                                    if (audioRef.current) audioRef.current.playbackRate = nextSpeed;
+                                  }}
+                                  className={`font-bold text-[10.5px] px-2 py-0.5 rounded-md cursor-pointer ${
+                                    isMe
+                                      ? 'text-white bg-white/25 hover:bg-white/35'
+                                      : 'text-rose-700 bg-rose-100 hover:bg-rose-200'
+                                  }`}
+                                >
+                                  {playbackSpeed}x
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <p className="font-serif-romantic italic text-stone-800 text-sm leading-relaxed pr-8">
-                            {msg.content}
-                          </p>
+                        )}
+
+                        {/* Love Note Card format */}
+                        {isLoveNote ? (
+                          <div className="py-1">
+                            <div className="flex items-center gap-1.5 text-rose-700 font-bold text-xs mb-1">
+                              <Heart className="w-3.5 h-3.5 fill-current text-rose-500" />
+                              <span>Billet doux pour toi</span>
+                            </div>
+                            <p className={`font-serif-romantic italic text-stone-900 leading-relaxed ${CHAT_FONT_SIZES[chatFontSize].textClass}`}>
+                              {msg.content}
+                            </p>
+                          </div>
+                        ) : (
+                          /* Standard Text Content with customizable comfortable font size and contrast */
+                          msg.content && msg.content !== '🎵 Note vocale' && msg.content !== '📷 Photo partagée' && (
+                            <p className={`leading-[1.55] whitespace-pre-wrap break-words tracking-[0.01em] ${CHAT_FONT_SIZES[chatFontSize].textClass} ${
+                              isMe
+                                ? themeStyles.myBubbleText
+                                : chatTheme === 'velvet-night'
+                                ? 'text-slate-100 font-normal antialiased'
+                                : 'text-stone-900 font-normal antialiased'
+                            }`}>
+                              {msg.content}
+                            </p>
+                          )
+                        )}
+
+                        {/* Bottom Info: Timestamp, WhatsApp-style Checkmarks & Edited tag */}
+                        <div className={`flex items-center justify-end gap-1.5 text-[11px] mt-1 select-none self-end ${
+                          isMe
+                            ? themeStyles.myBubbleMeta
+                            : chatTheme === 'velvet-night'
+                            ? 'text-slate-400'
+                            : 'text-stone-400'
+                        }`}>
+                          {msg.isEdited && (
+                            <span
+                              className="text-[9.5px] italic opacity-90 mr-0.5"
+                              title={msg.editedAt ? `Modifié à ${new Date(msg.editedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Modifié'}
+                            >
+                              modifié
+                            </span>
+                          )}
+                          <span title={`Heure exacte d'arrivée : ${msgTime}`} className="tracking-tight">
+                            {msgTime}
+                          </span>
+                          {isMe && (
+                            <span className="inline-flex items-center ml-0.5">
+                              {isMsgRead ? (
+                                <CheckCheck
+                                  className="w-3.5 h-3.5 text-sky-300 stroke-[2.5]"
+                                  title="Lu"
+                                />
+                              ) : msg.status === 'delivered' ? (
+                                <CheckCheck
+                                  className="w-3.5 h-3.5 text-white/90 stroke-[2.2]"
+                                  title="Distribué"
+                                />
+                              ) : (
+                                <Check
+                                  className="w-3.5 h-3.5 text-white/80 stroke-[2.2]"
+                                  title="Envoyé"
+                                />
+                              )}
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        /* Standard Text Content */
-                        msg.content && msg.content !== '🎵 Note vocale' && msg.content !== '📷 Photo partagée' && (
-                          <p className={`text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words pr-12 ${
-                            isMe
-                              ? themeStyles.myBubbleText
-                              : chatTheme === 'velvet-night'
-                              ? 'text-slate-100'
-                              : 'text-stone-800'
-                          }`}>
-                            {msg.content}
-                          </p>
-                        )
-                      )}
-
-                      {/* Bottom Info: Timestamp, WhatsApp-style Checkmarks & Edited tag */}
-                      <div className={`flex items-center justify-end gap-1 text-[10px] float-right -mt-2 -mr-1 select-none ${
-                        isMe
-                          ? themeStyles.myBubbleMeta
-                          : chatTheme === 'velvet-night'
-                          ? 'text-slate-400'
-                          : 'text-stone-400'
-                      }`}>
-                        {msg.isEdited && (
-                          <span
-                            className="text-[9px] italic opacity-85 mr-0.5"
-                            title={msg.editedAt ? `Modifié à ${new Date(msg.editedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Modifié'}
-                          >
-                            modifié
-                          </span>
-                        )}
-                        <span title={`Heure exacte d'arrivée : ${msgTime}`}>{msgTime}</span>
-                        {isMe && (
-                          <span className="inline-flex items-center ml-0.5">
-                            {isMsgRead ? (
-                              <CheckCheck
-                                className="w-3.5 h-3.5 text-sky-400 stroke-[2.5]"
-                                title="Lu"
-                              />
-                            ) : msg.status === 'delivered' ? (
-                              <CheckCheck
-                                className="w-3.5 h-3.5 opacity-75 stroke-[2]"
-                                title="Distribué"
-                              />
-                            ) : (
-                              <Check
-                                className="w-3.5 h-3.5 opacity-75 stroke-[2]"
-                                title="Envoyé"
-                              />
-                            )}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="clear-both" />
 
                       {/* Reactions Badges underneath bubble */}
                       {reactionsList.length > 0 && (
@@ -1702,8 +1877,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   }
                 }}
                 placeholder="Tapez un mot doux, un souvenir..."
-                className={`w-full bg-transparent text-xs sm:text-sm resize-none outline-hidden max-h-24 ${
-                  chatTheme === 'velvet-night' ? 'text-white placeholder-slate-400' : 'text-stone-800 placeholder-stone-400'
+                className={`w-full bg-transparent ${CHAT_FONT_SIZES[chatFontSize].inputClass} leading-relaxed resize-none outline-hidden max-h-24 ${
+                  chatTheme === 'velvet-night' ? 'text-white placeholder-slate-400' : 'text-stone-900 placeholder-stone-400'
                 }`}
               />
             </div>
