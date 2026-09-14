@@ -116,6 +116,18 @@ export default function App() {
 
   // Main active tab
   const [activeTab, setActiveTab] = useState<MainTab>('chat');
+  const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('journal');
+
+  const handleSelectTab = (tab: MainTab) => {
+    if (activeTab !== 'chat') {
+      setLastNonChatTab(activeTab);
+    }
+    setActiveTab(tab);
+  };
+
+  const handleBackFromChat = () => {
+    setActiveTab(lastNonChatTab || 'journal');
+  };
 
   // Couple Data States with localStorage initialization
   const [profile, setProfile] = useState<CoupleProfile>(() => {
@@ -1369,42 +1381,46 @@ export default function App() {
         activeTab === 'chat' ? 'h-screen h-[100dvh] overflow-hidden no-scrollbar' : ''
       }`}
     >
-      {/* Top Header */}
-      <Header
-        profile={profile}
-        activePartnerId={activePartnerId}
-        onSwitchPartner={handleSwitchPartner}
-        onOpenSettings={() => {
-          setProfileFocusPartner(undefined);
-          setShowProfileModal(true);
-        }}
-        onOpenPhotoPicker={(pId) => {
-          setProfileFocusPartner(pId);
-          setShowProfileModal(true);
-        }}
-        onSendMissYou={handleSendMissYou}
-        unreadNotesCount={unreadNotesCount}
-        onGoToNotes={() => setActiveTab('journal')}
-        onGoToGallery={() => setActiveTab('gallery')}
-        isPinEnabled={settings.isPinEnabled}
-        onLockApp={() => setIsAppLocked(true)}
-        isFirebaseConnected={isCloudSynced}
-        onOpenInstallModal={() => setShowInstallModal(true)}
-      />
+      {/* Top Header - hidden when in Chat for immersive edge-to-edge phone-style messaging */}
+      {activeTab !== 'chat' && (
+        <Header
+          profile={profile}
+          activePartnerId={activePartnerId}
+          onSwitchPartner={handleSwitchPartner}
+          onOpenSettings={() => {
+            setProfileFocusPartner(undefined);
+            setShowProfileModal(true);
+          }}
+          onOpenPhotoPicker={(pId) => {
+            setProfileFocusPartner(pId);
+            setShowProfileModal(true);
+          }}
+          onSendMissYou={handleSendMissYou}
+          unreadNotesCount={unreadNotesCount}
+          onGoToNotes={() => handleSelectTab('journal')}
+          onGoToGallery={() => handleSelectTab('gallery')}
+          isPinEnabled={settings.isPinEnabled}
+          onLockApp={() => setIsAppLocked(true)}
+          isFirebaseConnected={isCloudSynced}
+          onOpenInstallModal={() => setShowInstallModal(true)}
+        />
+      )}
 
       {/* Main Body */}
       <main
         className={`flex-1 flex flex-col min-h-0 ${
-          activeTab === 'chat' ? 'pb-16 sm:pb-2 overflow-hidden' : 'pb-24 sm:pb-12'
+          activeTab === 'chat' ? 'pb-0 overflow-hidden' : 'pb-24 sm:pb-12'
         }`}
       >
-        {/* Tab Navigation */}
-        <Navigation
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          unreadNotesCount={unreadNotesCount}
-          unreadChatCount={unreadChatCount}
-        />
+        {/* Tab Navigation - hidden when in Chat like a native messaging phone screen */}
+        {activeTab !== 'chat' && (
+          <Navigation
+            activeTab={activeTab}
+            onSelectTab={handleSelectTab}
+            unreadNotesCount={unreadNotesCount}
+            unreadChatCount={unreadChatCount}
+          />
+        )}
 
         {/* Views */}
         <div
@@ -1422,6 +1438,7 @@ export default function App() {
               onSendMissYouPulse={handleSendMissYouPulseFromChat}
               onDeleteMessages={handleDeleteChatMessages}
               onEditMessage={handleEditChatMessage}
+              onBack={handleBackFromChat}
             />
           )}
 

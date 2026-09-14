@@ -30,6 +30,7 @@ import {
   CheckSquare,
   Square,
   SmilePlus,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -65,6 +66,7 @@ export interface ChatViewProps {
   onSendMissYouPulse: (pulseData: Omit<MissYouPulse, 'id' | 'timestamp'>) => void;
   onDeleteMessages?: (ids: string[]) => Promise<void> | void;
   onEditMessage?: (id: string, newContent: string) => Promise<void> | void;
+  onBack?: () => void;
 }
 
 type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
@@ -86,6 +88,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onSendMissYouPulse,
   onDeleteMessages,
   onEditMessage,
+  onBack,
 }) => {
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -667,7 +670,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   }[chatTheme];
 
   return (
-    <div className="max-w-4xl w-full mx-auto px-1 sm:px-4 py-1 sm:py-2 flex-1 flex flex-col min-h-0 h-full relative">
+    <div className="w-full h-full max-w-5xl mx-auto p-0 sm:px-4 sm:py-2 flex-1 flex flex-col min-h-0 relative">
       {/* Floating Hearts Particles Burst */}
       {particles.map((p) => (
         <div
@@ -692,8 +695,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
         className="hidden"
       />
 
-      {/* Main Chat Window Card */}
-      <div className={`${themeStyles.cardBg} rounded-2xl sm:rounded-3xl shadow-xl border overflow-hidden flex flex-col flex-1 min-h-0 h-full relative transition-colors duration-300`}>
+      {/* Main Chat Window Card - edge to edge on mobile like WhatsApp / native chat apps */}
+      <div className={`${themeStyles.cardBg} rounded-none sm:rounded-3xl shadow-none sm:shadow-xl border-0 sm:border overflow-hidden flex flex-col flex-1 min-h-0 h-full relative transition-colors duration-300`}>
         
         {/* ================================================================= */}
         {/* 1. CHAT TOP APP BAR & WHATSAPP-STYLE SELECTION BAR */}
@@ -787,10 +790,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </motion.div>
         ) : (
           <div className={`${themeStyles.headerBg} px-3 sm:px-4 py-2.5 flex items-center justify-between border-b shadow-2xs z-20 shrink-0 transition-colors duration-300`}>
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Back Button (Phone & Fullscreen UI - returns to Journal/other tabs) */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className={`p-2 -ml-1 rounded-full transition-colors cursor-pointer flex items-center justify-center shrink-0 ${
+                  chatTheme === 'velvet-night'
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-stone-600 hover:text-rose-600 hover:bg-rose-50'
+                }`}
+                title="Retour au menu & aux autres onglets"
+                aria-label="Retour"
+              >
+                <ArrowLeft className="w-5 h-5 sm:w-5 sm:h-5" />
+              </button>
+            )}
+
             {/* Other Partner Avatar with active status & glowing pulse */}
             <div
-              className="relative cursor-pointer group"
+              className="relative cursor-pointer group shrink-0"
               onClick={() => onSwitchPartner(otherPartnerId)}
               title={`Basculer sur ${otherPartner.name}`}
             >
