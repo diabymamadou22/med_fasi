@@ -78,6 +78,116 @@ export interface ChatViewProps {
 export type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
 export type SentBubbleColor = 'rose-ruby' | 'emerald-whatsapp' | 'ocean-blue' | 'slate-dark';
 export type ChatFontSize = 'normal' | 'large' | 'xlarge';
+export type ChatPattern = 'hearts' | 'floral' | 'stars' | 'doodle' | 'none';
+export type ChatPatternOpacity = 'subtle' | 'medium' | 'vibrant';
+
+export interface ChatPatternInfo {
+  id: ChatPattern;
+  name: string;
+  shortLabel: string;
+  emoji: string;
+  description: string;
+}
+
+export const CHAT_PATTERNS: ChatPatternInfo[] = [
+  {
+    id: 'hearts',
+    name: 'Cœurs Tendres',
+    shortLabel: 'Cœurs',
+    emoji: '💖',
+    description: 'Petits cœurs entrelacés & étincelles douces',
+  },
+  {
+    id: 'floral',
+    name: 'Pétales & Roses',
+    shortLabel: 'Fleurs',
+    emoji: '🌸',
+    description: 'Roses romantiques, boutons fleuris & feuillage',
+  },
+  {
+    id: 'stars',
+    name: 'Nuit Étoilée',
+    shortLabel: 'Étoiles',
+    emoji: '✨',
+    description: 'Constellations intimes & scintillements doux',
+  },
+  {
+    id: 'doodle',
+    name: 'Doodles Tendresse',
+    shortLabel: 'Doodles',
+    emoji: '💌',
+    description: 'Billets doux, anneaux, tasses & infini',
+  },
+  {
+    id: 'none',
+    name: 'Épuré (Uni)',
+    shortLabel: 'Uni',
+    emoji: '🕊️',
+    description: 'Fond dégradé épuré sans motif',
+  },
+];
+
+export const getPatternSvgDataUri = (pattern: ChatPattern, theme: ChatTheme): string => {
+  if (pattern === 'none') return '';
+
+  const color =
+    theme === 'velvet-night'
+      ? '%23fb7185' // rose-400
+      : theme === 'ivory-linen'
+      ? '%23b45309' // amber-700
+      : '%23e11d48'; // rose-600
+
+  if (pattern === 'hearts') {
+    // 76x76 seamless repeating tile with interlocking hearts, mini-hearts and subtle sparkles
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='76' height='76' viewBox='0 0 76 76'%3E%3Cpath fill='${color}' d='M20 14c-3.3 0-6 2.7-6 6 0 7 10 13 10 13s10-6 10-13c0-3.3-2.7-6-6-6-2.5 0-4.6 1.5-5.5 3.7-.9-2.2-3-3.7-5.5-3.7z'/%3E%3Cpath fill='${color}' d='M58 48c-2.4 0-4.4 2-4.4 4.4 0 5.2 7.4 9.6 7.4 9.6s7.4-4.4 7.4-9.6c0-2.4-2-4.4-4.4-4.4-1.9 0-3.4 1.1-4.1 2.8-.7-1.7-2.2-2.8-4.1-2.8z'/%3E%3Cpath fill='${color}' d='M62 16l1.2 2.8 2.8 1.2-2.8 1.2-1.2 2.8-1.2-2.8-2.8-1.2 2.8-1.2z'/%3E%3Cpath fill='${color}' d='M16 56l1 2.2 2.2 1-2.2 1-1 2.2-1-2.2-2.2-1 2.2-1z'/%3E%3Ccircle cx='40' cy='38' r='1.5' fill='${color}'/%3E%3Ccircle cx='70' cy='38' r='1.2' fill='${color}'/%3E%3Ccircle cx='10' cy='32' r='1.2' fill='${color}'/%3E%3C/svg%3E`;
+  }
+
+  if (pattern === 'floral') {
+    // 84x84 seamless repeating tile of delicate flowers, leaves and petals
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cpath fill='${color}' d='M24 22c-2.5 0-5 2-4 5.5 1 3.5 5 7.5 8 9.5 3-2 7-6 8-9.5 1-3.5-1.5-5.5-4-5.5-2.2 0-3.6 1.5-4 2.5-.4-1-1.8-2.5-4-2.5z'/%3E%3Cpath fill='none' stroke='${color}' stroke-width='1.2' stroke-linecap='round' d='M28 37c-2 6-5 12-10 16'/%3E%3Cpath fill='${color}' d='M23 44c1-3 4-4 7-3-1 3-4 4-7 3z'/%3E%3Cpath fill='${color}' d='M64 58c-2 0-3.8 1.5-3 4.2.8 2.7 3.8 5.8 6 7.3 2.2-1.5 5.2-4.6 6-7.3.8-2.7-1-4.2-3-4.2-1.6 0-2.7 1.1-3 1.9-.3-.8-1.4-1.9-3-1.9z'/%3E%3Cpath fill='${color}' d='M58 20c2-1 5 0 6 3-2 1-5 0-6-3z'/%3E%3Ccircle cx='70' cy='24' r='1.5' fill='${color}'/%3E%3Ccircle cx='18' cy='70' r='1.5' fill='${color}'/%3E%3Cpath fill='${color}' d='M44 28l1 2 2 1-2 1-1 2-1-2-2-1 2-1z'/%3E%3C/svg%3E`;
+  }
+
+  if (pattern === 'stars') {
+    // 78x78 seamless repeating tile of twinkling stars & cosmic hearts
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='78' height='78' viewBox='0 0 78 78'%3E%3Cpath fill='${color}' d='M24 16l2 5 5 2-5 2-2 5-2-5-5-2 5-2z'/%3E%3Cpath fill='${color}' d='M58 48l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6z'/%3E%3Cpath fill='${color}' d='M40 32c-1.8 0-3.2 1.4-3.2 3.2 0 3.8 4.2 6.8 4.2 6.8s4.2-3 4.2-6.8c0-1.8-1.4-3.2-3.2-3.2-1.2 0-2.3 0.8-2.7 1.8-.4-1-1.5-1.8-2.7-1.8z'/%3E%3Ccircle cx='64' cy='18' r='1.8' fill='${color}'/%3E%3Ccircle cx='16' cy='58' r='1.6' fill='${color}'/%3E%3Ccircle cx='34' cy='68' r='1.2' fill='${color}'/%3E%3Ccircle cx='72' cy='70' r='1' fill='${color}'/%3E%3Ccircle cx='10' cy='24' r='1' fill='${color}'/%3E%3C/svg%3E`;
+  }
+
+  if (pattern === 'doodle') {
+    // 92x92 seamless repeating tile of romantic love notes & cups
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92' viewBox='0 0 92 92'%3E%3Crect x='14' y='16' width='20' height='14' rx='2' fill='none' stroke='${color}' stroke-width='1.2'/%3E%3Cpath d='M14 16l10 7 10-7' fill='none' stroke='${color}' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M58 22c-2.5 0-4 1.6-5.2 3.2-1.2-1.6-2.8-3.2-5.2-3.2-3 0-5 2-5 5 0 5 10.2 9 10.2 9s10.2-4 10.2-9c0-3-2-5-5-5z' fill='${color}'/%3E%3Cpath d='M20 58h12v6a4 4 0 01-4 4h-4a4 4 0 01-4-4v-6z' fill='none' stroke='${color}' stroke-width='1.2'/%3E%3Cpath d='M32 60h2a2 2 0 010 4h-2' fill='none' stroke='${color}' stroke-width='1.2'/%3E%3Cpath d='M68 62c-1.8 0-3 1.2-3 3 0 3.5 4.5 6 4.5 6s4.5-2.5 4.5-6c0-1.8-1.2-3-3-3-1 0-1.7.6-2.1 1.4-.4-.8-1.1-1.4-2.1-1.4z' fill='${color}'/%3E%3Ccircle cx='76' cy='32' r='1.3' fill='${color}'/%3E%3Ccircle cx='12' cy='42' r='1.1' fill='${color}'/%3E%3Ccircle cx='48' cy='76' r='1.3' fill='${color}'/%3E%3C/svg%3E`;
+  }
+
+  return '';
+};
+
+export const getPatternOpacityValue = (opacity: ChatPatternOpacity, theme: ChatTheme): number => {
+  const isDark = theme === 'velvet-night';
+  switch (opacity) {
+    case 'subtle':
+      return isDark ? 0.08 : 0.06;
+    case 'medium':
+      return isDark ? 0.15 : 0.12;
+    case 'vibrant':
+      return isDark ? 0.25 : 0.20;
+    default:
+      return 0.12;
+  }
+};
+
+export const getPatternTileSize = (pattern: ChatPattern): number => {
+  switch (pattern) {
+    case 'hearts':
+      return 76;
+    case 'floral':
+      return 84;
+    case 'stars':
+      return 78;
+    case 'doodle':
+      return 92;
+    default:
+      return 80;
+  }
+};
 
 export const SENT_BUBBLE_PRESETS: Record<
   SentBubbleColor,
@@ -193,6 +303,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   });
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const [showClearChatModal, setShowClearChatModal] = useState<boolean>(false);
   const [showExportOptions, setShowExportOptions] = useState<boolean>(false);
   const [chatToastFeedback, setChatToastFeedback] = useState<string | null>(null);
@@ -353,6 +465,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
     localStorage.setItem('nid_amour_chat_font_size', size);
   };
 
+  // Subtle repeating romantic background pattern state
+  const [chatPattern, setChatPattern] = useState<ChatPattern>(() => {
+    return (localStorage.getItem('nid_amour_chat_pattern') as ChatPattern) || 'hearts';
+  });
+
+  const [chatPatternOpacity, setChatPatternOpacity] = useState<ChatPatternOpacity>(() => {
+    return (localStorage.getItem('nid_amour_chat_pattern_opacity') as ChatPatternOpacity) || 'medium';
+  });
+
+  const handleSelectChatPattern = (pattern: ChatPattern) => {
+    setChatPattern(pattern);
+    localStorage.setItem('nid_amour_chat_pattern', pattern);
+    soundEffects.playSoftTap();
+    const info = CHAT_PATTERNS.find((p) => p.id === pattern);
+    if (info) {
+      setChatToastFeedback(`Motif : ${info.emoji} ${info.name}`);
+      setTimeout(() => setChatToastFeedback(null), 2500);
+    }
+  };
+
+  const handleSelectChatPatternOpacity = (opacity: ChatPatternOpacity) => {
+    setChatPatternOpacity(opacity);
+    localStorage.setItem('nid_amour_chat_pattern_opacity', opacity);
+    soundEffects.playSoftTap();
+  };
+
   // Input states
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -470,6 +608,47 @@ export const ChatView: React.FC<ChatViewProps> = ({
       return 'En ligne récemment';
     }
   };
+
+  // Close MoreVertical options menu when clicking anywhere outside or pressing Escape
+  useEffect(() => {
+    if (!showMoreMenu) return;
+
+    const handlePointerDownOutside = (event: Event) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+
+      // Do nothing if click is inside the menu itself or on the toggle button
+      if (
+        moreMenuRef.current?.contains(target) ||
+        moreButtonRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      setShowMoreMenu(false);
+      setShowExportOptions(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowMoreMenu(false);
+        setShowExportOptions(false);
+      }
+    };
+
+    // Attach to document with capture phase to detect any click anywhere on the screen
+    document.addEventListener('pointerdown', handlePointerDownOutside, true);
+    document.addEventListener('mousedown', handlePointerDownOutside, true);
+    document.addEventListener('touchstart', handlePointerDownOutside, true);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside, true);
+      document.removeEventListener('mousedown', handlePointerDownOutside, true);
+      document.removeEventListener('touchstart', handlePointerDownOutside, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMoreMenu]);
 
   // Mark other partner's messages as read when viewing chat
   useEffect(() => {
@@ -1190,31 +1369,55 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </div>
 
-          {/* Right Action Menu (...) */}
-          <div className="relative">
+          {/* Header Action Buttons: Direct Theme & Motif button + More Options */}
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => setShowMoreMenu((prev) => !prev)}
+              type="button"
+              onClick={() => {
+                setShowThemePicker(true);
+                setShowMoreMenu(false);
+              }}
               className={`p-2 rounded-full transition-colors cursor-pointer relative ${
-                showMoreMenu
+                showThemePicker
                   ? 'bg-rose-100 text-rose-700 dark:bg-slate-800 dark:text-rose-400'
                   : chatTheme === 'velvet-night'
                   ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
                   : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
               }`}
-              title="Options du chat"
-              aria-label="Options du chat"
+              title="Personnaliser les couleurs, bulles & motifs de fond"
+              aria-label="Thème et motif de fond"
             >
-              <MoreVertical className="w-5 h-5" />
-              {showSearchBar && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
-              )}
+              <Palette className="w-4 h-4" />
             </button>
+
+            <div className="relative">
+              <button
+                ref={moreButtonRef}
+                onClick={() => setShowMoreMenu((prev) => !prev)}
+                className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+                  showMoreMenu
+                    ? 'bg-rose-100 text-rose-700 dark:bg-slate-800 dark:text-rose-400'
+                    : chatTheme === 'velvet-night'
+                    ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
+                    : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
+                }`}
+                title="Options du chat"
+                aria-label="Options du chat"
+              >
+                <MoreVertical className="w-5 h-5" />
+                {showSearchBar && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                )}
+              </button>
 
             {/* Backdrop for closing dropdown */}
             {showMoreMenu && (
               <div
                 className="fixed inset-0 z-30"
-                onClick={() => setShowMoreMenu(false)}
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setShowExportOptions(false);
+                }}
               />
             )}
 
@@ -1222,6 +1425,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <AnimatePresence>
               {showMoreMenu && (
                 <motion.div
+                  ref={moreMenuRef}
                   initial={{ opacity: 0, scale: 0.95, y: 6 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 6 }}
@@ -1404,7 +1608,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     >
                       <Palette className="w-4 h-4 text-rose-500 shrink-0" />
                       <span className="flex-1">Thème & Lisibilité</span>
-                      <span className="text-[10px] text-stone-400 dark:text-slate-500">Bulles & fond</span>
+                      <span className="text-[10px] text-stone-400 dark:text-slate-500">Bulles, fond & motifs</span>
                     </button>
                   </div>
                 </motion.div>
@@ -1426,12 +1630,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   initial={{ opacity: 0, scale: 0.95, y: 8 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                  className="absolute right-0 top-11 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 z-40 text-xs"
+                  className="absolute right-0 top-11 w-80 sm:w-96 max-h-[85vh] overflow-y-auto no-scrollbar bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-2xl shadow-2xl p-4 z-40 text-xs"
                 >
-                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-stone-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-stone-100 dark:border-slate-800 sticky -top-4 -mt-4 pt-3.5 pb-2.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md z-10">
                     <div className="flex items-center gap-1.5 font-bold text-stone-800 dark:text-slate-200 text-xs">
-                      <Palette className="w-3.5 h-3.5 text-rose-500" />
-                      <span>Lisibilité & Style de la discussion</span>
+                      <Palette className="w-4 h-4 text-rose-500" />
+                      <span>Personnalisation du Chat</span>
                     </div>
                     <button
                       type="button"
@@ -1505,49 +1709,149 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
 
                   {/* Section 3: Background Theme */}
-                  <div>
+                  <div className="mb-3.5">
                     <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5">
-                      Fond de discussion :
+                      Ambiance générale de fond :
                     </p>
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                       <button
                         type="button"
                         onClick={() => handleSelectTheme('rose-powder')}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
-                          chatTheme === 'rose-powder' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200/80' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                        className={`text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                          chatTheme === 'rose-powder' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200/80' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300 border border-transparent'
                         }`}
                       >
                         <span className="w-3.5 h-3.5 rounded-full bg-rose-400 inline-block shrink-0" />
-                        <span>🌸 Douceur Poudrée</span>
+                        <span className="truncate">🌸 Poudrée</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectTheme('velvet-night')}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
-                          chatTheme === 'velvet-night' ? 'bg-slate-800 text-rose-400 font-bold border border-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-stone-700 dark:text-slate-300'
+                        className={`text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                          chatTheme === 'velvet-night' ? 'bg-slate-800 text-rose-400 font-bold border border-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-stone-700 dark:text-slate-300 border border-transparent'
                         }`}
                       >
                         <span className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-700 inline-block shrink-0" />
-                        <span>🌙 Soirée Câline (Sombre)</span>
+                        <span className="truncate">🌙 Câline</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectTheme('ivory-linen')}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
-                          chatTheme === 'ivory-linen' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-200' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                        className={`text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                          chatTheme === 'ivory-linen' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-200' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300 border border-transparent'
                         }`}
                       >
                         <span className="w-3.5 h-3.5 rounded-full bg-amber-200 inline-block shrink-0" />
-                        <span>☁️ Cocon de Soie (Ivoire)</span>
+                        <span className="truncate">☁️ Ivoire</span>
                       </button>
                     </div>
+                  </div>
+
+                  {/* Section 4: Romantic Background Motif / Pattern */}
+                  <div className="pt-3 border-t border-stone-100 dark:border-slate-800">
+                    <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                        <span>Motif romantique de fond :</span>
+                      </span>
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold">
+                        {CHAT_PATTERNS.find((p) => p.id === chatPattern)?.shortLabel}
+                      </span>
+                    </p>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2.5">
+                      {CHAT_PATTERNS.map((pat) => {
+                        const isSelected = chatPattern === pat.id;
+                        return (
+                          <button
+                            key={pat.id}
+                            type="button"
+                            onClick={() => handleSelectChatPattern(pat.id)}
+                            className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
+                              isSelected
+                                ? 'border-rose-500 bg-rose-50/90 dark:bg-rose-950/60 ring-1 ring-rose-500 shadow-2xs'
+                                : 'border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-850'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm shrink-0">{pat.emoji}</span>
+                              <span className="font-bold text-[11px] text-stone-800 dark:text-slate-200 truncate">
+                                {pat.shortLabel}
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-stone-400 dark:text-slate-400 line-clamp-1">
+                              {pat.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Pattern Opacity / Intensity selector & Live Preview */}
+                    {chatPattern !== 'none' && (
+                      <div className="p-2.5 bg-stone-50 dark:bg-slate-850 rounded-xl border border-stone-200/80 dark:border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-stone-600 dark:text-slate-300">
+                            Intensité du motif :
+                          </span>
+                          <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                            {chatPatternOpacity === 'subtle'
+                              ? 'Discret (Subtil)'
+                              : chatPatternOpacity === 'medium'
+                              ? 'Doux (Recommandé)'
+                              : 'Marqué (Accent)'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1 bg-white/90 dark:bg-slate-800/90 p-0.5 rounded-lg border border-stone-200/60 dark:border-slate-700/60">
+                          {(
+                            [
+                              { id: 'subtle', label: 'Subtil' },
+                              { id: 'medium', label: 'Doux' },
+                              { id: 'vibrant', label: 'Marqué' },
+                            ] as { id: ChatPatternOpacity; label: string }[]
+                          ).map((op) => (
+                            <button
+                              key={op.id}
+                              type="button"
+                              onClick={() => handleSelectChatPatternOpacity(op.id)}
+                              className={`py-1 px-1.5 rounded-md text-center font-semibold text-[10px] transition-all cursor-pointer ${
+                                chatPatternOpacity === op.id
+                                  ? 'bg-rose-500 text-white shadow-2xs font-bold'
+                                  : 'text-stone-600 dark:text-slate-400 hover:text-stone-900 dark:hover:text-white'
+                              }`}
+                            >
+                              {op.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Live mini sample preview */}
+                        <div className="relative h-11 rounded-lg overflow-hidden border border-stone-200 dark:border-slate-700 flex items-center justify-center">
+                          <div className={`absolute inset-0 ${themeStyles.feedBg}`} />
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              backgroundImage: `url("${getPatternSvgDataUri(chatPattern, chatTheme)}")`,
+                              backgroundRepeat: 'repeat',
+                              backgroundSize: `${getPatternTileSize(chatPattern) * 0.75}px ${getPatternTileSize(chatPattern) * 0.75}px`,
+                              opacity: getPatternOpacityValue(chatPatternOpacity, chatTheme) * 1.3,
+                            }}
+                          />
+                          <div className="relative z-1 px-2.5 py-0.5 rounded-full bg-white/85 dark:bg-slate-900/85 backdrop-blur-xs text-[10px] font-semibold text-stone-700 dark:text-slate-200 shadow-2xs border border-rose-200/50">
+                            Aperçu du papier peint intime
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
-        )}
+      </div>
+      )}
 
         {/* Optional Search & Media Filter Bar */}
         <AnimatePresence>
@@ -1616,11 +1920,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
         {/* ================================================================= */}
         {/* 2. CHAT CANVAS & MESSAGES FEED */}
         {/* ================================================================= */}
-        <div
-          ref={chatContainerRef}
-          onScroll={handleScroll}
-          className={`flex-1 overflow-y-auto no-scrollbar p-3 sm:p-5 space-y-4 relative ${themeStyles.feedBg} transition-colors duration-300`}
-        >
+        <div className={`flex-1 relative min-h-0 overflow-hidden flex flex-col ${themeStyles.feedBg} transition-colors duration-300`}>
+          {/* Subtle Repeating Romantic Background Wallpaper Pattern Layer */}
+          {chatPattern !== 'none' && (
+            <div
+              className="absolute inset-0 pointer-events-none transition-opacity duration-500 z-0"
+              style={{
+                backgroundImage: `url("${getPatternSvgDataUri(chatPattern, chatTheme)}")`,
+                backgroundRepeat: 'repeat',
+                backgroundSize: `${getPatternTileSize(chatPattern)}px ${getPatternTileSize(chatPattern)}px`,
+                opacity: getPatternOpacityValue(chatPatternOpacity, chatTheme),
+              }}
+              aria-hidden="true"
+            />
+          )}
+
+          <div
+            ref={chatContainerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto no-scrollbar p-3 sm:p-5 space-y-4 relative z-10"
+          >
           {/* Private Intimate Space Indicator */}
           <div className="flex justify-center my-1">
             <div className={`backdrop-blur-xs border text-[11px] px-3.5 py-1.5 rounded-full text-center max-w-sm shadow-2xs ${
@@ -2057,23 +2376,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </motion.div>
           )}
 
-          <div ref={messagesEndRef} />
-        </div>
+            <div ref={messagesEndRef} />
+          </div>
 
-        {/* Floating Scroll to Bottom Button */}
-        {showScrollBottom && (
-          <button
-            onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
-            className={`absolute bottom-24 right-5 p-2.5 rounded-full shadow-lg border transition-all hover:scale-105 z-20 cursor-pointer ${
-              chatTheme === 'velvet-night'
-                ? 'bg-slate-800 text-slate-200 hover:text-rose-400 border-slate-700'
-                : 'bg-white text-stone-600 hover:text-rose-600 border-rose-100'
-            }`}
-            title="Revenir aux derniers messages"
-          >
-            <ChevronDown className="w-5 h-5" />
-          </button>
-        )}
+          {/* Floating Scroll to Bottom Button */}
+          {showScrollBottom && (
+            <button
+              onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className={`absolute bottom-4 right-5 p-2.5 rounded-full shadow-lg border transition-all hover:scale-105 z-20 cursor-pointer ${
+                chatTheme === 'velvet-night'
+                  ? 'bg-slate-800 text-slate-200 hover:text-rose-400 border-slate-700'
+                  : 'bg-white text-stone-600 hover:text-rose-600 border-rose-100'
+              }`}
+              title="Revenir aux derniers messages"
+            >
+              <ChevronDown className="w-5 h-5" />
+            </button>
+          )}
+        </div>
 
         {/* ================================================================= */}
         {/* 3. QUOTED REPLY & PHOTO COMPRESSION BANNERS */}
