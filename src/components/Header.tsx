@@ -12,8 +12,6 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenPhotoPicker?: (partnerId: PartnerId) => void;
   onSendMissYou: (vibe: MissYouPulse['vibe'], message: string) => void;
-  unreadNotesCount: number;
-  onGoToNotes: () => void;
   onGoToGallery?: () => void;
   isPinEnabled?: boolean;
   onLockApp?: () => void;
@@ -28,8 +26,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenPhotoPicker,
   onSendMissYou,
-  unreadNotesCount,
-  onGoToNotes,
   onGoToGallery,
   isPinEnabled,
   onLockApp,

@@ -29,6 +29,8 @@ import {
   Sparkles,
   Zap,
   Image as ImageIcon,
+  Database,
+  Clock,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../../types';
 import { soundEffects } from '../../lib/audio';
@@ -48,6 +50,8 @@ interface ProfileModalProps {
   onImportBackup: (backup: FullCoupleBackup) => void;
   onLockApp: () => void;
   isFirebaseConnected?: boolean;
+  totalMessagesCount?: number;
+  onPurgeOldChatMessages?: (days: number) => Promise<number>;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -62,8 +66,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onImportBackup,
   onLockApp,
   isFirebaseConnected = true,
+  totalMessagesCount = 0,
+  onPurgeOldChatMessages,
 }) => {
-  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'backup' | 'firebase' | 'app_mobile'>('profile');
+  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'storage' | 'backup' | 'firebase' | 'app_mobile'>('profile');
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [activePartnerSubTab, setActivePartnerSubTab] = useState<'both' | 'p1' | 'p2'>(
     initialFocusPartner === 'p2' ? 'p2' : initialFocusPartner === 'p1' ? 'p1' : 'both'
@@ -101,6 +107,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [pinCode, setPinCode] = useState(settings.pinCode || '1234');
   const [confirmPinCode, setConfirmPinCode] = useState(settings.pinCode || '1234');
   const [pinSaveFeedback, setPinSaveFeedback] = useState<string | null>(null);
+
+  // Storage / Auto-Clean History states
+  const [autoCleanChatEnabled, setAutoCleanChatEnabled] = useState<boolean>(
+    settings.autoCleanChatEnabled ?? false
+  );
+  const [autoCleanChatDays, setAutoCleanChatDays] = useState<number>(
+    settings.autoCleanChatDays ?? 30
+  );
+  const [isPurgingNow, setIsPurgingNow] = useState<boolean>(false);
+  const [purgeFeedback, setPurgeFeedback] = useState<string | null>(null);
+  const [storageSaveFeedback, setStorageSaveFeedback] = useState<string | null>(null);
 
   // File refs
   const p1FileInputRef = useRef<HTMLInputElement>(null);
@@ -193,6 +210,46 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setPinSaveFeedback('Paramètres de sécurité enregistrés !');
     soundEffects.playSuccessSparkle();
     setTimeout(() => setPinSaveFeedback(null), 3000);
+  };
+
+  const handleSaveStorageSettings = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const updatedSettings: CoupleSettings = {
+      ...settings,
+      autoCleanChatEnabled,
+      autoCleanChatDays: Math.max(1, Number(autoCleanChatDays) || 30),
+    };
+    onSaveSettings(updatedSettings);
+    soundEffects.playSuccessSparkle();
+    setStorageSaveFeedback('Options de nettoyage de la base enregistrées !');
+    setTimeout(() => setStorageSaveFeedback(null), 3500);
+  };
+
+  const handlePurgeNow = async () => {
+    const days = Math.max(1, Number(autoCleanChatDays) || 30);
+    const confirmed = confirm(
+      `Confirmez-vous la suppression définitive de tous les messages de plus de ${days} jours pour alléger la base de données Firestore et cet appareil ?`
+    );
+    if (!confirmed) return;
+
+    setIsPurgingNow(true);
+    setPurgeFeedback(null);
+    try {
+      if (onPurgeOldChatMessages) {
+        const deletedCount = await onPurgeOldChatMessages(days);
+        soundEffects.playSuccessSparkle();
+        triggerCelebrationConfetti();
+        if (deletedCount > 0) {
+          setPurgeFeedback(`✨ Succès : ${deletedCount} ancien(s) message(s) purgé(s) de Firestore !`);
+        } else {
+          setPurgeFeedback(`ℹ️ Aucun message antérieur à ${days} jours trouvé dans l'historique.`);
+        }
+      }
+    } catch (err: any) {
+      setPurgeFeedback(`Erreur lors du nettoyage : ${err?.message || 'Une erreur est survenue'}`);
+    } finally {
+      setIsPurgingNow(false);
+    }
   };
 
   const handleSubmitProfile = (e: React.FormEvent) => {
@@ -294,6 +351,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           >
             <Lock className="w-3.5 h-3.5 text-amber-500" />
             <span>Code PIN Secret</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setModalTab('storage')}
+            className={`py-2 px-3 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              modalTab === 'storage'
+                ? 'bg-white text-stone-900 shadow-xs ring-1 ring-rose-200'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Historique & Base</span>
           </button>
           <button
             type="button"
@@ -1069,6 +1138,232 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* TAB: HISTORIQUE & STOCKAGE / ALLÈGEMENT BASE */}
+          {modalTab === 'storage' && (
+            <div className="space-y-5 p-2">
+              {/* Header card */}
+              <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-200/80 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-indigo-100 text-indigo-800 rounded-xl mt-0.5 shadow-2xs">
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-stone-900">
+                        Nettoyage & Allègement de la Base de Données
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300">
+                        Firestore Optimisé
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                      Allégez votre base de données en configurant la suppression automatique des anciens messages (textes, photos et audios). Cela préserve vos quotas Firestore et garantit une navigation ultra-fluide.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status overview */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500">Messages en mémoire / base</p>
+                    <p className="text-lg font-bold text-stone-900 mt-0.5">
+                      {totalMessagesCount ?? 0} <span className="text-xs font-normal text-stone-500">message(s)</span>
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-rose-100 text-rose-700 rounded-xl">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500">Politique de rétention</p>
+                    <p className="text-xs font-bold text-stone-800 mt-1">
+                      {autoCleanChatEnabled ? (
+                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" /> Purge auto (&gt; {autoCleanChatDays} jours)
+                        </span>
+                      ) : (
+                        <span className="text-stone-500">Illimitée (aucun nettoyage auto)</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-emerald-100 text-emerald-700 rounded-xl">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Settings Form */}
+              <form onSubmit={handleSaveStorageSettings} className="space-y-4">
+                {/* Auto clean switch */}
+                <div className="flex items-center justify-between p-4 bg-stone-50 rounded-2xl border border-stone-200">
+                  <div className="pr-4">
+                    <p className="text-xs font-bold text-stone-800">
+                      Vider automatiquement l'historique ancien
+                    </p>
+                    <p className="text-[11px] text-stone-500 mt-0.5 leading-relaxed">
+                      Supprime automatiquement les messages plus vieux que la durée sélectionnée pour libérer la base de données.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={autoCleanChatEnabled}
+                      onChange={(e) => setAutoCleanChatEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-stone-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+                  </label>
+                </div>
+
+                {/* Day selector presets and input */}
+                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3.5">
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Conserver les messages pendant :
+                    </label>
+                    <p className="text-[11px] text-stone-500 mb-2.5">
+                      Les messages plus anciens que ce nombre de jours seront automatiquement supprimés.
+                    </p>
+
+                    {/* Quick preset buttons */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { days: 7, label: '7 jours' },
+                        { days: 14, label: '14 jours' },
+                        { days: 30, label: '30 jours' },
+                        { days: 60, label: '60 jours' },
+                        { days: 90, label: '90 jours' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.days}
+                          type="button"
+                          onClick={() => setAutoCleanChatDays(preset.days)}
+                          className={`py-2 px-2.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer text-center ${
+                            autoCleanChatDays === preset.days
+                              ? 'bg-rose-500 text-white border-rose-500 shadow-2xs'
+                              : 'bg-white text-stone-700 border-stone-200 hover:border-rose-300 hover:bg-rose-50/50'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom days input */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <label className="text-xs text-stone-600 font-medium whitespace-nowrap">
+                      Ou personnalisé :
+                    </label>
+                    <div className="relative w-32">
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={autoCleanChatDays}
+                        onChange={(e) => setAutoCleanChatDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-full pl-3 pr-10 py-1.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-rose-400"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-stone-400">
+                        jours
+                      </span>
+                    </div>
+                  </div>
+
+                  {settings.lastAutoCleanAt && (
+                    <div className="pt-2 text-[11px] text-stone-500 flex items-center gap-1.5 border-t border-stone-200">
+                      <Clock className="w-3.5 h-3.5 text-stone-400" />
+                      <span>
+                        Dernier nettoyage effectué le{' '}
+                        <strong>
+                          {new Date(settings.lastAutoCleanAt).toLocaleDateString('fr-FR', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {storageSaveFeedback && (
+                  <p className="text-xs font-semibold text-emerald-700 p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-1.5">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span>{storageSaveFeedback}</span>
+                  </p>
+                )}
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Enregistrer les préférences</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Manual Immediate Clean Action Card */}
+              <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-200/80 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h5 className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-rose-500" />
+                      <span>Nettoyage immédiat de la base</span>
+                    </h5>
+                    <p className="text-[11px] text-stone-600 mt-1 leading-relaxed">
+                      Vous n'avez pas besoin d'attendre : purgez dès maintenant les messages plus anciens que{' '}
+                      <strong>{autoCleanChatDays} jours</strong> de Firebase Firestore et de cet appareil.
+                    </p>
+                  </div>
+                </div>
+
+                {purgeFeedback && (
+                  <div className="p-2.5 bg-white rounded-xl border border-rose-200 text-xs font-medium text-stone-800">
+                    {purgeFeedback}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handlePurgeNow}
+                    disabled={isPurgingNow}
+                    className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isPurgingNow ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-rose-400" />
+                        <span>Nettoyage en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 text-rose-400" />
+                        <span>Purger les messages &gt; {autoCleanChatDays} jours maintenant</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Backup recommendation banner */}
+              <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Conseil :</strong> Si vous souhaitez garder une trace de vos conversations passées, rendez-vous d'abord dans l'onglet <strong>Sauvegarde</strong> pour télécharger une copie complète au format fichier avant de purger.
+                </span>
+              </div>
             </div>
           )}
 

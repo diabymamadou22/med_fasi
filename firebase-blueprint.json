@@ -162,12 +162,35 @@
         "editedAt": { "type": "string" }
       },
       "required": ["id", "senderId", "timestamp"]
+    },
+    "CoupleSettings": {
+      "title": "CoupleSettings",
+      "description": "Paramètres et préférences de l'application (sécurité, musique, allègement de base)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pinCode": { "type": "string" },
+        "isPinEnabled": { "type": "boolean" },
+        "songTitle": { "type": "string" },
+        "songAudioUrl": { "type": "string" },
+        "ambientTrackId": { "type": "string" },
+        "musicVolume": { "type": "number" },
+        "isMusicPlaying": { "type": "boolean" },
+        "autoCleanChatEnabled": { "type": "boolean" },
+        "autoCleanChatDays": { "type": "number" },
+        "lastAutoCleanAt": { "type": "string" }
+      },
+      "required": ["isPinEnabled"]
     }
   },
   "firestore": {
     "couple_profile": {
       "schema": "CoupleProfile",
       "description": "Profil et humeur du couple"
+    },
+    "couple_settings": {
+      "schema": "CoupleSettings",
+      "description": "Paramètres de couple et politique d'allègement de base"
     },
     "chat_messages": {
       "schema": "ChatMessage",

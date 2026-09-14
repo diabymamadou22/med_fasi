@@ -1,20 +1,18 @@
 import React from 'react';
-import { Mail, Clock, Gamepad2, Ticket, Images, MessageCircle } from 'lucide-react';
+import { Clock, Gamepad2, Images, MessageCircle } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 
-export type MainTab = 'chat' | 'journal' | 'timeline' | 'gallery' | 'games' | 'vouchers';
+export type MainTab = 'chat' | 'timeline' | 'gallery' | 'games';
 
 interface NavigationProps {
   activeTab: MainTab;
   onSelectTab: (tab: MainTab) => void;
-  unreadNotesCount: number;
   unreadChatCount?: number;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   activeTab,
   onSelectTab,
-  unreadNotesCount,
   unreadChatCount = 0,
 }) => {
   const tabs = [
@@ -26,14 +24,6 @@ export const Navigation: React.FC<NavigationProps> = ({
       icon: MessageCircle,
       badge: unreadChatCount > 0 ? unreadChatCount : undefined,
       badgeColor: 'bg-rose-500',
-    },
-    {
-      id: 'journal' as MainTab,
-      label: 'Journal & Douceurs',
-      shortLabel: 'Journal',
-      sublabel: 'Billets, Humeurs & Gratitude',
-      icon: Mail,
-      badge: unreadNotesCount > 0 ? unreadNotesCount : undefined,
     },
     {
       id: 'timeline' as MainTab,
@@ -55,13 +45,6 @@ export const Navigation: React.FC<NavigationProps> = ({
       shortLabel: 'Jeux',
       sublabel: 'Quiz, Date Picker & Défis',
       icon: Gamepad2,
-    },
-    {
-      id: 'vouchers' as MainTab,
-      label: 'Bons d\'amour',
-      shortLabel: 'Bons',
-      sublabel: 'Coupons & Chéquier du Cœur',
-      icon: Ticket,
     },
   ];
 

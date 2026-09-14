@@ -168,6 +168,10 @@ export interface CoupleSettings {
   ambientTrackId: AmbientTrackId;
   musicVolume: number; // 0 to 1
   isMusicPlaying: boolean;
+  // Allègement de la base de données (purge automatique des messages anciens)
+  autoCleanChatEnabled?: boolean;
+  autoCleanChatDays?: number; // ex: 7, 14, 30, 60, 90 jours
+  lastAutoCleanAt?: string; // date ISO du dernier nettoyage
 }
 
 export interface ChatMessage {

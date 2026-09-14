@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart } from 'lucide-react';
 import { Header } from './components/Header';
@@ -116,7 +116,7 @@ export default function App() {
 
   // Main active tab
   const [activeTab, setActiveTab] = useState<MainTab>('chat');
-  const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('journal');
+  const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('gallery');
 
   const handleSelectTab = (tab: MainTab) => {
     if (activeTab !== 'chat') {
@@ -126,7 +126,7 @@ export default function App() {
   };
 
   const handleBackFromChat = () => {
-    setActiveTab(lastNonChatTab || 'journal');
+    setActiveTab(lastNonChatTab || 'gallery');
   };
 
   // Couple Data States with localStorage initialization
@@ -274,7 +274,7 @@ export default function App() {
     }
   });
 
-  // Couple Settings (PIN, Romantic Music, Ambiance)
+  // Couple Settings (PIN, Romantic Music, Ambiance, Database cleaning)
   const [settings, setSettings] = useState<CoupleSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
@@ -287,6 +287,8 @@ export default function App() {
             ambientTrackId: 'kora_serenade',
             musicVolume: 0.35,
             isMusicPlaying: false,
+            autoCleanChatEnabled: false,
+            autoCleanChatDays: 30,
           };
     } catch {
       return {
@@ -296,6 +298,8 @@ export default function App() {
         ambientTrackId: 'kora_serenade',
         musicVolume: 0.35,
         isMusicPlaying: false,
+        autoCleanChatEnabled: false,
+        autoCleanChatDays: 30,
       };
     }
   });
@@ -775,6 +779,69 @@ export default function App() {
       console.error('Erreur suppression messages WhatsApp:', err);
     }
   };
+
+  // Purge de l'historique des messages plus vieux qu'un certain nombre de jours
+  const handlePurgeOldChatMessages = async (days: number): Promise<number> => {
+    if (days <= 0) return 0;
+    const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+    const oldMessages = messages.filter((m) => {
+      const t = extractMessageTimestampMs(m);
+      return t > 0 && t < cutoffMs;
+    });
+    if (oldMessages.length === 0) return 0;
+    const oldIds = oldMessages.map((m) => m.id);
+    await handleDeleteChatMessages(oldIds);
+    const nowIso = new Date().toISOString();
+    const updatedSettings: CoupleSettings = {
+      ...settings,
+      lastAutoCleanAt: nowIso,
+    };
+    setSettings(updatedSettings);
+    saveSettings(updatedSettings).catch(console.error);
+    return oldIds.length;
+  };
+
+  // Nettoyage automatique des anciens messages pour alléger la base Firestore
+  const lastCleanCheckRef = useRef<number>(0);
+
+  useEffect(() => {
+    lastCleanCheckRef.current = 0;
+  }, [settings.autoCleanChatEnabled, settings.autoCleanChatDays]);
+
+  useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
+    if (!settings.autoCleanChatEnabled) return;
+    const days = settings.autoCleanChatDays ?? 30;
+    if (days <= 0) return;
+
+    const now = Date.now();
+    // Limiter la vérification de nettoyage pour éviter les appels répétés
+    if (now - lastCleanCheckRef.current < 5 * 60 * 1000) return;
+
+    const cutoffMs = now - days * 24 * 60 * 60 * 1000;
+    const oldMessages = messages.filter((m) => {
+      const t = extractMessageTimestampMs(m);
+      return t > 0 && t < cutoffMs;
+    });
+
+    if (oldMessages.length > 0) {
+      lastCleanCheckRef.current = now;
+      console.log(`[Auto-Clean] Suppression de ${oldMessages.length} anciens messages (> ${days} jours)...`);
+      const oldIds = oldMessages.map((m) => m.id);
+      handleDeleteChatMessages(oldIds)
+        .then(() => {
+          const nowIso = new Date().toISOString();
+          setSettings((prev) => {
+            const updated = { ...prev, lastAutoCleanAt: nowIso };
+            saveSettings(updated).catch(console.error);
+            return updated;
+          });
+        })
+        .catch(console.error);
+    } else {
+      lastCleanCheckRef.current = now;
+    }
+  }, [isInitialRemoteLoaded, settings.autoCleanChatEnabled, settings.autoCleanChatDays, messages]);
 
   const handleEditChatMessage = async (messageId: string, newContent: string) => {
     setMessages((prev) =>
@@ -1396,8 +1463,6 @@ export default function App() {
             setShowProfileModal(true);
           }}
           onSendMissYou={handleSendMissYou}
-          unreadNotesCount={unreadNotesCount}
-          onGoToNotes={() => handleSelectTab('journal')}
           onGoToGallery={() => handleSelectTab('gallery')}
           isPinEnabled={settings.isPinEnabled}
           onLockApp={() => setIsAppLocked(true)}
@@ -1417,7 +1482,6 @@ export default function App() {
           <Navigation
             activeTab={activeTab}
             onSelectTab={handleSelectTab}
-            unreadNotesCount={unreadNotesCount}
             unreadChatCount={unreadChatCount}
           />
         )}
@@ -1440,39 +1504,6 @@ export default function App() {
               onEditMessage={handleEditChatMessage}
               onBack={handleBackFromChat}
             />
-          )}
-
-          {activeTab === 'journal' && (
-            <>
-              {/* Real-time Mood & Needs Bar for Journal & Douceurs */}
-              <MoodAndNeedsBar
-                profile={profile}
-                activePartnerId={activePartnerId}
-                onUpdateMood={handleUpdateMood}
-                onOpenPhotoPicker={(pId) => {
-                  setProfileFocusPartner(pId);
-                  setShowProfileModal(true);
-                }}
-              />
-              <JournalView
-                profile={profile}
-                activePartnerId={activePartnerId}
-                notes={notes}
-                gratitudes={gratitudes}
-                onOpenWriteNoteModal={() => {
-                  setEditingNote(null);
-                  setShowWriteNoteModal(true);
-                }}
-                onMarkNoteAsRead={handleMarkNoteAsRead}
-                onToggleFavoriteNote={handleToggleFavoriteNote}
-                onReactNote={handleReactNote}
-                onAddGratitude={handleAddGratitude}
-                onLikeGratitude={handleLikeGratitude}
-                onEditNote={(note) => setEditingNote(note)}
-                onDeleteNote={handleDeleteNote}
-                onDeleteGratitude={handleDeleteGratitude}
-              />
-            </>
           )}
 
           {activeTab === 'timeline' && (
@@ -1541,29 +1572,6 @@ export default function App() {
               onToggleChallenge={handleToggleChallenge}
               onAddNewQuiz={handleAddNewQuiz}
               onAddNewDateIdea={handleAddNewDateIdea}
-            />
-          )}
-
-          {activeTab === 'vouchers' && (
-            <VouchersAndBucketView
-              profile={profile}
-              activePartnerId={activePartnerId}
-              vouchers={vouchers}
-              bucketList={bucketList}
-              onRedeemVoucher={handleRedeemVoucher}
-              onOpenAddVoucherModal={() => {
-                setEditingVoucher(null);
-                setShowAddVoucherModal(true);
-              }}
-              onOpenAddBucketModal={() => {
-                setEditingBucketItem(null);
-                setShowAddBucketModal(true);
-              }}
-              onUpdateBucketStatus={handleUpdateBucketStatus}
-              onEditVoucher={(v) => setEditingVoucher(v)}
-              onDeleteVoucher={handleDeleteVoucher}
-              onEditBucketItem={(item) => setEditingBucketItem(item)}
-              onDeleteBucketItem={handleDeleteBucketItem}
             />
           )}
         </div>
@@ -1720,6 +1728,8 @@ export default function App() {
             onImportBackup={handleImportBackup}
             onLockApp={() => setIsAppLocked(true)}
             isFirebaseConnected={true}
+            totalMessagesCount={messages.length}
+            onPurgeOldChatMessages={handlePurgeOldChatMessages}
           />
         )}
 

@@ -7,8 +7,6 @@ import {
   Paperclip,
   Check,
   CheckCheck,
-  Phone,
-  Video,
   X,
   Search,
   CornerUpLeft,
@@ -18,7 +16,6 @@ import {
   Image as ImageIcon,
   ChevronDown,
   StopCircle,
-  PhoneOff,
   UserCheck,
   Sparkles,
   Palette,
@@ -133,10 +130,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'audio' | 'loveNote'>('all');
 
-  // Audio / Call modals
-  const [activeCallType, setActiveCallType] = useState<'audio' | 'video' | null>(null);
-  const [callDuration, setCallDuration] = useState(0);
-
   // Lightbox for photos
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
@@ -203,20 +196,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }, 60);
     return () => clearTimeout(t);
   }, []);
-
-  // Call timer effect
-  useEffect(() => {
-    let interval: any = null;
-    if (activeCallType) {
-      setCallDuration(0);
-      interval = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeCallType]);
 
   // Spawn heart burst animation
   const spawnHeartBurst = (x: number, y: number, count = 8) => {
@@ -606,12 +585,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setShowScrollBottom(!isAtBottom);
   };
 
-  const formatCallTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
   const romanticEmojis = [
     '❤️', '😘', '🥰', '😍', '🌹', '💌', '💍', '✨',
     '🥺', '🔥', '😂', '💋', '💖', '🧸', '🍫', '🙏',
@@ -886,32 +859,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
               title="Envoyer une pluie de cœurs et un battement"
             >
               <Heart className="w-5 h-5 fill-current animate-heartbeat" />
-            </button>
-
-            {/* Video Call Simulation */}
-            <button
-              onClick={() => setActiveCallType('video')}
-              className={`p-2 rounded-full transition-colors cursor-pointer ${
-                chatTheme === 'velvet-night'
-                  ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
-                  : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-              }`}
-              title="Appel vidéo intime"
-            >
-              <Video className="w-4.5 h-4.5" />
-            </button>
-
-            {/* Audio Call Simulation */}
-            <button
-              onClick={() => setActiveCallType('audio')}
-              className={`p-2 rounded-full transition-colors cursor-pointer ${
-                chatTheme === 'velvet-night'
-                  ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
-                  : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-              }`}
-              title="Appel vocal intime"
-            >
-              <Phone className="w-4.5 h-4.5" />
             </button>
 
             {/* Selection Mode Button */}
@@ -1817,87 +1764,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </AnimatePresence>
 
       {/* ================================================================= */}
-      {/* 9. CALL SIMULATION MODAL (Romantic Video / Audio Call) */}
-      {/* ================================================================= */}
-      <AnimatePresence>
-        {activeCallType && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-50 bg-stone-950/90 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <div className="bg-gradient-to-b from-stone-950 via-rose-950 to-stone-900 text-white rounded-3xl border border-rose-800/40 max-w-sm w-full p-6 text-center shadow-2xl relative overflow-hidden">
-              {/* Call Type Label */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-rose-300 text-xs font-semibold mb-4">
-                {activeCallType === 'video' ? <Video className="w-3.5 h-3.5" /> : <Phone className="w-3.5 h-3.5" />}
-                <span>{activeCallType === 'video' ? 'Appel Vidéo Intime' : 'Appel Audio Intime'}</span>
-              </div>
-
-              {/* Partner Avatar in Big Call View */}
-              <div className="relative mx-auto w-24 h-24 rounded-full overflow-hidden border-4 border-rose-400/80 shadow-xl mb-4 bg-stone-800">
-                {otherPartner.avatarUrl ? (
-                  <img
-                    src={otherPartner.avatarUrl}
-                    alt={otherPartner.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-rose-200">
-                    {otherPartner.name.slice(0, 2)}
-                  </div>
-                )}
-                <div className="absolute inset-0 ring-4 ring-rose-400/30 animate-ping rounded-full pointer-events-none" />
-              </div>
-
-              <h3 className="font-serif-romantic text-xl font-bold mb-1">{otherPartner.name}</h3>
-              <p className="text-xs text-rose-300 font-mono mb-6 flex items-center justify-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
-                <span>En communication : {formatCallTime(callDuration)}</span>
-              </p>
-
-              {/* Romantic quote */}
-              <p className="text-xs text-rose-100/80 italic mb-6 px-4">
-                « Même à distance, ta voix et ton regard font battre mon cœur... »
-              </p>
-
-              {/* Call Controls */}
-              <div className="flex items-center justify-center gap-4">
-                <button
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    spawnHeartBurst(rect.left + rect.width / 2, rect.top, 8);
-                    soundEffects.playHeartPulse();
-                    onSendMessage({
-                      senderId: activePartnerId,
-                      content: '❤️ Je t\'envoie un bisou pendant notre appel !',
-                    });
-                  }}
-                  className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-rose-300 transition-colors cursor-pointer"
-                  title="Envoyer un bisou pendant l'appel"
-                >
-                  <Heart className="w-6 h-6 fill-current" />
-                </button>
-
-                {/* Hang up button */}
-                <button
-                  onClick={() => {
-                    setActiveCallType(null);
-                    soundEffects.playSoftTap();
-                  }}
-                  className="p-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-                  title="Raccrocher"
-                >
-                  <PhoneOff className="w-7 h-7" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ================================================================= */}
-      {/* 10. EDIT MESSAGE MODAL */}
+      {/* 9. EDIT MESSAGE MODAL */}
       {/* ================================================================= */}
       <AnimatePresence>
         {editingMessage && (
