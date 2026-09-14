@@ -31,11 +31,20 @@ import {
   Image as ImageIcon,
   Database,
   Clock,
+  Bell,
+  BellRing,
+  Radio,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti } from '../../lib/confetti';
 import { processImageFile } from '../../lib/imageUtils';
+import {
+  sendSystemNotification,
+  requestNotificationPermission,
+  areNotificationsSupported,
+  triggerVibration,
+} from '../../lib/notificationService';
 import { PartnerAvatar } from '../PartnerAvatar';
 
 interface ProfileModalProps {
@@ -118,6 +127,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isPurgingNow, setIsPurgingNow] = useState<boolean>(false);
   const [purgeFeedback, setPurgeFeedback] = useState<string | null>(null);
   const [storageSaveFeedback, setStorageSaveFeedback] = useState<string | null>(null);
+
+  // Web Push Notifications & Badging state
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(() => {
+    return typeof window !== 'undefined' && 'Notification' in window
+      ? Notification.permission
+      : 'default';
+  });
+  const [notifTestFeedback, setNotifTestFeedback] = useState<string | null>(null);
 
   // File refs
   const p1FileInputRef = useRef<HTMLInputElement>(null);
@@ -1572,6 +1589,105 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       <span>Télécharger l'icône HD</span>
                     </a>
                   </div>
+                </div>
+              </div>
+
+              {/* Web Push Notifications & Badges Setup */}
+              <div className="p-4 bg-gradient-to-br from-rose-50/70 to-pink-50/50 rounded-2xl border border-rose-200/70 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-rose-500 text-white rounded-xl shadow-xs shrink-0">
+                      <BellRing className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-stone-900">
+                          Notifications & Alertes hors de l'application
+                        </h4>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            notifPermission === 'granted'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : notifPermission === 'denied'
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {notifPermission === 'granted'
+                            ? 'Actives'
+                            : notifPermission === 'denied'
+                            ? 'Bloquées'
+                            : 'Non activées'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                        Recevez une alerte native sur votre téléphone dès que votre partenaire vous envoie un message, une photo, ou une impulsion « Tu me manques », même si l'application est fermée.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {notifPermission !== 'granted' ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const granted = await requestNotificationPermission();
+                        if (typeof window !== 'undefined' && 'Notification' in window) {
+                          setNotifPermission(Notification.permission);
+                        }
+                        if (granted) {
+                          setNotifTestFeedback('Notifications activées avec succès !');
+                          soundEffects.playSuccessSparkle();
+                        } else {
+                          setNotifTestFeedback('Autorisation non accordée par le navigateur.');
+                        }
+                        setTimeout(() => setNotifTestFeedback(null), 3500);
+                      }}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Bell className="w-4 h-4" />
+                      <span>Activer les notifications sur cet appareil</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        triggerVibration([100, 50, 150]);
+                        soundEffects.playHeartPulse();
+                        const sent = await sendSystemNotification({
+                          title: 'Nid d’Amour 💕 Alerte Test',
+                          body: 'Vos notifications push et alertes hors-ligne fonctionnent à merveille !',
+                          icon: '/app-icon.png',
+                          tab: 'chat',
+                          tag: 'test-notification',
+                        });
+                        if (sent) {
+                          setNotifTestFeedback('Notification envoyée sur votre écran !');
+                        } else {
+                          setNotifTestFeedback('Vérifiez les paramètres de notification du système.');
+                        }
+                        setTimeout(() => setNotifTestFeedback(null), 4000);
+                      }}
+                      className="px-4 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Radio className="w-4 h-4 text-rose-500" />
+                      <span>Envoyer une alerte de test</span>
+                    </button>
+                  )}
+
+                  {notifTestFeedback && (
+                    <span className="text-xs font-semibold text-rose-700 bg-white/80 px-3 py-1.5 rounded-xl border border-rose-200">
+                      {notifTestFeedback}
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-2.5 bg-white/70 rounded-xl border border-rose-100 text-[11px] text-stone-600 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    <strong>Badge d'icône non-lus inclus :</strong> Le compteur de messages non-lus s'affiche directement sur l'icône de votre écran d'accueil (sur appareils compatibles).
+                  </span>
                 </div>
               </div>
 

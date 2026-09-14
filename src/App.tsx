@@ -24,6 +24,13 @@ import { PWAInstallModal } from './components/modals/PWAInstallModal';
 import { soundEffects } from './lib/audio';
 import { triggerCelebrationConfetti } from './lib/confetti';
 import {
+  sendSystemNotification,
+  updateAppBadge,
+  triggerVibration,
+} from './lib/notificationService';
+import { onPwaNavigate } from './lib/pwaService';
+import { WifiOff } from 'lucide-react';
+import {
   CoupleProfile,
   PartnerId,
   TimelineMemory,
@@ -320,6 +327,34 @@ export default function App() {
   const [activeMissYouPulse, setActiveMissYouPulse] = useState<MissYouPulse | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState<boolean>(true);
 
+  // Network connectivity state for Offline PWA Mode
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  });
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Listen for PWA notification navigation events (e.g. user taps a notification)
+  useEffect(() => {
+    const unsubPwaNav = onPwaNavigate((tab) => {
+      if (tab) {
+        setActiveTab(tab as MainTab);
+      }
+    });
+    return unsubPwaNav;
+  }, []);
+
   // Protection contre le reset des données sur un nouvel appareil ou rafraîchissement
   const [isInitialRemoteLoaded, setIsInitialRemoteLoaded] = useState<boolean>(() => {
     return Boolean(localStorage.getItem(STORAGE_KEYS.PROFILE));
@@ -516,6 +551,19 @@ export default function App() {
       if (pulse && pulse.senderId !== activePartnerId) {
         setActiveMissYouPulse(pulse);
         soundEffects.playHeartPulse();
+        triggerVibration([100, 50, 150]);
+
+        // Background Web Push / Native notification if app is in background or not on chat tab
+        if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
+          const sender = pulse.senderId === 'p1' ? profile.partner1 : profile.partner2;
+          sendSystemNotification({
+            title: `Tu me manques ! 💓`,
+            body: `${sender.name || 'Votre amour'} vous envoie une impulsion de cœur !`,
+            icon: sender.avatar || '/app-icon.png',
+            tab: 'chat',
+            tag: 'miss-you-pulse',
+          });
+        }
       }
     });
 
@@ -529,6 +577,25 @@ export default function App() {
               const lastMsg = sorted[sorted.length - 1];
               if (lastMsg && lastMsg.senderId !== activePartnerId) {
                 soundEffects.playMessageReceived();
+                triggerVibration([80, 40, 80]);
+
+                if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
+                  const sender = lastMsg.senderId === 'p1' ? profile.partner1 : profile.partner2;
+                  const bodyText =
+                    lastMsg.mediaType === 'image'
+                      ? '📷 Vous a envoyé une photo'
+                      : lastMsg.mediaType === 'audio'
+                      ? '🎵 Vous a envoyé une note vocale'
+                      : lastMsg.content;
+
+                  sendSystemNotification({
+                    title: `${sender.name || 'Votre amour'} ❤️`,
+                    body: bodyText,
+                    icon: sender.avatar || '/app-icon.png',
+                    tab: 'chat',
+                    tag: `chat-${lastMsg.id}`,
+                  });
+                }
               }
             }
             return sorted;
@@ -625,6 +692,23 @@ export default function App() {
     if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
   }, [messages, isInitialRemoteLoaded]);
+
+  // Update PWA Home Screen App Badge for unread chat messages
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      updateAppBadge(0);
+      return;
+    }
+    const unreadCount = messages.filter(
+      (m) =>
+        m.senderId !== activePartnerId &&
+        m.readStatus !== 'read' &&
+        m.readStatus !== true &&
+        m.status !== 'read'
+    ).length;
+
+    updateAppBadge(unreadCount);
+  }, [messages, activeTab, activePartnerId]);
 
   // Export full JSON backup
   const handleExportBackup = () => {
@@ -778,6 +862,12 @@ export default function App() {
     } catch (err) {
       console.error('Erreur suppression messages WhatsApp:', err);
     }
+  };
+
+  const handleClearChat = async () => {
+    if (messages.length === 0) return;
+    const allIds = messages.map((m) => m.id);
+    await handleDeleteChatMessages(allIds);
   };
 
   // Purge de l'historique des messages plus vieux qu'un certain nombre de jours
@@ -1448,6 +1538,14 @@ export default function App() {
         activeTab === 'chat' ? 'h-screen h-[100dvh] overflow-hidden no-scrollbar' : ''
       }`}
     >
+      {/* Offline Mode Alert banner */}
+      {!isOnline && (
+        <div className="bg-amber-600 text-white px-3 py-1.5 text-xs text-center font-medium flex items-center justify-center gap-2 shadow-xs shrink-0 z-50">
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          <span>Mode hors-ligne : vous consultez vos souvenirs et messages mis en cache localement.</span>
+        </div>
+      )}
+
       {/* Top Header - hidden when in Chat for immersive edge-to-edge phone-style messaging */}
       {activeTab !== 'chat' && (
         <Header
@@ -1501,6 +1599,7 @@ export default function App() {
               onSendMessage={handleSendChatMessage}
               onSendMissYouPulse={handleSendMissYouPulseFromChat}
               onDeleteMessages={handleDeleteChatMessages}
+              onClearChat={handleClearChat}
               onEditMessage={handleEditChatMessage}
               onBack={handleBackFromChat}
             />

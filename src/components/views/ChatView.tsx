@@ -29,6 +29,10 @@ import {
   SmilePlus,
   ArrowLeft,
   Type,
+  Loader2,
+  MoreVertical,
+  Download,
+  FileText,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -40,12 +44,14 @@ import {
   updateChatMessageReaction,
   updateChatMessageStatus,
   setChatTypingStatus,
+  updatePartnerPresence,
   subscribeChatTypingStatus,
   deleteChatMessageFromDb,
   deleteMultipleChatMessagesFromDb,
   editChatMessageContent,
   updateMultipleChatMessagesReaction,
   updateMultipleChatMessagesReadStatus,
+  PartnerPresenceInfo,
 } from '../../lib/firestoreService';
 import {
   sortChatMessagesChronologically,
@@ -53,7 +59,7 @@ import {
   formatMessageTime,
 } from '../../lib/chatUtils';
 import { soundEffects } from '../../lib/audio';
-import { processPhotoWithoutCropping } from '../../lib/imageUtils';
+import { processPhotoWithoutCropping, compressImageWithStats, formatBytes } from '../../lib/imageUtils';
 
 export interface ChatViewProps {
   profile: CoupleProfile;
@@ -63,6 +69,8 @@ export interface ChatViewProps {
   onSendMessage: (msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>) => void;
   onSendMissYouPulse: (pulseData: Omit<MissYouPulse, 'id' | 'timestamp'>) => void;
   onDeleteMessages?: (ids: string[]) => Promise<void> | void;
+  onClearChat?: () => Promise<void> | void;
+  onExportChat?: (format?: 'txt' | 'json') => void;
   onEditMessage?: (id: string, newContent: string) => Promise<void> | void;
   onBack?: () => void;
 }
@@ -153,6 +161,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onSendMessage,
   onSendMissYouPulse,
   onDeleteMessages,
+  onClearChat,
+  onExportChat,
   onEditMessage,
   onBack,
 }) => {
@@ -182,6 +192,141 @@ export const ChatView: React.FC<ChatViewProps> = ({
     return (localStorage.getItem('nid_amour_chat_theme') as ChatTheme) || 'rose-powder';
   });
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showClearChatModal, setShowClearChatModal] = useState<boolean>(false);
+  const [showExportOptions, setShowExportOptions] = useState<boolean>(false);
+  const [chatToastFeedback, setChatToastFeedback] = useState<string | null>(null);
+
+  const handleExportChat = (format: 'txt' | 'json' = 'txt') => {
+    if (onExportChat) {
+      onExportChat(format);
+      setShowMoreMenu(false);
+      setShowExportOptions(false);
+      return;
+    }
+
+    if (messages.length === 0) {
+      setChatToastFeedback("Aucun message à exporter pour le moment 💕");
+      setTimeout(() => setChatToastFeedback(null), 3000);
+      setShowMoreMenu(false);
+      setShowExportOptions(false);
+      return;
+    }
+
+    const p1Name = profile.partner1?.name || 'Partenaire 1';
+    const p2Name = profile.partner2?.name || 'Partenaire 2';
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (format === 'json') {
+      const chatExportData = {
+        title: "Notre Nid d'Amour - Discussion de couple",
+        couple: `${p1Name} & ${p2Name}`,
+        exportedAt: new Date().toISOString(),
+        totalMessages: messages.length,
+        messages: messages,
+      };
+      const dataStr =
+        'data:text/json;charset=utf-8,' +
+        encodeURIComponent(JSON.stringify(chatExportData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute(
+        'download',
+        `nid_damour_messages_${p1Name.toLowerCase()}_${p2Name.toLowerCase()}_${today}.json`
+      );
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } else {
+      let txtContent = `╔════════════════════════════════════════════════════════════════════╗\n`;
+      txtContent += `║           💕 NOTRE NID D'AMOUR - JOURNAL DE CONVERSATION 💕          ║\n`;
+      txtContent += `║                    ${p1Name} & ${p2Name}                           ║\n`;
+      txtContent += `║      Exporté avec amour le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}          ║\n`;
+      txtContent += `╚════════════════════════════════════════════════════════════════════╝\n\n`;
+      txtContent += `Total de messages échangés : ${messages.length}\n`;
+      txtContent += `────────────────────────────────────────────────────────────────────\n\n`;
+
+      messages.forEach((msg) => {
+        const authorName = msg.senderId === 'p1' ? p1Name : p2Name;
+        let timeStr = msg.timestamp;
+        try {
+          const d = new Date(msg.timestamp);
+          if (!isNaN(d.getTime())) {
+            timeStr = d.toLocaleString('fr-FR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+        } catch {
+          // fallback
+        }
+
+        let extra = '';
+        if (msg.mediaType === 'image') {
+          extra = ' [📷 Photo jointe]';
+        } else if (msg.mediaType === 'audio') {
+          extra = ` [🎙️ Note vocale ${msg.audioDuration ? `(${msg.audioDuration}s)` : ''}]`;
+        }
+        if (msg.reaction) {
+          extra += ` (Réaction : ${msg.reaction})`;
+        }
+
+        txtContent += `[${timeStr}] ${authorName} : ${msg.content || ''}${extra}\n`;
+      });
+
+      txtContent += `\n────────────────────────────────────────────────────────────────────\n`;
+      txtContent += `Fin du journal d'amour. Conservez précieusement ces doux souvenirs ❤️\n`;
+
+      const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', url);
+      downloadAnchor.setAttribute(
+        'download',
+        `nid_damour_journal_${p1Name.toLowerCase()}_${p2Name.toLowerCase()}_${today}.txt`
+      );
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    soundEffects.playSuccessSparkle();
+    setShowMoreMenu(false);
+    setShowExportOptions(false);
+    setChatToastFeedback(`Discussion exportée (${messages.length} messages) 💕`);
+    setTimeout(() => setChatToastFeedback(null), 3500);
+  };
+
+  const handleClearChatConfirm = async () => {
+    if (messages.length === 0) {
+      setShowClearChatModal(false);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      if (onClearChat) {
+        await onClearChat();
+      } else if (onDeleteMessages) {
+        const allIds = messages.map((m) => m.id);
+        await onDeleteMessages(allIds);
+      } else {
+        const allIds = messages.map((m) => m.id);
+        await deleteMultipleChatMessagesFromDb(allIds);
+      }
+      soundEffects.playSoftTap();
+      setShowClearChatModal(false);
+      setChatToastFeedback('Conversation effacée avec succès 🌸');
+      setTimeout(() => setChatToastFeedback(null), 3000);
+    } catch (err) {
+      console.error('Erreur effacement discussion:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSelectTheme = (theme: ChatTheme) => {
     setChatTheme(theme);
@@ -235,12 +380,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Real-time typing status from Firestore
-  const [typingMap, setTypingMap] = useState<Record<string, { isTyping: boolean; updatedAt: string }>>({});
+  // Real-time presence & typing status from Firestore
+  const [presenceMap, setPresenceMap] = useState<Record<string, PartnerPresenceInfo>>({});
   const typingTimeoutRef = useRef<any>(null);
 
   // Floating hearts particles
   const [particles, setParticles] = useState<FloatingHeartParticle[]>([]);
+
+  // Photo compression status banner state
+  const [compressingStats, setCompressingStats] = useState<{
+    isCompressing: boolean;
+    filename?: string;
+    originalSize?: number;
+    compressedSize?: number;
+    reduction?: number;
+  } | null>(null);
 
   // Scroll to bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -248,17 +402,74 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Subscribe to real-time typing status
+  // Subscribe to real-time presence and typing status
   useEffect(() => {
     const unsubTyping = subscribeChatTypingStatus((map) => {
-      setTypingMap(map);
+      setPresenceMap(map);
     });
     return () => {
       unsubTyping();
     };
   }, []);
 
-  const isOtherPartnerTyping = Boolean(typingMap[otherPartnerId]?.isTyping);
+  // Presence heartbeat & disconnect detection
+  useEffect(() => {
+    // Initial online notification
+    updatePartnerPresence(activePartnerId, true);
+
+    // Heartbeat every 20 seconds
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        updatePartnerPresence(activePartnerId, true);
+      }
+    }, 20000);
+
+    // Immediate visibility change detection (tab hidden/active)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        setChatTypingStatus(activePartnerId, false);
+        updatePartnerPresence(activePartnerId, false);
+      } else {
+        updatePartnerPresence(activePartnerId, true);
+      }
+    };
+
+    // Before unload / pagehide: immediate offline broadcast
+    const handleDisconnect = () => {
+      setChatTypingStatus(activePartnerId, false);
+      updatePartnerPresence(activePartnerId, false);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleDisconnect);
+    window.addEventListener('pagehide', handleDisconnect);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleDisconnect);
+      window.removeEventListener('pagehide', handleDisconnect);
+      setChatTypingStatus(activePartnerId, false);
+      updatePartnerPresence(activePartnerId, false);
+    };
+  }, [activePartnerId]);
+
+  const otherPartnerPresence = presenceMap[otherPartnerId];
+  const isOtherPartnerTyping = Boolean(otherPartnerPresence?.isTyping);
+  const isOtherPartnerOnline = Boolean(otherPartnerPresence?.isOnline);
+
+  const formatLastSeen = (isoStr?: string) => {
+    if (!isoStr) return 'En ligne récemment';
+    try {
+      const date = new Date(isoStr);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+      const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      return isToday ? `Vu aujourd'hui à ${timeStr}` : `Vu le ${date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${timeStr}`;
+    } catch {
+      return 'En ligne récemment';
+    }
+  };
 
   // Mark other partner's messages as read when viewing chat
   useEffect(() => {
@@ -466,22 +677,49 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
-  // Image Upload handler with compression
+  // Image Upload handler with smart mobile photo auto-compression
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const dataUrl = await processPhotoWithoutCropping(file, 1280, 0.82);
+      setCompressingStats({
+        isCompressing: true,
+        filename: file.name,
+        originalSize: file.size,
+      });
+
+      // Compress 5-15 MB mobile camera photo to ~200-280 KB
+      const result = await compressImageWithStats(file, {
+        maxDimension: 1280,
+        maxSizeBytes: 280 * 1024,
+        initialQuality: 0.82,
+      });
+
+      setCompressingStats({
+        isCompressing: false,
+        filename: file.name,
+        originalSize: result.originalSizeBytes,
+        compressedSize: result.compressedSizeBytes,
+        reduction: result.reductionPercent,
+      });
+
       onSendMessage({
         senderId: activePartnerId,
         content: '📷 Photo partagée',
         mediaType: 'image',
-        mediaUrl: dataUrl,
+        mediaUrl: result.dataUrl,
       });
       soundEffects.playMessageSent();
+
+      // Clear compression notification badge after 3.5s
+      setTimeout(() => {
+        setCompressingStats(null);
+      }, 3500);
     } catch (err) {
       console.error('Erreur compression image chat:', err);
+      setCompressingStats(null);
+      alert('Impossible d’optimiser cette photo. Veuillez en essayer une autre.');
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -762,6 +1000,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* Main Chat Window Card - edge to edge on mobile like WhatsApp / native chat apps */}
       <div className={`${themeStyles.cardBg} rounded-none sm:rounded-3xl shadow-none sm:shadow-xl border-0 sm:border overflow-hidden flex flex-col flex-1 min-h-0 h-full relative transition-colors duration-300`}>
         
+        {/* Floating Chat Notification Toast */}
+        <AnimatePresence>
+          {chatToastFeedback && (
+            <motion.div
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-stone-900/90 dark:bg-slate-900/95 backdrop-blur-md text-white text-xs font-semibold rounded-full shadow-lg flex items-center gap-2 border border-rose-500/40 pointer-events-none"
+            >
+              <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse shrink-0" />
+              <span>{chatToastFeedback}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ================================================================= */}
         {/* 1. CHAT TOP APP BAR & WHATSAPP-STYLE SELECTION BAR */}
         {/* ================================================================= */}
@@ -890,7 +1143,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
                 )}
               </div>
-              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse" />
+              <span
+                className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full transition-colors ${
+                  isOtherPartnerOnline ? 'bg-emerald-500 animate-pulse ring-2 ring-emerald-300/60' : 'bg-stone-300'
+                }`}
+              />
             </div>
 
             {/* Partner Info */}
@@ -904,230 +1161,390 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 </span>
               </div>
               
-              {/* Online or Typing Status */}
+              {/* Online, Typing or Last Seen Status */}
               <p className="text-xs leading-tight truncate flex items-center gap-1.5 mt-0.5">
                 {isOtherPartnerTyping ? (
-                  <span className="text-rose-500 font-semibold flex items-center gap-1 animate-pulse">
+                  <span className="text-rose-500 font-semibold flex items-center gap-1.5 animate-pulse">
+                    <span className="flex gap-0.5 items-center">
+                      <span className="w-1 h-1 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1 h-1 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1 h-1 rounded-full bg-rose-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
                     <span>en train d'écrire...</span>
-                    <Sparkles className="w-3 h-3 animate-spin text-rose-500" />
+                  </span>
+                ) : isOtherPartnerOnline ? (
+                  <span className={`flex items-center gap-1.5 ${chatTheme === 'velvet-night' ? 'text-emerald-400' : 'text-emerald-600 font-medium'}`}>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>en ligne</span>
                   </span>
                 ) : (
                   <span className={`flex items-center gap-1.5 ${chatTheme === 'velvet-night' ? 'text-slate-400' : 'text-stone-500'}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                    <span>en ligne avec toi 💕</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-stone-300 inline-block" />
+                    <span>{formatLastSeen(otherPartnerPresence?.lastSeen)}</span>
                   </span>
                 )}
               </p>
             </div>
           </div>
 
-          {/* Right Action Icons (Theme, Calls, Heart Pulse, Switch Duo) */}
-          <div className="flex items-center gap-1 sm:gap-1.5">
-            {/* Perspective Switch Button */}
+          {/* Right Action Menu (...) */}
+          <div className="relative">
             <button
-              onClick={() => onSwitchPartner(otherPartnerId)}
-              className={`px-2.5 py-1.5 border rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${themeStyles.badgeBg}`}
-              title="Changer de perspective"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-rose-600" />
-              <span className="hidden md:inline opacity-70">Moi :</span>
-              <span className="font-bold truncate max-w-[65px]">{currentPartner.name}</span>
-            </button>
-
-            {/* Send Instant Heart Pulse Burst */}
-            <button
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                spawnHeartBurst(rect.left + rect.width / 2, rect.top, 12);
-                onSendMissYouPulse({
-                  senderId: activePartnerId,
-                  vibe: 'kiss',
-                  message: 'Je pense fort à toi mon amour ❤️',
-                });
-                soundEffects.playHeartPulse();
-              }}
-              className="p-2 hover:bg-rose-50/20 rounded-full text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-              title="Envoyer une pluie de cœurs et un battement"
-            >
-              <Heart className="w-5 h-5 fill-current animate-heartbeat" />
-            </button>
-
-            {/* Selection Mode Button */}
-            <button
-              onClick={() => {
-                const nextMode = !isSelectionMode;
-                setIsSelectionMode(nextMode);
-                if (!nextMode) setSelectedMessageIds([]);
-              }}
-              className={`p-2 rounded-full transition-colors cursor-pointer ${
-                isSelectionMode
-                  ? 'bg-rose-500 text-white shadow-xs'
+              onClick={() => setShowMoreMenu((prev) => !prev)}
+              className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+                showMoreMenu
+                  ? 'bg-rose-100 text-rose-700 dark:bg-slate-800 dark:text-rose-400'
                   : chatTheme === 'velvet-night'
                   ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
                   : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
               }`}
-              title={isSelectionMode ? "Quitter le mode sélection" : "Sélectionner des messages"}
+              title="Options du chat"
+              aria-label="Options du chat"
             >
-              <CheckSquare className="w-4.5 h-4.5" />
+              <MoreVertical className="w-5 h-5" />
+              {showSearchBar && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+              )}
             </button>
 
-            {/* Search Button */}
-            <button
-              onClick={() => setShowSearchBar(!showSearchBar)}
-              className={`p-2 rounded-full transition-colors cursor-pointer ${
-                showSearchBar
-                  ? 'bg-rose-500 text-white'
-                  : chatTheme === 'velvet-night'
-                  ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
-                  : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-              }`}
-              title="Rechercher dans la discussion"
-            >
-              <Search className="w-4.5 h-4.5" />
-            </button>
+            {/* Backdrop for closing dropdown */}
+            {showMoreMenu && (
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setShowMoreMenu(false)}
+              />
+            )}
 
-            {/* Theme / Ambiance & Readability Palette Selector */}
-            <div className="relative">
-              <button
-                onClick={() => setShowThemePicker(!showThemePicker)}
-                className={`p-2 rounded-full transition-colors cursor-pointer ${
-                  showThemePicker
-                    ? 'bg-rose-100 text-rose-700'
-                    : chatTheme === 'velvet-night'
-                    ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
-                    : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-                }`}
-                title="Personnaliser l'affichage & la lisibilité"
-              >
-                <Palette className="w-4.5 h-4.5" />
-              </button>
-
-              <AnimatePresence>
-                {showThemePicker && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                    className="absolute right-0 top-11 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 z-40 text-xs"
-                  >
-                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-stone-100 dark:border-slate-800">
-                      <div className="flex items-center gap-1.5 font-bold text-stone-800 dark:text-slate-200 text-xs">
-                        <Palette className="w-3.5 h-3.5 text-rose-500" />
-                        <span>Lisibilité & Style de la discussion</span>
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+              {showMoreMenu && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 6 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-11 w-72 sm:w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-rose-200/80 dark:border-rose-900/40 rounded-2xl shadow-xl shadow-rose-950/10 p-2 z-40 text-xs"
+                >
+                  {/* Switch Duo Profile */}
+                  <div className="p-2 border-b border-rose-100/70 dark:border-slate-800 mb-1.5 bg-rose-50/40 dark:bg-slate-800/40 rounded-xl">
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-stone-400 dark:text-slate-500 mb-1.5 flex items-center justify-between">
+                      <span>Profil actif</span>
+                      <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSwitchPartner(otherPartnerId);
+                        setShowMoreMenu(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl border text-xs transition-colors cursor-pointer ${themeStyles.badgeBg} hover:opacity-90`}
+                      title={`Basculer sur ${otherPartner.name}`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <UserCheck className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="font-semibold text-stone-800 dark:text-slate-200 truncate">
+                          Moi : <strong className="font-bold">{currentPartner.name}</strong>
+                        </span>
                       </div>
+                      <span className="text-[11px] text-rose-600 font-bold ml-2 shrink-0">
+                        Basculer ➔
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Section: Actions Discussion (Clear Chat & Export) */}
+                  <div className="py-1">
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-rose-400 dark:text-rose-500/80 px-2.5 py-1 flex items-center gap-1">
+                      <span>Actions du chat</span>
+                    </p>
+
+                    {/* Export Chat */}
+                    <div className="rounded-xl overflow-hidden transition-colors">
                       <button
                         type="button"
-                        onClick={() => setShowThemePicker(false)}
-                        className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-slate-200 rounded-md cursor-pointer"
-                        title="Fermer"
+                        onClick={() => setShowExportOptions((prev) => !prev)}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-medium text-stone-700 dark:text-slate-200 hover:bg-rose-50/80 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Section 1: Sent Bubble Color */}
-                    <div className="mb-3.5">
-                      <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                        <span>Couleur de mes messages :</span>
-                        <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
-                          {SENT_BUBBLE_PRESETS[sentBubbleColor]?.name}
-                        </span>
-                      </p>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {(Object.keys(SENT_BUBBLE_PRESETS) as SentBubbleColor[]).map((key) => {
-                          const preset = SENT_BUBBLE_PRESETS[key];
-                          const isSelected = sentBubbleColor === key;
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => handleSelectSentBubbleColor(key)}
-                              className={`p-1.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'border-rose-500 bg-rose-50/80 dark:bg-rose-950/40 ring-1 ring-rose-500'
-                                  : 'border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-850'
+                        <Download className="w-4 h-4 text-rose-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold">Exporter la discussion</span>
+                            <ChevronDown
+                              className={`w-3.5 h-3.5 text-stone-400 transition-transform duration-150 ${
+                                showExportOptions ? 'rotate-180 text-rose-500' : ''
                               }`}
+                            />
+                          </div>
+                          <p className="text-[10px] text-stone-400 dark:text-slate-500 truncate">
+                            Sauvegarder en journal texte ou JSON
+                          </p>
+                        </div>
+                      </button>
+
+                      <AnimatePresence>
+                        {showExportOptions && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="pl-7 pr-2 py-1 space-y-1 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl my-1 border border-rose-100 dark:border-rose-900/30"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleExportChat('txt')}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-white dark:hover:bg-slate-800 text-stone-700 dark:text-slate-200 flex items-center gap-2 transition-colors cursor-pointer"
                             >
-                              <span className={`w-4 h-4 rounded-full shrink-0 shadow-2xs ${preset.swatch}`} />
+                              <FileText className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                               <div className="min-w-0">
-                                <p className="font-bold text-[11px] text-stone-800 dark:text-slate-200 truncate">
-                                  {preset.name}
+                                <span className="font-semibold">Journal d'amour (.txt)</span>
+                                <p className="text-[9px] text-stone-400 dark:text-slate-400">
+                                  Format doux à lire & imprimer
                                 </p>
                               </div>
                             </button>
-                          );
-                        })}
-                      </div>
+                            <button
+                              type="button"
+                              onClick={() => handleExportChat('json')}
+                              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-white dark:hover:bg-slate-800 text-stone-700 dark:text-slate-200 flex items-center gap-2 transition-colors cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                              <div className="min-w-0">
+                                <span className="font-semibold">Sauvegarde brute (.json)</span>
+                                <p className="text-[9px] text-stone-400 dark:text-slate-400">
+                                  Données complètes restaurables
+                                </p>
+                              </div>
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
-                    {/* Section 2: Text Size for Readability */}
-                    <div className="mb-3.5">
-                      <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                        <span>Taille du texte :</span>
-                        <span className="text-[10px] text-stone-500 dark:text-slate-400">
-                          {CHAT_FONT_SIZES[chatFontSize]?.label}
+                    {/* Clear Chat */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowClearChatModal(true);
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer mt-0.5"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold">Effacer la discussion</span>
+                          {messages.length > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 font-bold">
+                              {messages.length}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-rose-400/90 dark:text-rose-400/70 truncate">
+                          Vider l'historique du fil de chat
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Section: Outils & Recherche */}
+                  <div className="pt-1 border-t border-rose-100/70 dark:border-slate-800 my-1">
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-stone-400 dark:text-slate-500 px-2.5 py-1">
+                      Outils
+                    </p>
+
+                    {/* Search in chat */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSearchBar((prev) => !prev);
+                        setShowMoreMenu(false);
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-medium transition-colors cursor-pointer ${
+                        showSearchBar
+                          ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold'
+                          : 'text-stone-700 dark:text-slate-200 hover:bg-stone-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Search className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span className="flex-1">Rechercher dans le chat</span>
+                      {showSearchBar && (
+                        <span className="text-[10px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+                          Actif
                         </span>
-                      </p>
-                      <div className="grid grid-cols-3 gap-1 bg-stone-100 dark:bg-slate-800 p-1 rounded-xl">
-                        {(['normal', 'large', 'xlarge'] as ChatFontSize[]).map((size) => (
+                      )}
+                    </button>
+
+                    {/* Selection Mode */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSelectionMode(true);
+                        setSelectedMessageIds([]);
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-medium text-stone-700 dark:text-slate-200 hover:bg-stone-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <CheckSquare className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span className="flex-1">Sélectionner des messages</span>
+                    </button>
+                  </div>
+
+                  {/* Section: Apparence */}
+                  <div className="pt-1 border-t border-rose-100/70 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowThemePicker(true);
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs font-medium text-stone-700 dark:text-slate-200 hover:bg-stone-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <Palette className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span className="flex-1">Thème & Lisibilité</span>
+                      <span className="text-[10px] text-stone-400 dark:text-slate-500">Bulles & fond</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Backdrop for Theme Picker */}
+            {showThemePicker && (
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setShowThemePicker(false)}
+              />
+            )}
+
+            {/* Theme / Ambiance & Readability Palette Selector */}
+            <AnimatePresence>
+              {showThemePicker && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                  className="absolute right-0 top-11 w-72 sm:w-80 bg-white dark:bg-slate-900 border border-stone-200/90 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 z-40 text-xs"
+                >
+                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-stone-100 dark:border-slate-800">
+                    <div className="flex items-center gap-1.5 font-bold text-stone-800 dark:text-slate-200 text-xs">
+                      <Palette className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Lisibilité & Style de la discussion</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowThemePicker(false)}
+                      className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-slate-200 rounded-md cursor-pointer"
+                      title="Fermer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Section 1: Sent Bubble Color */}
+                  <div className="mb-3.5">
+                    <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span>Couleur de mes messages :</span>
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">
+                        {SENT_BUBBLE_PRESETS[sentBubbleColor]?.name}
+                      </span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(Object.keys(SENT_BUBBLE_PRESETS) as SentBubbleColor[]).map((key) => {
+                        const preset = SENT_BUBBLE_PRESETS[key];
+                        const isSelected = sentBubbleColor === key;
+                        return (
                           <button
-                            key={size}
+                            key={key}
                             type="button"
-                            onClick={() => handleSelectChatFontSize(size)}
-                            className={`py-1.5 px-2 rounded-lg text-center font-semibold text-[11px] transition-all cursor-pointer ${
-                              chatFontSize === size
-                                ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-2xs font-bold'
-                                : 'text-stone-600 dark:text-slate-400 hover:text-stone-900'
+                            onClick={() => handleSelectSentBubbleColor(key)}
+                            className={`p-1.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-rose-500 bg-rose-50/80 dark:bg-rose-950/40 ring-1 ring-rose-500'
+                                : 'border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-850'
                             }`}
                           >
-                            {size === 'normal' ? 'Standard' : size === 'large' ? 'Grand' : 'Confort +'}
+                            <span className={`w-4 h-4 rounded-full shrink-0 shadow-2xs ${preset.swatch}`} />
+                            <div className="min-w-0">
+                              <p className="font-bold text-[11px] text-stone-800 dark:text-slate-200 truncate">
+                                {preset.name}
+                              </p>
+                            </div>
                           </button>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
+                  </div>
 
-                    {/* Section 3: Background Theme */}
-                    <div>
-                      <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5">
-                        Fond de discussion :
-                      </p>
-                      <div className="space-y-1">
+                  {/* Section 2: Text Size for Readability */}
+                  <div className="mb-3.5">
+                    <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span>Taille du texte :</span>
+                      <span className="text-[10px] text-stone-500 dark:text-slate-400">
+                        {CHAT_FONT_SIZES[chatFontSize]?.label}
+                      </span>
+                    </p>
+                    <div className="grid grid-cols-3 gap-1 bg-stone-100 dark:bg-slate-800 p-1 rounded-xl">
+                      {(['normal', 'large', 'xlarge'] as ChatFontSize[]).map((size) => (
                         <button
+                          key={size}
                           type="button"
-                          onClick={() => handleSelectTheme('rose-powder')}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
-                            chatTheme === 'rose-powder' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200/80' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                          onClick={() => handleSelectChatFontSize(size)}
+                          className={`py-1.5 px-2 rounded-lg text-center font-semibold text-[11px] transition-all cursor-pointer ${
+                            chatFontSize === size
+                              ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-2xs font-bold'
+                              : 'text-stone-600 dark:text-slate-400 hover:text-stone-900'
                           }`}
                         >
-                          <span className="w-3.5 h-3.5 rounded-full bg-rose-400 inline-block shrink-0" />
-                          <span>🌸 Douceur Poudrée</span>
+                          {size === 'normal' ? 'Standard' : size === 'large' ? 'Grand' : 'Confort +'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTheme('velvet-night')}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
-                            chatTheme === 'velvet-night' ? 'bg-slate-800 text-rose-400 font-bold border border-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-stone-700 dark:text-slate-300'
-                          }`}
-                        >
-                          <span className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-700 inline-block shrink-0" />
-                          <span>🌙 Soirée Câline (Sombre)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTheme('ivory-linen')}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
-                            chatTheme === 'ivory-linen' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-200' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
-                          }`}
-                        >
-                          <span className="w-3.5 h-3.5 rounded-full bg-amber-200 inline-block shrink-0" />
-                          <span>☁️ Cocon de Soie (Ivoire)</span>
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                  </div>
+
+                  {/* Section 3: Background Theme */}
+                  <div>
+                    <p className="font-semibold text-stone-700 dark:text-slate-300 mb-1.5">
+                      Fond de discussion :
+                    </p>
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTheme('rose-powder')}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                          chatTheme === 'rose-powder' ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200/80' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full bg-rose-400 inline-block shrink-0" />
+                        <span>🌸 Douceur Poudrée</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTheme('velvet-night')}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                          chatTheme === 'velvet-night' ? 'bg-slate-800 text-rose-400 font-bold border border-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-stone-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-700 inline-block shrink-0" />
+                        <span>🌙 Soirée Câline (Sombre)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTheme('ivory-linen')}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-xl flex items-center gap-2 cursor-pointer transition-colors ${
+                          chatTheme === 'ivory-linen' ? 'bg-amber-50 text-amber-800 font-bold border border-amber-200' : 'hover:bg-stone-50 text-stone-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full bg-amber-200 inline-block shrink-0" />
+                        <span>☁️ Cocon de Soie (Ivoire)</span>
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
         )}
@@ -1659,7 +2076,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         )}
 
         {/* ================================================================= */}
-        {/* 3. QUOTED REPLY BANNER */}
+        {/* 3. QUOTED REPLY & PHOTO COMPRESSION BANNERS */}
         {/* ================================================================= */}
         <AnimatePresence>
           {replyingTo && (
@@ -1686,6 +2103,44 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 className="p-1 text-stone-400 hover:text-stone-700 rounded-full cursor-pointer"
               >
                 <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+
+          {compressingStats && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className={`border-t px-3.5 py-2 flex items-center justify-between text-xs z-10 ${
+                compressingStats.isCompressing
+                  ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                {compressingStats.isCompressing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
+                    <span className="truncate">
+                      Optimisation de la photo mobile ({formatBytes(compressingStats.originalSize || 0)})...
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="truncate">
+                      Photo optimisée : {formatBytes(compressingStats.originalSize || 0)} ➔ {formatBytes(compressingStats.compressedSize || 0)}{' '}
+                      <strong className="text-emerald-700">(-{compressingStats.reduction}%)</strong>
+                    </span>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setCompressingStats(null)}
+                className="p-1 text-stone-400 hover:text-stone-700 rounded-full cursor-pointer shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             </motion.div>
           )}
@@ -2077,6 +2532,103 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     <>
                       <Trash2 className="w-4 h-4" />
                       <span>Supprimer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================= */}
+      {/* 11.5. CLEAR ENTIRE CHAT CONFIRMATION MODAL */}
+      {/* ================================================================= */}
+      <AnimatePresence>
+        {showClearChatModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => {
+              if (!isDeleting) setShowClearChatModal(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-rose-100 dark:border-slate-800 text-center relative overflow-hidden"
+            >
+              {/* Soft romantic glow decoration */}
+              <div className="absolute -top-10 -right-10 w-28 h-28 bg-rose-200/40 dark:bg-rose-950/40 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="w-14 h-14 rounded-2xl bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center mb-3.5 shadow-xs border border-rose-200/60 dark:border-rose-900/50">
+                <Trash2 className="w-7 h-7" />
+              </div>
+
+              <h4 className="text-base font-bold text-stone-900 dark:text-stone-100 mb-1.5 flex items-center justify-center gap-1.5">
+                <span>Effacer la discussion ?</span>
+                <Heart className="w-4 h-4 fill-rose-500 text-rose-500 inline" />
+              </h4>
+
+              <p className="text-xs text-stone-600 dark:text-slate-300 mb-3 leading-relaxed">
+                {messages.length > 0 ? (
+                  <>
+                    Vous êtes sur le point d'effacer les{' '}
+                    <strong className="text-rose-600 dark:text-rose-400 font-bold">{messages.length} messages</strong> de votre
+                    conversation. L'historique sera réinitialisé pour vous deux.
+                  </>
+                ) : (
+                  'La conversation ne contient aucun message pour le moment.'
+                )}
+              </p>
+
+              {messages.length > 0 && (
+                <div className="bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/40 rounded-2xl p-3 mb-4 text-left">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-stone-700 dark:text-slate-300">
+                      <span className="font-semibold text-rose-700 dark:text-rose-300">Gardez un souvenir !</span>
+                      <p className="mt-0.5 text-stone-500 dark:text-slate-400">
+                        Téléchargez votre journal de conversation avant d'effacer les messages.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleExportChat('txt')}
+                        className="mt-2 text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Exporter maintenant (.txt)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setShowClearChatModal(false)}
+                  className="flex-1 px-4 py-2.5 text-xs font-semibold text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  Conserver
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting || messages.length === 0}
+                  onClick={handleClearChatConfirm}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 disabled:opacity-50 rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  {isDeleting ? (
+                    <span>Effacement...</span>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Effacer tout</span>
                     </>
                   )}
                 </button>

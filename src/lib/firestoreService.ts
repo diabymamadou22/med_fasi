@@ -504,16 +504,51 @@ export async function updateChatMessageReadStatus(
   );
 }
 
+export interface PartnerPresenceInfo {
+  partnerId: string;
+  isTyping: boolean;
+  isOnline: boolean;
+  lastSeen: string;
+  updatedAt: string;
+}
+
 export async function setChatTypingStatus(partnerId: string, isTyping: boolean) {
   try {
     const ref = doc(db, COLLECTIONS.CHAT_STATUS, partnerId);
-    await setDoc(ref, {
-      partnerId,
-      isTyping,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    const now = new Date().toISOString();
+    await setDoc(
+      ref,
+      {
+        partnerId,
+        isTyping,
+        isOnline: true,
+        lastSeen: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
   } catch (err) {
     console.error('Erreur typing status:', err);
+  }
+}
+
+export async function updatePartnerPresence(partnerId: string, isOnline: boolean) {
+  try {
+    const ref = doc(db, COLLECTIONS.CHAT_STATUS, partnerId);
+    const now = new Date().toISOString();
+    await setDoc(
+      ref,
+      {
+        partnerId,
+        isOnline,
+        ...(isOnline ? {} : { isTyping: false }),
+        lastSeen: now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error('Erreur presence status:', err);
   }
 }
 
@@ -541,20 +576,29 @@ export function subscribeChatMessages(
 }
 
 export function subscribeChatTypingStatus(
-  onUpdate: (statusMap: Record<string, { isTyping: boolean; updatedAt: string }>) => void
+  onUpdate: (statusMap: Record<string, PartnerPresenceInfo>) => void
 ) {
   const colRef = collection(db, COLLECTIONS.CHAT_STATUS);
   return onSnapshot(
     colRef,
     (snap) => {
-      const map: Record<string, { isTyping: boolean; updatedAt: string }> = {};
+      const map: Record<string, PartnerPresenceInfo> = {};
+      const nowMs = Date.now();
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         if (data && data.updatedAt) {
-          // Check if typing signal is fresh (within last 8 seconds)
-          const isFresh = Date.now() - new Date(data.updatedAt).getTime() < 8000;
+          const updatedMs = new Date(data.updatedAt).getTime();
+          // Typing signal strictly expires after 4.2 seconds if not refreshed
+          const isTypingFresh = nowMs - updatedMs < 4200;
+          // Presence is considered online if lastSeen was within the last 65 seconds
+          const lastSeenMs = data.lastSeen ? new Date(data.lastSeen).getTime() : updatedMs;
+          const isOnlineFresh = Boolean(data.isOnline && nowMs - lastSeenMs < 65000);
+
           map[docSnap.id] = {
-            isTyping: Boolean(data.isTyping && isFresh),
+            partnerId: docSnap.id,
+            isTyping: Boolean(data.isTyping && isTypingFresh),
+            isOnline: isOnlineFresh,
+            lastSeen: data.lastSeen || data.updatedAt,
             updatedAt: data.updatedAt,
           };
         }
