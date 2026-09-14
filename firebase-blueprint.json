@@ -157,7 +157,9 @@
         "reactions": { "type": "object" },
         "replyTo": { "type": "object" },
         "status": { "type": "string" },
-        "readStatus": { "type": "string" }
+        "readStatus": { "type": "string" },
+        "isEdited": { "type": "boolean" },
+        "editedAt": { "type": "string" }
       },
       "required": ["id", "senderId", "timestamp"]
     }

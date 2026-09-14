@@ -5,12 +5,12 @@ import {
   Mic,
   Smile,
   Paperclip,
+  Check,
   CheckCheck,
   Phone,
   Video,
   X,
   Search,
-  Trash2,
   CornerUpLeft,
   Heart,
   Play,
@@ -25,6 +25,11 @@ import {
   Filter,
   MessageSquareHeart,
   Volume2,
+  Trash2,
+  Pencil,
+  CheckSquare,
+  Square,
+  SmilePlus,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -33,12 +38,21 @@ import {
   MissYouPulse,
 } from '../../types';
 import {
-  deleteChatMessageFromDb,
   updateChatMessageReaction,
   updateChatMessageStatus,
   setChatTypingStatus,
   subscribeChatTypingStatus,
+  deleteChatMessageFromDb,
+  deleteMultipleChatMessagesFromDb,
+  editChatMessageContent,
+  updateMultipleChatMessagesReaction,
+  updateMultipleChatMessagesReadStatus,
 } from '../../lib/firestoreService';
+import {
+  sortChatMessagesChronologically,
+  extractMessageTimestampMs,
+  formatMessageTime,
+} from '../../lib/chatUtils';
 import { soundEffects } from '../../lib/audio';
 import { processPhotoWithoutCropping } from '../../lib/imageUtils';
 
@@ -49,6 +63,8 @@ export interface ChatViewProps {
   messages: ChatMessage[];
   onSendMessage: (msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>) => void;
   onSendMissYouPulse: (pulseData: Omit<MissYouPulse, 'id' | 'timestamp'>) => void;
+  onDeleteMessages?: (ids: string[]) => Promise<void> | void;
+  onEditMessage?: (id: string, newContent: string) => Promise<void> | void;
 }
 
 type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
@@ -68,10 +84,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
   messages,
   onSendMessage,
   onSendMissYouPulse,
+  onDeleteMessages,
+  onEditMessage,
 }) => {
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
   const otherPartnerId: PartnerId = activePartnerId === 'p1' ? 'p2' : 'p1';
+
+  // Multi-selection state
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+
+  // Single message editing state
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [editInputText, setEditInputText] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+
+  // Deletion modal state (single or bulk)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
+  const [messageIdsToDelete, setMessageIdsToDelete] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // Bulk actions modal state
+  const [showBulkActionModal, setShowBulkActionModal] = useState<boolean>(false);
 
   // Theme selection stored in state
   const [chatTheme, setChatTheme] = useState<ChatTheme>(() => {
@@ -154,10 +189,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
     });
   }, [messages, otherPartnerId]);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages & initial mount (WhatsApp behavior)
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isOtherPartnerTyping]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   // Call timer effect
   useEffect(() => {
@@ -381,9 +423,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
     await updateChatMessageReaction(messageId, activePartnerId, emoji);
   };
 
-  // Filtered Messages by search & media filter
+  // Helper to reliably parse message sending/arrival timestamp in milliseconds
+  const getMsgTimestamp = (m: ChatMessage | null | undefined): number => {
+    return extractMessageTimestampMs(m);
+  };
+
+  // Strictly sort messages chronologically (oldest at top, newest at bottom down to the exact second) and filter
   const filteredMessages = useMemo(() => {
-    let list = messages;
+    const sorted = sortChatMessagesChronologically(messages);
+
+    let list = sorted;
 
     // Filter by media
     if (mediaFilter === 'image') {
@@ -405,14 +454,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
     );
   }, [messages, searchQuery, mediaFilter]);
 
-  // Group messages by date
+  // Group messages by date in strict chronological sequence (like WhatsApp)
   const groupedMessages = useMemo(() => {
-    const groups: { dateLabel: string; items: ChatMessage[] }[] = [];
+    const groups: { dateKey: string; dateLabel: string; dateSortTime: number; items: ChatMessage[] }[] = [];
+
     filteredMessages.forEach((msg) => {
-      const msgDate = new Date(msg.timestamp);
+      const timeMs = extractMessageTimestampMs(msg);
+      const msgDate = new Date(timeMs || Date.now());
       const today = new Date();
       const yesterday = new Date();
       yesterday.setDate(today.getDate() - 1);
+
+      const dateKey = `${msgDate.getFullYear()}-${String(msgDate.getMonth() + 1).padStart(2, '0')}-${String(msgDate.getDate()).padStart(2, '0')}`;
+      const dateSortTime = new Date(msgDate.getFullYear(), msgDate.getMonth(), msgDate.getDate()).getTime();
 
       let dateLabel = msgDate.toLocaleDateString('fr-FR', {
         day: 'numeric',
@@ -426,15 +480,122 @@ export const ChatView: React.FC<ChatViewProps> = ({
         dateLabel = 'Hier';
       }
 
-      const existingGroup = groups.find((g) => g.dateLabel === dateLabel);
-      if (existingGroup) {
-        existingGroup.items.push(msg);
-      } else {
-        groups.push({ dateLabel, items: [msg] });
+      let group = groups.find((g) => g.dateKey === dateKey);
+      if (!group) {
+        group = { dateKey, dateLabel, dateSortTime, items: [] };
+        groups.push(group);
       }
+      group.items.push(msg);
     });
+
+    // Ensure groups follow exact chronological order (oldest days first, today last)
+    groups.sort((a, b) => a.dateSortTime - b.dateSortTime);
+
+    // Ensure all items within each day strictly follow arrival second ascending
+    groups.forEach((g) => {
+      g.items = sortChatMessagesChronologically(g.items);
+    });
+
     return groups;
   }, [filteredMessages]);
+
+  // Selection helpers
+  const toggleSelectMessage = (id: string) => {
+    setSelectedMessageIds((prev) => {
+      const exists = prev.includes(id);
+      const next = exists ? prev.filter((item) => item !== id) : [...prev, id];
+      if (next.length === 0) {
+        setIsSelectionMode(false);
+      } else {
+        setIsSelectionMode(true);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMessageIds.length === filteredMessages.length) {
+      setSelectedMessageIds([]);
+      setIsSelectionMode(false);
+    } else {
+      setSelectedMessageIds(filteredMessages.map((m) => m.id));
+      setIsSelectionMode(true);
+    }
+  };
+
+  const openEditModal = (msg: ChatMessage) => {
+    setEditingMessage(msg);
+    setEditInputText(msg.content || '');
+  };
+
+  const executeSaveEdit = async () => {
+    if (!editingMessage || !editInputText.trim()) return;
+    setIsSavingEdit(true);
+    try {
+      const trimmed = editInputText.trim();
+      if (onEditMessage) {
+        await onEditMessage(editingMessage.id, trimmed);
+      } else {
+        await editChatMessageContent(editingMessage.id, trimmed);
+      }
+      soundEffects.playSoftTap();
+      setEditingMessage(null);
+      setEditInputText('');
+    } catch (err) {
+      console.error('Erreur modification message:', err);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const executeDeleteMessages = async () => {
+    if (messageIdsToDelete.length === 0) return;
+    setIsDeleting(true);
+    try {
+      if (onDeleteMessages) {
+        await onDeleteMessages(messageIdsToDelete);
+      } else {
+        await deleteMultipleChatMessagesFromDb(messageIdsToDelete);
+      }
+      soundEffects.playSoftTap();
+      setSelectedMessageIds((prev) => prev.filter((id) => !messageIdsToDelete.includes(id)));
+      if (selectedMessageIds.length <= messageIdsToDelete.length) {
+        setIsSelectionMode(false);
+      }
+      setShowDeleteConfirmModal(false);
+      setMessageIdsToDelete([]);
+    } catch (err) {
+      console.error('Erreur suppression messages:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const executeBulkReaction = async (emoji: string) => {
+    if (selectedMessageIds.length === 0) return;
+    try {
+      await updateMultipleChatMessagesReaction(selectedMessageIds, activePartnerId, emoji);
+      soundEffects.playHeartPulse();
+      setShowBulkActionModal(false);
+      setSelectedMessageIds([]);
+      setIsSelectionMode(false);
+    } catch (err) {
+      console.error('Erreur réaction groupée:', err);
+    }
+  };
+
+  const executeBulkMarkAsRead = async () => {
+    if (selectedMessageIds.length === 0) return;
+    try {
+      await updateMultipleChatMessagesReadStatus(selectedMessageIds, 'read');
+      soundEffects.playSoftTap();
+      setShowBulkActionModal(false);
+      setSelectedMessageIds([]);
+      setIsSelectionMode(false);
+    } catch (err) {
+      console.error('Erreur marquage lu groupé:', err);
+    }
+  };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -535,9 +696,97 @@ export const ChatView: React.FC<ChatViewProps> = ({
       <div className={`${themeStyles.cardBg} rounded-2xl sm:rounded-3xl shadow-xl border overflow-hidden flex flex-col flex-1 min-h-0 h-full relative transition-colors duration-300`}>
         
         {/* ================================================================= */}
-        {/* 1. CHAT TOP APP BAR (Romantic Elegance & Mood Controls) */}
+        {/* 1. CHAT TOP APP BAR & WHATSAPP-STYLE SELECTION BAR */}
         {/* ================================================================= */}
-        <div className={`${themeStyles.headerBg} px-3 sm:px-4 py-2.5 flex items-center justify-between border-b shadow-2xs z-20 shrink-0 transition-colors duration-300`}>
+        {selectedMessageIds.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`px-3 sm:px-4 py-2.5 flex items-center justify-between border-b shadow-md z-20 shrink-0 ${
+              chatTheme === 'velvet-night'
+                ? 'bg-slate-900 border-rose-900/60 text-white'
+                : 'bg-gradient-to-r from-rose-600 via-rose-500 to-pink-600 border-rose-600 text-white shadow-rose-200/50'
+            }`}
+          >
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => {
+                  setSelectedMessageIds([]);
+                  setIsSelectionMode(false);
+                }}
+                className="p-1.5 rounded-full hover:bg-white/20 transition-colors cursor-pointer"
+                title="Annuler la sélection"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div>
+                <span className="font-bold text-sm sm:text-base tracking-wide">
+                  {selectedMessageIds.length} sélectionné{selectedMessageIds.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <button
+                onClick={toggleSelectAll}
+                className="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer flex items-center gap-1.5 ml-1 sm:ml-2"
+                title={selectedMessageIds.length === filteredMessages.length ? 'Désélectionner tout' : 'Sélectionner tous les messages'}
+              >
+                {selectedMessageIds.length === filteredMessages.length ? (
+                  <>
+                    <Square className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Désélectionner tout</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Tout sélectionner</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* If 1 message selected: Modifier button */}
+              {selectedMessageIds.length === 1 && (
+                <button
+                  onClick={() => {
+                    const msgToEdit = messages.find((m) => m.id === selectedMessageIds[0]);
+                    if (msgToEdit) openEditModal(msgToEdit);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  title="Modifier le texte du message"
+                >
+                  <Pencil className="w-4 h-4" />
+                  <span className="hidden sm:inline">Modifier</span>
+                </button>
+              )}
+
+              {/* Bulk Actions Button (Reaction, Mark Read) */}
+              {selectedMessageIds.length > 1 && (
+                <button
+                  onClick={() => setShowBulkActionModal(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/20 hover:bg-white/30 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  title="Actions groupées (Réactions, Lu)"
+                >
+                  <SmilePlus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Actions</span>
+                </button>
+              )}
+
+              {/* Bulk Delete Button */}
+              <button
+                onClick={() => {
+                  setMessageIdsToDelete([...selectedMessageIds]);
+                  setShowDeleteConfirmModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                title="Supprimer la sélection"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Supprimer ({selectedMessageIds.length})</span>
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <div className={`${themeStyles.headerBg} px-3 sm:px-4 py-2.5 flex items-center justify-between border-b shadow-2xs z-20 shrink-0 transition-colors duration-300`}>
           <div className="flex items-center gap-3 min-w-0">
             {/* Other Partner Avatar with active status & glowing pulse */}
             <div
@@ -646,6 +895,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <Phone className="w-4.5 h-4.5" />
             </button>
 
+            {/* Selection Mode Button */}
+            <button
+              onClick={() => {
+                const nextMode = !isSelectionMode;
+                setIsSelectionMode(nextMode);
+                if (!nextMode) setSelectedMessageIds([]);
+              }}
+              className={`p-2 rounded-full transition-colors cursor-pointer ${
+                isSelectionMode
+                  ? 'bg-rose-500 text-white shadow-xs'
+                  : chatTheme === 'velvet-night'
+                  ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
+                  : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
+              }`}
+              title={isSelectionMode ? "Quitter le mode sélection" : "Sélectionner des messages"}
+            >
+              <CheckSquare className="w-4.5 h-4.5" />
+            </button>
+
             {/* Search Button */}
             <button
               onClick={() => setShowSearchBar(!showSearchBar)}
@@ -721,6 +989,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </div>
         </div>
+        )}
 
         {/* Optional Search & Media Filter Bar */}
         <AnimatePresence>
@@ -805,27 +1074,42 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </div>
 
-          {/* Grouped Messages */}
+          {/* Grouped Messages in WhatsApp chronological flow */}
           {groupedMessages.map((group) => (
-            <div key={group.dateLabel} className="space-y-3">
-              {/* Date divider badge */}
-              <div className="flex justify-center">
-                <span className={`backdrop-blur-xs font-medium text-[11px] px-3.5 py-1 rounded-full shadow-2xs border ${
+            <div key={group.dateKey} className="flex flex-col">
+              {/* WhatsApp-style Date divider badge */}
+              <div className="flex justify-center my-3 sticky top-1 z-10 select-none">
+                <span className={`backdrop-blur-md font-semibold text-[11px] px-3.5 py-1 rounded-lg shadow-2xs border ${
                   chatTheme === 'velvet-night'
-                    ? 'bg-slate-900/80 text-slate-300 border-slate-800'
-                    : 'bg-white/90 text-stone-600 border-rose-100'
+                    ? 'bg-slate-900/90 text-slate-300 border-slate-800'
+                    : 'bg-white/90 text-stone-600 border-rose-100/80'
                 }`}>
                   {group.dateLabel}
                 </span>
               </div>
 
-              {/* Message items */}
-              {group.items.map((msg) => {
+              {/* Message items strictly ordered by sending time */}
+              {group.items.map((msg, index) => {
+                const prevMsg = index > 0 ? group.items[index - 1] : null;
+                const nextMsg = index < group.items.length - 1 ? group.items[index + 1] : null;
                 const isMe = msg.senderId === activePartnerId;
-                const msgTime = new Date(msg.timestamp).toLocaleTimeString('fr-FR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
+
+                const timeCurrent = getMsgTimestamp(msg);
+                const timePrev = prevMsg ? getMsgTimestamp(prevMsg) : 0;
+                const timeNext = nextMsg ? getMsgTimestamp(nextMsg) : 0;
+
+                // WhatsApp-like clustering: consecutive messages from same sender within 5 mins
+                const isFirstInBurst = !prevMsg || prevMsg.senderId !== msg.senderId || (timeCurrent - timePrev > 5 * 60 * 1000);
+                const isLastInBurst = !nextMsg || nextMsg.senderId !== msg.senderId || (timeNext - timeCurrent > 5 * 60 * 1000);
+
+                const msgDate = new Date(timeCurrent || Date.now());
+                const msgTime = !isNaN(msgDate.getTime())
+                  ? msgDate.toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })
+                  : '';
                 const senderName = isMe ? currentPartner.name : otherPartner.name;
                 const reactionsList = Object.entries(msg.reactions || {});
                 const isMsgRead =
@@ -834,29 +1118,76 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   (!msg.readStatus && msg.status === 'read');
                 const isLoveNote = Boolean(msg.content && (msg.content.startsWith('💌') || msg.content.includes('Mot doux')));
 
+                // WhatsApp bubble corners
+                const bubbleCorners = isMe
+                  ? isFirstInBurst
+                    ? 'rounded-2xl rounded-tr-xs'
+                    : 'rounded-2xl rounded-tr-md'
+                  : isFirstInBurst
+                  ? 'rounded-2xl rounded-tl-xs'
+                  : 'rounded-2xl rounded-tl-md';
+
+                const isSelected = selectedMessageIds.includes(msg.id);
+                const isTextEditable = Boolean(msg.content && msg.content !== '🎵 Note vocale' && msg.content !== '📷 Photo partagée');
+
                 return (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'}`}
+                    className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'} ${
+                      isFirstInBurst ? 'mt-3 sm:mt-3.5' : 'mt-1 sm:mt-1.5'
+                    }`}
                   >
-                    {/* Message Bubble Container with double tap listener */}
-                    <div
-                      onClick={(e) => handleMessageDoubleTap(e, msg)}
-                      className={`relative max-w-[85%] sm:max-w-[76%] rounded-2xl p-2.5 sm:p-3 shadow-xs transition-transform select-none ${
-                        isMe
-                          ? `${themeStyles.myBubble} rounded-tr-xs`
-                          : `${themeStyles.partnerBubble} rounded-tl-xs`
-                      } ${isLoveNote ? 'border-2 border-rose-300/80 bg-rose-50/90' : ''}`}
-                    >
-                      {/* Sender name on received message */}
-                      {!isMe && (
-                        <p className="text-[11px] font-bold text-rose-500 mb-1 flex items-center gap-1">
-                          <span>{senderName}</span>
-                          <span className="text-[9px] opacity-70">💕</span>
-                        </p>
+                    <div className={`flex items-center gap-2 w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      {/* Selection checkbox when in selection mode (partner message) */}
+                      {(isSelectionMode || selectedMessageIds.length > 0) && !isMe && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelectMessage(msg.id);
+                          }}
+                          className="p-1 shrink-0 cursor-pointer transition-transform hover:scale-110"
+                          title={isSelected ? 'Désélectionner' : 'Sélectionner'}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'bg-rose-500 text-white shadow-xs scale-105'
+                                : 'border-2 border-stone-300 dark:border-slate-600 hover:border-rose-400 bg-white/80 dark:bg-slate-800'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                        </button>
                       )}
+
+                      {/* Message Bubble Container with double tap and selection click listener */}
+                      <div
+                        onClick={(e) => {
+                          if (isSelectionMode || selectedMessageIds.length > 0) {
+                            e.stopPropagation();
+                            toggleSelectMessage(msg.id);
+                          } else {
+                            handleMessageDoubleTap(e, msg);
+                          }
+                        }}
+                        className={`relative max-w-[85%] sm:max-w-[76%] p-2.5 sm:p-3 shadow-xs transition-all select-none cursor-pointer ${bubbleCorners} ${
+                          isMe
+                            ? themeStyles.myBubble
+                            : themeStyles.partnerBubble
+                        } ${isLoveNote ? 'border-2 border-rose-300/80 bg-rose-50/90' : ''} ${
+                          isSelected ? 'ring-2 ring-rose-500 ring-offset-2 scale-[1.01]' : ''
+                        }`}
+                      >
+                        {/* Sender name on received message - ONLY ON FIRST IN BURST */}
+                        {!isMe && isFirstInBurst && (
+                          <p className="text-[11px] font-bold text-rose-500 mb-1 flex items-center gap-1">
+                            <span>{senderName}</span>
+                            <span className="text-[9px] opacity-70">💕</span>
+                          </p>
+                        )}
 
                       {/* Quoted Reply if present */}
                       {msg.replyTo && (
@@ -991,25 +1322,38 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         )
                       )}
 
-                      {/* Bottom Info: Timestamp and Double Checkmark */}
-                      <div className={`flex items-center justify-end gap-1 text-[10px] float-right -mt-2 -mr-1 ${
+                      {/* Bottom Info: Timestamp, WhatsApp-style Checkmarks & Edited tag */}
+                      <div className={`flex items-center justify-end gap-1 text-[10px] float-right -mt-2 -mr-1 select-none ${
                         isMe
                           ? themeStyles.myBubbleMeta
                           : chatTheme === 'velvet-night'
                           ? 'text-slate-400'
                           : 'text-stone-400'
                       }`}>
-                        <span>{msgTime}</span>
+                        {msg.isEdited && (
+                          <span
+                            className="text-[9px] italic opacity-85 mr-0.5"
+                            title={msg.editedAt ? `Modifié à ${new Date(msg.editedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Modifié'}
+                          >
+                            modifié
+                          </span>
+                        )}
+                        <span title={`Heure exacte d'arrivée : ${msgTime}`}>{msgTime}</span>
                         {isMe && (
                           <span className="inline-flex items-center ml-0.5">
                             {isMsgRead ? (
                               <CheckCheck
-                                className="w-3.5 h-3.5 text-amber-200 stroke-[2.5]"
-                                title="Lu avec tendresse"
+                                className="w-3.5 h-3.5 text-sky-400 stroke-[2.5]"
+                                title="Lu"
+                              />
+                            ) : msg.status === 'delivered' ? (
+                              <CheckCheck
+                                className="w-3.5 h-3.5 opacity-75 stroke-[2]"
+                                title="Distribué"
                               />
                             ) : (
-                              <CheckCheck
-                                className="w-3.5 h-3.5 opacity-80 stroke-[2]"
+                              <Check
+                                className="w-3.5 h-3.5 opacity-75 stroke-[2]"
                                 title="Envoyé"
                               />
                             )}
@@ -1031,11 +1375,78 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       )}
                     </div>
 
-                    {/* Quick Hover Action Bar (Double-tap hint, Reply, Reactions, Delete) */}
+                    {/* Selection checkbox when in selection mode (my message) */}
+                    {(isSelectionMode || selectedMessageIds.length > 0) && isMe && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectMessage(msg.id);
+                        }}
+                        className="p-1 shrink-0 cursor-pointer transition-transform hover:scale-110 ml-1"
+                        title={isSelected ? 'Désélectionner' : 'Sélectionner'}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                            isSelected
+                              ? 'bg-rose-500 text-white shadow-xs scale-105'
+                              : 'border-2 border-stone-300 dark:border-slate-600 hover:border-rose-400 bg-white/80 dark:bg-slate-800'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        </div>
+                      </button>
+                    )}
+                  </div>
+
+                    {/* Quick Hover Action Bar (Select, Edit, Delete, Reply, Reactions) */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1 text-stone-400 text-xs px-2">
                       <span className="text-[9px] text-stone-400 hidden sm:inline mr-1">
                         (Double-clic pour ❤️)
                       </span>
+
+                      {/* Select for multi-action */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsSelectionMode(true);
+                          toggleSelectMessage(msg.id);
+                        }}
+                        className={`p-1 rounded-full cursor-pointer hover:bg-rose-50 dark:hover:bg-slate-800 ${
+                          isSelected ? 'text-rose-600 font-bold' : 'hover:text-rose-600'
+                        }`}
+                        title="Sélectionner pour action groupée"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Edit single message */}
+                      {isTextEditable && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(msg);
+                          }}
+                          className="p-1 hover:text-rose-600 hover:bg-rose-50/50 dark:hover:bg-slate-800 rounded-full cursor-pointer"
+                          title="Modifier le texte de ce message"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* Delete single message */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMessageIdsToDelete([msg.id]);
+                          setShowDeleteConfirmModal(true);
+                        }}
+                        className="p-1 hover:text-rose-600 hover:bg-rose-50/50 dark:hover:bg-slate-800 rounded-full cursor-pointer"
+                        title="Supprimer ce message"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+
                       <button
                         onClick={() => setReplyingTo(msg)}
                         className="p-1 hover:text-rose-600 hover:bg-rose-50/50 rounded-full cursor-pointer"
@@ -1064,15 +1475,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       >
                         💋
                       </button>
-                      {isMe && (
-                        <button
-                          onClick={() => deleteChatMessageFromDb(msg.id)}
-                          className="p-1 hover:text-rose-600 hover:bg-rose-50/50 rounded-full cursor-pointer"
-                          title="Supprimer pour moi"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
                     </div>
                   </motion.div>
                 );
@@ -1471,6 +1873,232 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 </button>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================= */}
+      {/* 10. EDIT MESSAGE MODAL */}
+      {/* ================================================================= */}
+      <AnimatePresence>
+        {editingMessage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setEditingMessage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-stone-200 dark:border-slate-800"
+            >
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-stone-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 text-stone-800 dark:text-stone-100 font-bold">
+                  <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600">
+                    <Pencil className="w-4 h-4" />
+                  </div>
+                  <span>Modifier le message</span>
+                </div>
+                <button
+                  onClick={() => setEditingMessage(null)}
+                  className="p-1.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 rounded-full hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-stone-500 dark:text-slate-400">
+                  Modifiez le contenu de votre message ci-dessous :
+                </p>
+                <textarea
+                  value={editInputText}
+                  onChange={(e) => setEditInputText(e.target.value)}
+                  rows={4}
+                  autoFocus
+                  placeholder="Tapez le nouveau texte..."
+                  className="w-full text-sm rounded-2xl border border-stone-200 dark:border-slate-700 bg-stone-50 dark:bg-slate-800/80 p-3.5 text-stone-900 dark:text-stone-100 focus:outline-hidden focus:ring-2 focus:ring-rose-400 resize-none transition-all"
+                />
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingMessage(null)}
+                  className="px-4 py-2 text-xs font-semibold text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingEdit || !editInputText.trim()}
+                  onClick={executeSaveEdit}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 active:scale-95 disabled:opacity-50 disabled:pointer-events-none rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  {isSavingEdit ? (
+                    <span>Enregistrement...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Enregistrer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================= */}
+      {/* 11. DELETE CONFIRMATION MODAL */}
+      {/* ================================================================= */}
+      <AnimatePresence>
+        {showDeleteConfirmModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => {
+              if (!isDeleting) {
+                setShowDeleteConfirmModal(false);
+                setMessageIdsToDelete([]);
+              }
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl border border-stone-200 dark:border-slate-800 text-center"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 mx-auto flex items-center justify-center mb-3">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h4 className="text-base font-bold text-stone-900 dark:text-stone-100 mb-1">
+                {messageIdsToDelete.length > 1
+                  ? `Supprimer ${messageIdsToDelete.length} messages ?`
+                  : 'Supprimer ce message ?'}
+              </h4>
+              <p className="text-xs text-stone-500 dark:text-slate-400 mb-5 leading-relaxed">
+                {messageIdsToDelete.length > 1
+                  ? `Ces ${messageIdsToDelete.length} messages seront définitivement effacés de votre conversation pour vous deux.`
+                  : 'Ce message sera définitivement effacé de la conversation pour vous deux.'}
+              </p>
+
+              <div className="flex items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setShowDeleteConfirmModal(false);
+                    setMessageIdsToDelete([]);
+                  }}
+                  className="flex-1 px-4 py-2.5 text-xs font-semibold text-stone-600 dark:text-slate-300 hover:bg-stone-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={executeDeleteMessages}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 disabled:opacity-50 rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  {isDeleting ? (
+                    <span>Suppression...</span>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Supprimer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ================================================================= */}
+      {/* 12. BULK ACTION MODAL */}
+      {/* ================================================================= */}
+      <AnimatePresence>
+        {showBulkActionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setShowBulkActionModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl border border-stone-200 dark:border-slate-800"
+            >
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-stone-100 dark:border-slate-800">
+                <div className="font-bold text-stone-800 dark:text-stone-100 text-sm">
+                  Actions groupées ({selectedMessageIds.length})
+                </div>
+                <button
+                  onClick={() => setShowBulkActionModal(false)}
+                  className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 rounded-full cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Emoji reactions */}
+                <div>
+                  <p className="text-xs font-medium text-stone-600 dark:text-slate-300 mb-2">
+                    Réagir à toute la sélection :
+                  </p>
+                  <div className="flex items-center justify-around bg-stone-50 dark:bg-slate-800/60 p-2 rounded-2xl border border-stone-100 dark:border-slate-700/60">
+                    {['❤️', '😍', '😂', '🥺', '🔥', '💋', '👏'].map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => executeBulkReaction(emoji)}
+                        className="text-2xl hover:scale-125 transition-transform p-1 cursor-pointer"
+                        title={`Réagir avec ${emoji}`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mark as read */}
+                <button
+                  onClick={executeBulkMarkAsRead}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-stone-100 hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-stone-800 dark:text-stone-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <CheckCheck className="w-4 h-4 text-emerald-500" />
+                  <span>Marquer tout comme lu</span>
+                </button>
+
+                {/* Delete button from modal */}
+                <button
+                  onClick={() => {
+                    setShowBulkActionModal(false);
+                    setMessageIdsToDelete([...selectedMessageIds]);
+                    setShowDeleteConfirmModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Supprimer les {selectedMessageIds.length} messages</span>
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

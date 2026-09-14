@@ -175,6 +175,7 @@ export interface ChatMessage {
   senderId: PartnerId;
   content: string;
   timestamp: string; // ISO string
+  timestampMs?: number; // Exact millisecond timestamp for strict chronological order
   mediaUrl?: string;
   mediaType?: 'image' | 'audio';
   audioDuration?: number; // duration in seconds
@@ -187,6 +188,8 @@ export interface ChatMessage {
   };
   status?: 'sent' | 'delivered' | 'read';
   readStatus?: 'sent' | 'delivered' | 'read' | 'unread' | boolean;
+  isEdited?: boolean;
+  editedAt?: string;
 }
 
 export interface ChatTypingStatus {

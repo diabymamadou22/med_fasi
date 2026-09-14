@@ -83,7 +83,11 @@ import {
   sendMissYouPulse,
   subscribeChatMessages,
   saveChatMessage,
+  deleteMultipleChatMessagesFromDb,
+  editChatMessageContent,
   COLLECTIONS,
+  sortChatMessagesChronologically,
+  extractMessageTimestampMs,
 } from './lib/firestoreService';
 
 const STORAGE_KEYS = {
@@ -251,7 +255,8 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
-      return saved ? JSON.parse(saved) : [];
+      const parsed: ChatMessage[] = saved ? JSON.parse(saved) : [];
+      return sortChatMessagesChronologically(parsed);
     } catch {
       return [];
     }
@@ -502,13 +507,15 @@ export default function App() {
       (remoteMessages) => {
         if (Array.isArray(remoteMessages)) {
           setMessages((prev) => {
-            if (prev.length > 0 && remoteMessages.length > prev.length) {
-              const lastMsg = remoteMessages[remoteMessages.length - 1];
+            const sorted = sortChatMessagesChronologically(remoteMessages);
+
+            if (prev.length > 0 && sorted.length > prev.length) {
+              const lastMsg = sorted[sorted.length - 1];
               if (lastMsg && lastMsg.senderId !== activePartnerId) {
                 soundEffects.playMessageReceived();
               }
             }
-            return remoteMessages;
+            return sorted;
           });
         }
       },
@@ -718,18 +725,62 @@ export default function App() {
   const handleSendChatMessage = async (
     msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
   ) => {
+    // Determine the highest existing message timestamp in the thread to guarantee strict monotonicity in both directions
+    let maxExistingMs = 0;
+    for (const m of messages) {
+      const t = extractMessageTimestampMs(m);
+      if (t > maxExistingMs) maxExistingMs = t;
+    }
+
+    const now = Date.now();
+    // Guarantee that each new message in either direction arrives at least 1 second after the previous message
+    const finalTimestampMs = Math.max(now, maxExistingMs + 1000);
+    const finalTimestampIso = new Date(finalTimestampMs).toISOString();
+
     const newMsg: ChatMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      timestamp: new Date().toISOString(),
+      id: `msg_${finalTimestampMs}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: finalTimestampIso,
+      timestampMs: finalTimestampMs,
       status: 'sent',
       readStatus: 'sent',
       ...msgData,
     };
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => sortChatMessagesChronologically([...prev, newMsg]));
     try {
       await saveChatMessage(newMsg);
     } catch (err) {
       console.error('Erreur sauvegarde message WhatsApp:', err);
+    }
+  };
+
+  const handleDeleteChatMessages = async (messageIds: string[]) => {
+    if (!messageIds || messageIds.length === 0) return;
+    const idSet = new Set(messageIds);
+    setMessages((prev) => prev.filter((m) => !idSet.has(m.id)));
+    try {
+      await deleteMultipleChatMessagesFromDb(messageIds);
+    } catch (err) {
+      console.error('Erreur suppression messages WhatsApp:', err);
+    }
+  };
+
+  const handleEditChatMessage = async (messageId: string, newContent: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              content: newContent,
+              isEdited: true,
+              editedAt: new Date().toISOString(),
+            }
+          : m
+      )
+    );
+    try {
+      await editChatMessageContent(messageId, newContent);
+    } catch (err) {
+      console.error('Erreur modification message WhatsApp:', err);
     }
   };
 
@@ -1333,10 +1384,8 @@ export default function App() {
         }}
         onSendMissYou={handleSendMissYou}
         unreadNotesCount={unreadNotesCount}
-        unreadChatCount={unreadChatCount}
         onGoToNotes={() => setActiveTab('journal')}
         onGoToGallery={() => setActiveTab('gallery')}
-        onGoToChat={() => setActiveTab('chat')}
         isPinEnabled={settings.isPinEnabled}
         onLockApp={() => setIsAppLocked(true)}
         isFirebaseConnected={isCloudSynced}
@@ -1371,6 +1420,8 @@ export default function App() {
               messages={messages}
               onSendMessage={handleSendChatMessage}
               onSendMissYouPulse={handleSendMissYouPulseFromChat}
+              onDeleteMessages={handleDeleteChatMessages}
+              onEditMessage={handleEditChatMessage}
             />
           )}
 

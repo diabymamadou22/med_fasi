@@ -25,6 +25,10 @@ import {
   CoupleSettings,
   ChatMessage,
 } from '../types';
+import {
+  sortChatMessagesChronologically,
+  extractMessageTimestampMs,
+} from './chatUtils';
 
 // Collections
 const COLLECTIONS = {
@@ -389,6 +393,68 @@ export async function deleteChatMessageFromDb(id: string) {
   await deleteDoc(doc(db, COLLECTIONS.CHAT_MESSAGES, id));
 }
 
+export async function deleteMultipleChatMessagesFromDb(ids: string[]) {
+  if (!ids || ids.length === 0) return;
+  // Use batches (max 500 per batch)
+  const chunkSize = 450;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    chunk.forEach((id) => {
+      batch.delete(doc(db, COLLECTIONS.CHAT_MESSAGES, id));
+    });
+    await batch.commit();
+  }
+}
+
+export async function editChatMessageContent(id: string, newContent: string) {
+  const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, id);
+  await setDoc(
+    ref,
+    sanitizeForFirestore({
+      content: newContent,
+      isEdited: true,
+      editedAt: new Date().toISOString(),
+    }),
+    { merge: true }
+  );
+}
+
+export async function updateMultipleChatMessagesReaction(
+  messageIds: string[],
+  partnerId: string,
+  reaction: string | null
+) {
+  if (!messageIds || messageIds.length === 0) return;
+  await Promise.all(
+    messageIds.map((id) => updateChatMessageReaction(id, partnerId, reaction))
+  );
+}
+
+export async function updateMultipleChatMessagesReadStatus(
+  messageIds: string[],
+  status: 'delivered' | 'read'
+) {
+  if (!messageIds || messageIds.length === 0) return;
+  const chunkSize = 450;
+  for (let i = 0; i < messageIds.length; i += chunkSize) {
+    const chunk = messageIds.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    chunk.forEach((id) => {
+      const ref = doc(db, COLLECTIONS.CHAT_MESSAGES, id);
+      batch.set(
+        ref,
+        {
+          status,
+          readStatus: status === 'read' ? 'read' : 'delivered',
+        },
+        { merge: true }
+      );
+    });
+    await batch.commit();
+  }
+}
+
 export async function updateChatMessageReaction(
   messageId: string,
   partnerId: string,
@@ -463,11 +529,9 @@ export function subscribeChatMessages(
       snap.forEach((docSnap) => {
         messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
       });
-      // Sort chronologically
-      messages.sort((a, b) => {
-        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-      });
-      onUpdate(messages);
+      // Sort chronologically strictly by sending/arrival timestamp to the second
+      const sorted = sortChatMessagesChronologically(messages);
+      onUpdate(sorted);
     },
     (err) => {
       console.error('Firestore Chat messages sync error:', err);
@@ -503,4 +567,4 @@ export function subscribeChatTypingStatus(
   );
 }
 
-export { COLLECTIONS };
+export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };
