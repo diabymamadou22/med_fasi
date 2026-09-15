@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, Gamepad2, Images, MessageCircle } from 'lucide-react';
+import { Clock, Images, MessageCircle, Languages } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 
 export type MainTab = 'chat' | 'timeline' | 'gallery' | 'games';
@@ -41,10 +41,10 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
     {
       id: 'games' as MainTab,
-      label: 'Jeux & Complicité',
-      shortLabel: 'Jeux',
-      sublabel: 'Quiz, Date Picker & Défis',
-      icon: Gamepad2,
+      label: 'Anglais en Duo',
+      shortLabel: 'Anglais',
+      sublabel: 'Cours & Jeux Débutants',
+      icon: Languages,
     },
   ];
 

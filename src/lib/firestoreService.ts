@@ -24,6 +24,8 @@ import {
   CoupleChallenge,
   CoupleSettings,
   ChatMessage,
+  EnglishLexiconItem,
+  WeeklyLearningChallenge,
 } from '../types';
 import {
   sortChatMessagesChronologically,
@@ -47,6 +49,8 @@ const COLLECTIONS = {
   DATES: 'dates',
   CHALLENGES: 'challenges',
   SETTINGS: 'couple_settings',
+  LEXICON: 'couple_lexicon',
+  WEEKLY_LEARNING_CHALLENGES: 'weekly_learning_challenges',
 };
 
 /**
@@ -92,6 +96,8 @@ export async function seedInitialDataIfEmpty(defaults: {
   dateIdeas?: DateIdea[];
   challenges?: CoupleChallenge[];
   settings?: CoupleSettings;
+  lexicon?: EnglishLexiconItem[];
+  weeklyChallenges?: WeeklyLearningChallenge[];
 }) {
   if (isSeedChecked) return;
   isSeedChecked = true;
@@ -185,6 +191,20 @@ export async function seedInitialDataIfEmpty(defaults: {
         ...defaults.settings,
         id: 'main_settings',
       }));
+    }
+
+    // Seed lexicon
+    if (defaults.lexicon) {
+      defaults.lexicon.forEach((item) => {
+        batch.set(doc(db, COLLECTIONS.LEXICON, item.id), sanitizeForFirestore(item));
+      });
+    }
+
+    // Seed weekly learning challenges
+    if (defaults.weeklyChallenges) {
+      defaults.weeklyChallenges.forEach((item) => {
+        batch.set(doc(db, COLLECTIONS.WEEKLY_LEARNING_CHALLENGES, item.id), sanitizeForFirestore(item));
+      });
     }
 
     await batch.commit();
@@ -321,6 +341,49 @@ export async function saveChallenge(challenge: CoupleChallenge) {
 
 export async function deleteChallengeFromDb(id: string) {
   await deleteDoc(doc(db, COLLECTIONS.CHALLENGES, id));
+}
+
+// =========================================================================
+// Notre Lexique d'Anglais du Couple (Synchronisation Cloud)
+// =========================================================================
+
+export async function saveLexiconWord(word: EnglishLexiconItem) {
+  const ref = doc(db, COLLECTIONS.LEXICON, word.id);
+  await setDoc(ref, sanitizeForFirestore(word), { merge: true });
+}
+
+export async function deleteLexiconWordFromDb(id: string) {
+  await deleteDoc(doc(db, COLLECTIONS.LEXICON, id));
+}
+
+export async function toggleLexiconFavoriteInDb(id: string, isFavorite: boolean) {
+  const ref = doc(db, COLLECTIONS.LEXICON, id);
+  await setDoc(ref, { isFavorite }, { merge: true });
+}
+
+export async function toggleLexiconMasteredInDb(id: string, isMastered: boolean) {
+  const ref = doc(db, COLLECTIONS.LEXICON, id);
+  await setDoc(ref, { isMastered }, { merge: true });
+}
+
+export async function saveWeeklyLearningChallenge(challenge: WeeklyLearningChallenge) {
+  const ref = doc(db, COLLECTIONS.WEEKLY_LEARNING_CHALLENGES, challenge.id);
+  await setDoc(ref, sanitizeForFirestore(challenge), { merge: true });
+}
+
+export async function deleteWeeklyLearningChallengeFromDb(id: string) {
+  await deleteDoc(doc(db, COLLECTIONS.WEEKLY_LEARNING_CHALLENGES, id));
+}
+
+export function subscribeWeeklyLearningChallenges(
+  onUpdate: (challenges: WeeklyLearningChallenge[]) => void,
+  onError?: (error: Error) => void
+) {
+  return subscribeCollection<WeeklyLearningChallenge>(
+    COLLECTIONS.WEEKLY_LEARNING_CHALLENGES,
+    onUpdate,
+    onError
+  );
 }
 
 export async function saveSettings(settings: CoupleSettings) {

@@ -194,6 +194,9 @@ export interface ChatMessage {
   readStatus?: 'sent' | 'delivered' | 'read' | 'unread' | boolean;
   isEdited?: boolean;
   editedAt?: string;
+  isLearningChallengeValidation?: boolean;
+  learningChallengeTarget?: string;
+  learningChallengeBonus?: number;
 }
 
 export interface ChatTypingStatus {
@@ -219,3 +222,117 @@ export interface FullCoupleBackup {
   chatMessages?: ChatMessage[];
   settings?: CoupleSettings;
 }
+
+// English Learning For Couples (Débutants)
+export interface EnglishLessonItem {
+  id: string;
+  english: string;
+  phonetic: string;
+  french: string;
+  contextOrTip?: string;
+  category: string;
+  audioExample?: string;
+  tags?: string[];
+}
+
+export interface EnglishLessonModule {
+  id: string;
+  level: 'Débutant A0' | 'Débutant A1';
+  title: string;
+  englishTitle: string;
+  icon: string;
+  description: string;
+  color: string;
+  badgeColor: string;
+  items: EnglishLessonItem[];
+}
+
+export interface EnglishRoleplayDialogue {
+  id: string;
+  title: string;
+  frenchTitle: string;
+  situation: string;
+  icon: string;
+  lines: {
+    speaker: 'partner1' | 'partner2';
+    english: string;
+    phonetic: string;
+    french: string;
+  }[];
+}
+
+export interface EnglishQuizQuestion {
+  id: string;
+  type: 'multiple_choice' | 'word_order' | 'listen_guess';
+  question: string;
+  audioText?: string;
+  options?: string[];
+  correctAnswer: string | number;
+  scrambledWords?: string[];
+  explanation: string;
+  xpReward: number;
+}
+
+export interface EnglishLexiconItem {
+  id: string;
+  english: string;
+  french: string;
+  phonetic?: string;
+  definition?: string; // Définition ou explication détaillée pour mieux retenir
+  contextSentence?: string; // Phrase contextuelle / exemple en anglais
+  contextSentenceFrench?: string; // Traduction de la phrase contextuelle
+  personalMemory?: string; // Souvenir / note personnelle de couple
+  category?: 'romantique' | 'quotidien' | 'restaurant' | 'voyage' | 'humour' | 'autre';
+  isFavorite?: boolean;
+  isMastered?: boolean;
+  addedBy: PartnerId;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type EnglishCustomWord = EnglishLexiconItem;
+
+export interface EnglishProgressState {
+  xpPoints: number;
+  masteredItemIds: string[];
+  completedQuizIds: string[];
+  dailyStreak: number;
+  lastStudiedDate: string;
+  customSavedWords: EnglishLexiconItem[];
+}
+
+export interface WeeklyLearningChallenge {
+  id: string;
+  weekKey: string; // e.g. "2026-W38"
+  weekNumber: number; // e.g. 1 to 52
+  title: string; // Titre poétique ou thématique du défi
+  category: 'word' | 'grammar' | 'expression';
+  targetEnglish: string; // Mot ou structure cible en anglais
+  targetFrench: string; // Traduction / équivalent en français
+  phonetic?: string; // Prononciation phonétique simplifiée
+  grammarRule?: string; // Formule grammaticale ou structure syntaxique (ex: "Subject + can't help but + V-ing")
+  description: string; // Consigne détaillée en français
+  tips: string; // Conseil complice pour glisser l'expression naturellement dans le chat
+  detectionKeywords: string[]; // Mots-clés ou fragments détectés dans les messages du chat
+  exampleSentences: {
+    english: string;
+    french: string;
+  }[];
+  pointsReward: number; // Points de couple gagnés par partenaire (ex: 50 pts)
+  duoBonusPoints: number; // Bonus additionnel quand les deux partenaires ont relevé le défi (ex: 100 pts)
+  partner1Completed: boolean;
+  partner1CompletedAt?: string;
+  partner1Snippet?: string;
+  partner1MessageId?: string;
+  partner2Completed: boolean;
+  partner2CompletedAt?: string;
+  partner2Snippet?: string;
+  partner2MessageId?: string;
+  bothCompleted: boolean;
+  bothCompletedAt?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  isCustom?: boolean;
+}
+

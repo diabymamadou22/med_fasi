@@ -181,6 +181,55 @@
         "lastAutoCleanAt": { "type": "string" }
       },
       "required": ["isPinEnabled"]
+    },
+    "EnglishLexiconItem": {
+      "title": "EnglishLexiconItem",
+      "description": "Mot ou expression anglaise enregistrée par le couple dans Notre Lexique",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "english": { "type": "string" },
+        "french": { "type": "string" },
+        "phonetic": { "type": "string" },
+        "definition": { "type": "string" },
+        "contextSentence": { "type": "string" },
+        "contextSentenceFrench": { "type": "string" },
+        "personalMemory": { "type": "string" },
+        "category": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "isMastered": { "type": "boolean" },
+        "addedBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "english", "french", "addedBy"]
+    },
+    "WeeklyLearningChallenge": {
+      "title": "WeeklyLearningChallenge",
+      "description": "Défi d'apprentissage hebdomadaire d'anglais à utiliser dans le chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "weekKey": { "type": "string" },
+        "weekNumber": { "type": "number" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "targetEnglish": { "type": "string" },
+        "targetFrench": { "type": "string" },
+        "phonetic": { "type": "string" },
+        "grammarRule": { "type": "string" },
+        "description": { "type": "string" },
+        "tips": { "type": "string" },
+        "detectionKeywords": { "type": "array", "items": { "type": "string" } },
+        "exampleSentences": { "type": "array" },
+        "pointsReward": { "type": "number" },
+        "duoBonusPoints": { "type": "number" },
+        "partner1Completed": { "type": "boolean" },
+        "partner2Completed": { "type": "boolean" },
+        "bothCompleted": { "type": "boolean" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "targetEnglish", "targetFrench", "pointsReward"]
     }
   },
   "firestore": {
@@ -227,6 +276,14 @@
     "pulses": {
       "schema": "MissYouPulse",
       "description": "Vibrations 'Tu me manques'"
+    },
+    "couple_lexicon": {
+      "schema": "EnglishLexiconItem",
+      "description": "Notre Lexique de couple pour retenir les mots d'anglais"
+    },
+    "weekly_learning_challenges": {
+      "schema": "WeeklyLearningChallenge",
+      "description": "Défis d'apprentissage hebdomadaires de vocabulaire et grammaire anglaise pour le chat"
     }
   }
 }

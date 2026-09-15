@@ -48,5 +48,11 @@ service cloud.firestore {
     match /chat_status/{document} {
       allow read, write: if true;
     }
+    match /couple_lexicon/{document} {
+      allow read, write: if true;
+    }
+    match /weekly_learning_challenges/{document} {
+      allow read, write: if true;
+    }
   }
 }

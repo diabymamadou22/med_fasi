@@ -47,6 +47,8 @@ import {
   CoupleSettings,
   FullCoupleBackup,
   ChatMessage,
+  EnglishLexiconItem,
+  WeeklyLearningChallenge,
 } from './types';
 import {
   INITIAL_PROFILE,
@@ -61,6 +63,12 @@ import {
   INITIAL_VOUCHERS,
   INITIAL_GRATITUDES,
 } from './data/initialData';
+import { INITIAL_LEXICON_WORDS } from './data/initialLexiconData';
+import {
+  INITIAL_WEEKLY_LEARNING_CHALLENGES,
+  matchLearningChallenge,
+  getActiveOrCurrentWeekChallenge,
+} from './data/initialWeeklyChallenges';
 import {
   seedInitialDataIfEmpty,
   subscribeProfile,
@@ -92,6 +100,13 @@ import {
   saveChatMessage,
   deleteMultipleChatMessagesFromDb,
   editChatMessageContent,
+  saveLexiconWord,
+  deleteLexiconWordFromDb,
+  toggleLexiconFavoriteInDb,
+  toggleLexiconMasteredInDb,
+  saveWeeklyLearningChallenge,
+  deleteWeeklyLearningChallengeFromDb,
+  subscribeWeeklyLearningChallenges,
   COLLECTIONS,
   sortChatMessagesChronologically,
   extractMessageTimestampMs,
@@ -112,6 +127,8 @@ const STORAGE_KEYS = {
   ACTIVE_PARTNER: 'nid_damour_active_partner',
   SETTINGS: 'nid_damour_settings',
   CHAT_MESSAGES: 'nid_damour_chat_messages',
+  LEXICON: 'nid_damour_lexicon',
+  WEEKLY_CHALLENGES: 'nid_damour_weekly_challenges',
 };
 
 export default function App() {
@@ -281,6 +298,29 @@ export default function App() {
     }
   });
 
+  // Notre Lexique d'anglais personnalisé
+  const [lexicon, setLexicon] = useState<EnglishLexiconItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.LEXICON);
+      return saved ? JSON.parse(saved) : INITIAL_LEXICON_WORDS;
+    } catch {
+      return INITIAL_LEXICON_WORDS;
+    }
+  });
+
+  // Défis d'apprentissage hebdomadaires en duo (mots & structures d'anglais)
+  const [weeklyChallenges, setWeeklyChallenges] = useState<WeeklyLearningChallenge[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.WEEKLY_CHALLENGES);
+      return saved ? JSON.parse(saved) : INITIAL_WEEKLY_LEARNING_CHALLENGES;
+    } catch {
+      return INITIAL_WEEKLY_LEARNING_CHALLENGES;
+    }
+  });
+
+  // Texte pré-rempli pour le chat (insertion depuis le lexique ou les défis)
+  const [chatDraftText, setChatDraftText] = useState<string>('');
+
   // Couple Settings (PIN, Romantic Music, Ambiance, Database cleaning)
   const [settings, setSettings] = useState<CoupleSettings>(() => {
     try {
@@ -409,6 +449,8 @@ export default function App() {
       quizzes: INITIAL_QUIZZES,
       dateIdeas: INITIAL_DATE_IDEAS,
       challenges: INITIAL_CHALLENGES,
+      lexicon: INITIAL_LEXICON_WORDS,
+      weeklyChallenges: INITIAL_WEEKLY_LEARNING_CHALLENGES,
     });
   }, []);
 
@@ -533,6 +575,23 @@ export default function App() {
       }
     );
 
+    const unsubLexicon = subscribeCollection<EnglishLexiconItem>(
+      COLLECTIONS.LEXICON,
+      (remoteLexicon) => {
+        if (Array.isArray(remoteLexicon) && remoteLexicon.length > 0) {
+          setLexicon(remoteLexicon);
+        }
+      }
+    );
+
+    const unsubWeeklyChallenges = subscribeWeeklyLearningChallenges(
+      (remoteChallenges) => {
+        if (Array.isArray(remoteChallenges) && remoteChallenges.length > 0) {
+          setWeeklyChallenges(remoteChallenges);
+        }
+      }
+    );
+
     const unsubSettings = subscribeSettings(
       (remoteSettings) => {
         if (remoteSettings) {
@@ -617,6 +676,8 @@ export default function App() {
       unsubQuizzes();
       unsubDates();
       unsubChallenges();
+      unsubLexicon();
+      unsubWeeklyChallenges();
       unsubSettings();
       unsubPulse();
       unsubChat();
@@ -632,6 +693,11 @@ export default function App() {
     if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
   }, [profile, isInitialRemoteLoaded]);
+
+  useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
+    localStorage.setItem(STORAGE_KEYS.WEEKLY_CHALLENGES, JSON.stringify(weeklyChallenges));
+  }, [weeklyChallenges, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
@@ -657,6 +723,11 @@ export default function App() {
     if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.QUIZZES, JSON.stringify(quizzes));
   }, [quizzes, isInitialRemoteLoaded]);
+
+  useEffect(() => {
+    if (!isInitialRemoteLoaded) return;
+    localStorage.setItem(STORAGE_KEYS.LEXICON, JSON.stringify(lexicon));
+  }, [lexicon, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
@@ -837,6 +908,71 @@ export default function App() {
     const finalTimestampMs = Math.max(now, maxExistingMs + 1000);
     const finalTimestampIso = new Date(finalTimestampMs).toISOString();
 
+    // Check Weekly English Challenge completion
+    let challengeValidated = false;
+    let challengeBonusPoints = 0;
+    let challengeTargetWord = '';
+
+    const activeChallenge = getActiveOrCurrentWeekChallenge(weeklyChallenges);
+    if (activeChallenge && msgData.content) {
+      const isMatch = matchLearningChallenge(msgData.content, activeChallenge);
+      if (isMatch) {
+        const sender = msgData.senderId;
+        const alreadyDoneBySender =
+          (sender === 'p1' && activeChallenge.partner1Completed) ||
+          (sender === 'p2' && activeChallenge.partner2Completed);
+
+        if (!alreadyDoneBySender) {
+          challengeValidated = true;
+          challengeBonusPoints = activeChallenge.pointsReward || 50;
+          challengeTargetWord = activeChallenge.targetEnglish;
+
+          const nowIso = new Date().toISOString();
+          const updatedPartner1Completed = sender === 'p1' ? true : activeChallenge.partner1Completed;
+          const updatedPartner2Completed = sender === 'p2' ? true : activeChallenge.partner2Completed;
+          const bothNowCompleted = updatedPartner1Completed && updatedPartner2Completed;
+
+          const updatedChallenge: WeeklyLearningChallenge = {
+            ...activeChallenge,
+            partner1Completed: updatedPartner1Completed,
+            partner1CompletedAt: sender === 'p1' ? nowIso : activeChallenge.partner1CompletedAt,
+            partner1Snippet: sender === 'p1' ? msgData.content.slice(0, 120) : activeChallenge.partner1Snippet,
+            partner2Completed: updatedPartner2Completed,
+            partner2CompletedAt: sender === 'p2' ? nowIso : activeChallenge.partner2CompletedAt,
+            partner2Snippet: sender === 'p2' ? msgData.content.slice(0, 120) : activeChallenge.partner2Snippet,
+            bothCompleted: bothNowCompleted,
+            bothCompletedAt: bothNowCompleted ? (activeChallenge.bothCompletedAt || nowIso) : undefined,
+            updatedAt: nowIso,
+          };
+
+          // Update state and DB
+          setWeeklyChallenges((prev) =>
+            prev.map((c) => (c.id === updatedChallenge.id ? updatedChallenge : c))
+          );
+          saveWeeklyLearningChallenge(updatedChallenge).catch(console.error);
+
+          // Add learning points to couple profile
+          const partnerKey = sender === 'p1' ? 'partner1' : 'partner2';
+          const currentPts = profile[partnerKey]?.learningPoints || 0;
+          const totalPointsAwarded = bothNowCompleted ? challengeBonusPoints + 30 : challengeBonusPoints;
+
+          const updatedProfile: CoupleProfile = {
+            ...profile,
+            [partnerKey]: {
+              ...profile[partnerKey],
+              learningPoints: currentPts + totalPointsAwarded,
+            },
+          };
+          setProfile(updatedProfile);
+          saveProfile(updatedProfile).catch(console.error);
+
+          // Trigger audio sparkle & celebration confetti
+          soundEffects.playSuccessSparkle();
+          triggerCelebrationConfetti();
+        }
+      }
+    }
+
     const newMsg: ChatMessage = {
       id: `msg_${finalTimestampMs}_${Math.random().toString(36).substring(2, 7)}`,
       timestamp: finalTimestampIso,
@@ -844,6 +980,14 @@ export default function App() {
       status: 'sent',
       readStatus: 'sent',
       ...msgData,
+      ...(challengeValidated
+        ? {
+            isLearningChallengeValidation: true,
+            learningChallengeId: activeChallenge?.id,
+            learningChallengeTarget: challengeTargetWord,
+            learningChallengeBonus: challengeBonusPoints,
+          }
+        : {}),
     };
     setMessages((prev) => sortChatMessagesChronologically([...prev, newMsg]));
     try {
@@ -1344,6 +1488,39 @@ export default function App() {
     });
   };
 
+  // Lexicon Handlers
+  const handleSaveLexiconWord = (word: EnglishLexiconItem) => {
+    setLexicon((prev) => {
+      const idx = prev.findIndex((w) => w.id === word.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = word;
+        return next;
+      }
+      return [word, ...prev];
+    });
+    saveLexiconWord(word).catch(console.error);
+  };
+
+  const handleDeleteLexiconWord = (wordId: string) => {
+    setLexicon((prev) => prev.filter((w) => w.id !== wordId));
+    deleteLexiconWordFromDb(wordId).catch(console.error);
+  };
+
+  const handleToggleLexiconFavorite = (wordId: string, isFavorite: boolean) => {
+    setLexicon((prev) =>
+      prev.map((w) => (w.id === wordId ? { ...w, isFavorite } : w))
+    );
+    toggleLexiconFavoriteInDb(wordId, isFavorite).catch(console.error);
+  };
+
+  const handleToggleLexiconMastered = (wordId: string, isMastered: boolean) => {
+    setLexicon((prev) =>
+      prev.map((w) => (w.id === wordId ? { ...w, isMastered } : w))
+    );
+    toggleLexiconMasteredInDb(wordId, isMastered).catch(console.error);
+  };
+
   const handleRemoveMemoryPhoto = (memoryId: string) => {
     const mem = memories.find((m) => m.id === memoryId);
     if (!mem) return;
@@ -1602,6 +1779,12 @@ export default function App() {
               onClearChat={handleClearChat}
               onEditMessage={handleEditChatMessage}
               onBack={handleBackFromChat}
+              weeklyChallenge={getActiveOrCurrentWeekChallenge(weeklyChallenges)}
+              onOpenWeeklyChallengeHub={() => {
+                setActiveTab('games');
+              }}
+              draftText={chatDraftText}
+              onClearDraftText={() => setChatDraftText('')}
             />
           )}
 
@@ -1666,11 +1849,45 @@ export default function App() {
               quizzes={quizzes}
               dateIdeas={dateIdeas}
               challenges={challenges}
+              lexicon={lexicon}
+              onSaveLexiconWord={handleSaveLexiconWord}
+              onDeleteLexiconWord={handleDeleteLexiconWord}
+              onToggleLexiconFavorite={handleToggleLexiconFavorite}
+              onToggleLexiconMastered={handleToggleLexiconMastered}
+              weeklyChallenges={weeklyChallenges}
+              onSelectActiveWeeklyChallenge={(challengeId) => {
+                const updated = weeklyChallenges.map((c) => ({
+                  ...c,
+                  isActive: c.id === challengeId,
+                }));
+                setWeeklyChallenges(updated);
+                const chosen = updated.find((c) => c.id === challengeId);
+                if (chosen) {
+                  saveWeeklyLearningChallenge(chosen).catch(console.error);
+                }
+              }}
+              onSaveWeeklyChallenge={(ch) => {
+                setWeeklyChallenges((prev) => {
+                  const idx = prev.findIndex((c) => c.id === ch.id);
+                  if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = ch;
+                    return copy;
+                  }
+                  return [ch, ...prev];
+                });
+                saveWeeklyLearningChallenge(ch).catch(console.error);
+              }}
+              onOpenChatWithDraft={(prefill) => {
+                setChatDraftText(prefill);
+                setActiveTab('chat');
+              }}
               onAnswerQuiz={handleAnswerQuiz}
               onSaveDateIdea={handleSaveDateIdea}
               onToggleChallenge={handleToggleChallenge}
               onAddNewQuiz={handleAddNewQuiz}
               onAddNewDateIdea={handleAddNewDateIdea}
+              onSendChatMessage={handleSendChatMessage}
             />
           )}
         </div>
