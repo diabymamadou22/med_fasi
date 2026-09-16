@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Clock, Images, MessageCircle, Gamepad2 } from 'lucide-react';
+import { Sparkles, Images, MessageCircle, Gamepad2 } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 
-export type MainTab = 'chat' | 'timeline' | 'gallery' | 'games';
+export type MainTab = 'home' | 'chat' | 'games' | 'gallery';
 
 interface NavigationProps {
   activeTab: MainTab;
@@ -18,8 +18,15 @@ export const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const tabs = [
     {
+      id: 'home' as MainTab,
+      label: 'Accueil',
+      shortLabel: 'Accueil',
+      sublabel: 'Notre nid d\'amour & tableau de bord',
+      icon: Sparkles,
+    },
+    {
       id: 'chat' as MainTab,
-      label: 'Chat',
+      label: 'Chat Intime',
       shortLabel: 'Chat',
       sublabel: 'Messages & Vocaux en direct',
       icon: MessageCircle,
@@ -27,25 +34,18 @@ export const Navigation: React.FC<NavigationProps> = ({
       badgeColor: 'bg-rose-500',
     },
     {
-      id: 'timeline' as MainTab,
-      label: 'Capsule & Timeline',
-      shortLabel: 'Souvenirs',
-      sublabel: 'Moments, Capsules & Carte',
-      icon: Clock,
-    },
-    {
-      id: 'gallery' as MainTab,
-      label: 'Galerie partagée',
-      shortLabel: 'Galerie',
-      sublabel: 'Nos photos en duo',
-      icon: Images,
-    },
-    {
       id: 'games' as MainTab,
       label: 'Jeux & Flirt Duo',
       shortLabel: 'Jeux & Flirt',
-      sublabel: 'Roue des gages, devinettes & mots doux',
+      sublabel: 'Roue des gages, blind test & anglais',
       icon: Gamepad2,
+    },
+    {
+      id: 'gallery' as MainTab,
+      label: 'Galerie Duo',
+      shortLabel: 'Galerie',
+      sublabel: 'Nos photos en duo',
+      icon: Images,
     },
   ];
 

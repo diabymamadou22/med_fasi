@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen,
@@ -125,7 +125,7 @@ export const LexiconSection: React.FC<LexiconSectionProps> = ({
   const [quizScore, setQuizScore] = useState(0);
 
   // Handle prefilled word trigger from lessons
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialPrefillWord) {
       setEditingWord(null);
       setFormEnglish(initialPrefillWord.english || '');

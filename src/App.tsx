@@ -5,10 +5,9 @@ import { Header } from './components/Header';
 import { Navigation, MainTab } from './components/Navigation';
 import { MoodAndNeedsBar } from './components/MoodAndNeedsBar';
 import { MissYouModal } from './components/MissYouModal';
-import { JournalView } from './components/views/JournalView';
-import { TimelineView } from './components/views/TimelineView';
+import { HomeView } from './components/views/HomeView';
 import { SharedGalleryView, GalleryItem } from './components/views/SharedGalleryView';
-import { GamesView } from './components/views/GamesView';
+import { GamesView, EnglishGameTab } from './components/views/GamesView';
 import { VouchersAndBucketView } from './components/views/VouchersAndBucketView';
 import { ChatView } from './components/views/ChatView';
 import { WriteNoteModal } from './components/modals/WriteNoteModal';
@@ -145,8 +144,9 @@ export default function App() {
   });
 
   // Main active tab
-  const [activeTab, setActiveTab] = useState<MainTab>('chat');
-  const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('gallery');
+  const [activeTab, setActiveTab] = useState<MainTab>('home');
+  const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
+  const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab>('roulette');
 
   const handleSelectTab = (tab: MainTab) => {
     if (activeTab !== 'chat') {
@@ -156,7 +156,7 @@ export default function App() {
   };
 
   const handleBackFromChat = () => {
-    setActiveTab(lastNonChatTab || 'gallery');
+    setActiveTab(lastNonChatTab || 'home');
   };
 
   // Couple Data States with localStorage initialization
@@ -1863,33 +1863,34 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'timeline' && (
-            <TimelineView
+          {activeTab === 'home' && (
+            <HomeView
               profile={profile}
               activePartnerId={activePartnerId}
-              memories={memories}
-              capsules={capsules}
-              locations={locations}
-              onOpenAddMemoryModal={() => {
-                setEditingMemory(null);
-                setShowAddMemoryModal(true);
+              onSwitchPartner={handleSwitchPartner}
+              onNavigateToTab={(tab) => handleSelectTab(tab)}
+              onNavigateToGame={(gameTab) => {
+                setSelectedGameTab(gameTab);
+                handleSelectTab('games');
               }}
-              onOpenAddCapsuleModal={() => {
-                setEditingCapsule(null);
-                setShowAddCapsuleModal(true);
+              onSendMissYou={(vibe, msg) => handleSendMissYou(vibe, msg)}
+              onOpenWriteNoteModal={() => {
+                setEditingNote(null);
+                setShowWriteNoteModal(true);
               }}
-              onOpenAddLocationModal={() => {
-                setEditingLocation(null);
-                setShowAddLocationModal(true);
+              notes={notes}
+              messages={messages}
+              vouchers={vouchers}
+              lexicon={lexicon}
+              weeklyChallenges={weeklyChallenges}
+              onOpenChatWithDraft={(prefill) => {
+                setChatDraftText(prefill);
+                handleSelectTab('chat');
               }}
-              onLikeMemory={handleLikeMemory}
-              onUnlockCapsule={handleUnlockCapsule}
-              onEditMemory={(mem) => setEditingMemory(mem)}
-              onDeleteMemory={handleDeleteMemory}
-              onEditCapsule={(cap) => setEditingCapsule(cap)}
-              onDeleteCapsule={handleDeleteCapsule}
-              onEditLocation={(loc) => setEditingLocation(loc)}
-              onDeleteLocation={handleDeleteLocation}
+              onOpenProfileModal={(pId) => {
+                setProfileFocusPartner(pId);
+                setShowProfileModal(true);
+              }}
             />
           )}
 
@@ -1924,6 +1925,7 @@ export default function App() {
               quizzes={quizzes}
               dateIdeas={dateIdeas}
               challenges={challenges}
+              initialTab={selectedGameTab}
               lexicon={lexicon}
               onSaveLexiconWord={handleSaveLexiconWord}
               onDeleteLexiconWord={handleDeleteLexiconWord}

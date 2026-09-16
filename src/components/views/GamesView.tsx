@@ -65,6 +65,7 @@ interface GamesViewProps {
   onSelectActiveWeeklyChallenge?: (challengeId: string) => void;
   onSaveWeeklyChallenge?: (challenge: WeeklyLearningChallenge) => void;
   onOpenChatWithDraft?: (prefilledText: string) => void;
+  initialTab?: EnglishGameTab;
 }
 
 export type EnglishGameTab =
@@ -104,11 +105,18 @@ export const GamesView: React.FC<GamesViewProps> = ({
   onSelectActiveWeeklyChallenge,
   onSaveWeeklyChallenge,
   onOpenChatWithDraft,
+  initialTab,
 }) => {
-  // Main Tab State - default is the exciting couple game roulette
-  const [activeTab, setActiveTab] = useState<EnglishGameTab>('roulette');
+  // Main Tab State - default is the exciting couple game roulette or requested initialTab
+  const [activeTab, setActiveTab] = useState<EnglishGameTab>(initialTab || 'roulette');
   const [speechRate, setSpeechRate] = useState<number>(0.85); // 0.85x gentle slow speed
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Notre Lexique State & persistence
   const [internalLexicon, setInternalLexicon] = useState<EnglishLexiconItem[]>(() => {
