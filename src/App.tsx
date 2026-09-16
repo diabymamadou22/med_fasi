@@ -21,12 +21,18 @@ import { ConfirmDeleteModal } from './components/modals/ConfirmDeleteModal';
 import { ProfileModal } from './components/modals/ProfileModal';
 import { PinLockModal } from './components/modals/PinLockModal';
 import { PWAInstallModal } from './components/modals/PWAInstallModal';
+import { NotificationAlertModal } from './components/modals/NotificationAlertModal';
+import { FloatingMessageAlert, FloatingAlertData } from './components/FloatingMessageAlert';
 import { soundEffects } from './lib/audio';
 import { triggerCelebrationConfetti } from './lib/confetti';
 import {
   sendSystemNotification,
   updateAppBadge,
   triggerVibration,
+  notifyPartnerViaPush,
+  subscribeToPushNotifications,
+  isPushSubscribed,
+  startTabMessageAlert,
 } from './lib/notificationService';
 import { onPwaNavigate } from './lib/pwaService';
 import { WifiOff } from 'lucide-react';
@@ -418,6 +424,37 @@ export default function App() {
   const [showAddVoucherModal, setShowAddVoucherModal] = useState(false);
   const [showAddBucketModal, setShowAddBucketModal] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [isNotificationsActive, setIsNotificationsActive] = useState(false);
+  const [floatingAlert, setFloatingAlert] = useState<FloatingAlertData | null>(null);
+
+  const checkPushSubscription = async () => {
+    try {
+      const isSub = await isPushSubscribed();
+      setIsNotificationsActive(isSub);
+
+      // Si l'autorisation a déjà été accordée, s'assurer que l'abonnement push est bien synchronisé sur le serveur
+      if (
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        Notification.permission === 'granted'
+      ) {
+        subscribeToPushNotifications(activePartnerId)
+          .then((res) => {
+            if (res.success) {
+              setIsNotificationsActive(true);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {
+      setIsNotificationsActive(false);
+    }
+  };
+
+  useEffect(() => {
+    checkPushSubscription();
+  }, [activePartnerId]);
 
   // Edit states for existing items
   const [editingMemory, setEditingMemory] = useState<TimelineMemory | null>(null);
@@ -636,23 +673,37 @@ export default function App() {
               const lastMsg = sorted[sorted.length - 1];
               if (lastMsg && lastMsg.senderId !== activePartnerId) {
                 soundEffects.playMessageReceived();
-                triggerVibration([80, 40, 80]);
+                triggerVibration([250, 100, 250, 100, 250]);
+
+                const sender = lastMsg.senderId === 'p1' ? profile.partner1 : profile.partner2;
+                const bodyText =
+                  lastMsg.mediaType === 'image'
+                    ? '📷 Vous a envoyé une photo'
+                    : lastMsg.mediaType === 'audio'
+                    ? '🎵 Vous a envoyé une note vocale'
+                    : lastMsg.content;
+
+                startTabMessageAlert(sender.name || 'Votre amour', bodyText);
 
                 if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
-                  const sender = lastMsg.senderId === 'p1' ? profile.partner1 : profile.partner2;
-                  const bodyText =
-                    lastMsg.mediaType === 'image'
-                      ? '📷 Vous a envoyé une photo'
-                      : lastMsg.mediaType === 'audio'
-                      ? '🎵 Vous a envoyé une note vocale'
-                      : lastMsg.content;
-
                   sendSystemNotification({
                     title: `${sender.name || 'Votre amour'} ❤️`,
                     body: bodyText,
                     icon: sender.avatar || '/app-icon.png',
                     tab: 'chat',
                     tag: `chat-${lastMsg.id}`,
+                  });
+                }
+
+                if (activeTab !== 'chat') {
+                  setFloatingAlert({
+                    id: lastMsg.id,
+                    senderId: lastMsg.senderId,
+                    senderName: sender.name || 'Votre amour',
+                    senderAvatar: sender.avatar,
+                    content: lastMsg.content,
+                    mediaType: lastMsg.mediaType,
+                    timestamp: lastMsg.timestamp,
                   });
                 }
               }
@@ -992,6 +1043,16 @@ export default function App() {
     setMessages((prev) => sortChatMessagesChronologically([...prev, newMsg]));
     try {
       await saveChatMessage(newMsg);
+      // Trigger Web Push alert to partner device asynchronously
+      const targetPartnerId = activePartnerId === 'p1' ? 'p2' : 'p1';
+      const senderPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
+      notifyPartnerViaPush({
+        senderId: activePartnerId,
+        senderName: senderPartner.name || 'Votre amour',
+        content: newMsg.content,
+        mediaType: newMsg.mediaType,
+        targetPartnerId,
+      }).catch((err) => console.warn('Push dispatch error:', err));
     } catch (err) {
       console.error('Erreur sauvegarde message WhatsApp:', err);
     }
@@ -1715,6 +1776,17 @@ export default function App() {
         activeTab === 'chat' ? 'h-screen h-[100dvh] overflow-hidden no-scrollbar' : ''
       }`}
     >
+      {/* Floating real-time message alert if user is in another tab */}
+      <FloatingMessageAlert
+        alert={floatingAlert}
+        profile={profile}
+        onOpenChat={() => {
+          setActiveTab('chat');
+          setFloatingAlert(null);
+        }}
+        onDismiss={() => setFloatingAlert(null)}
+      />
+
       {/* Offline Mode Alert banner */}
       {!isOnline && (
         <div className="bg-amber-600 text-white px-3 py-1.5 text-xs text-center font-medium flex items-center justify-center gap-2 shadow-xs shrink-0 z-50">
@@ -1743,6 +1815,8 @@ export default function App() {
           onLockApp={() => setIsAppLocked(true)}
           isFirebaseConnected={isCloudSynced}
           onOpenInstallModal={() => setShowInstallModal(true)}
+          onOpenNotifications={() => setShowNotificationModal(true)}
+          isNotificationsActive={isNotificationsActive}
         />
       )}
 
@@ -1785,6 +1859,7 @@ export default function App() {
               }}
               draftText={chatDraftText}
               onClearDraftText={() => setChatDraftText('')}
+              onOpenNotificationModal={() => setShowNotificationModal(true)}
             />
           )}
 
@@ -2068,6 +2143,17 @@ export default function App() {
           key="modal-pwa-install"
           isOpen={showInstallModal}
           onClose={() => setShowInstallModal(false)}
+        />
+
+        <NotificationAlertModal
+          key="modal-notification-alert"
+          isOpen={showNotificationModal}
+          onClose={() => {
+            setShowNotificationModal(false);
+            checkPushSubscription();
+          }}
+          profile={profile}
+          activePartnerId={activePartnerId}
         />
       </AnimatePresence>
 

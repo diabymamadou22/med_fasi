@@ -1,10 +1,64 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import webpush from "web-push";
 
 dotenv.config();
+
+// Web Push VAPID Setup
+const DEFAULT_VAPID_PUBLIC_KEY =
+  process.env.VAPID_PUBLIC_KEY ||
+  "BGVAXz9p6mfBB0HrdfnM6BWRXQ02r_-YKCTsQqc1B82ZbLBT-n0tDfh-cYWB3OE3qy3Xi_2ERIkKUhGhh8xrHPs";
+const DEFAULT_VAPID_PRIVATE_KEY =
+  process.env.VAPID_PRIVATE_KEY || "KbGLzdVl2MAL36DD7dBB0pjO4CV10_UjRPUUmsLd5Oc";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:diaby607622@gmail.com";
+
+try {
+  webpush.setVapidDetails(
+    VAPID_SUBJECT,
+    DEFAULT_VAPID_PUBLIC_KEY,
+    DEFAULT_VAPID_PRIVATE_KEY
+  );
+  console.log("Web Push VAPID initialisé avec succès");
+} catch (err) {
+  console.error("Erreur initialisation VAPID webpush:", err);
+}
+
+interface PushSubscriptionRecord {
+  id: string;
+  partnerId: string; // 'p1' | 'p2'
+  subscription: webpush.PushSubscription;
+  userAgent?: string;
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+const SUBSCRIPTIONS_FILE = path.join(process.cwd(), "push_subscriptions_store.json");
+
+function loadPushSubscriptions(): PushSubscriptionRecord[] {
+  try {
+    if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
+      const data = fs.readFileSync(SUBSCRIPTIONS_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.warn("Erreur lecture push subscriptions:", err);
+  }
+  return [];
+}
+
+function savePushSubscriptions(records: PushSubscriptionRecord[]) {
+  try {
+    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(records, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Erreur écriture push subscriptions:", err);
+  }
+}
+
+let pushSubscriptions: PushSubscriptionRecord[] = loadPushSubscriptions();
 
 let aiInstance: GoogleGenAI | null = null;
 function getAI(): GoogleGenAI | null {
@@ -22,7 +76,195 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", time: new Date().toISOString() });
+    res.json({
+      status: "ok",
+      time: new Date().toISOString(),
+      pushSubscriptionsCount: pushSubscriptions.length,
+    });
+  });
+
+  // Web Push API Routes
+  app.get("/api/push/vapid-public-key", (_req, res) => {
+    res.json({
+      publicKey: DEFAULT_VAPID_PUBLIC_KEY,
+      subject: VAPID_SUBJECT,
+    });
+  });
+
+  app.get("/api/push/status", (req, res) => {
+    const partnerId = req.query.partnerId as string;
+    const p1Count = pushSubscriptions.filter((s) => s.partnerId === "p1").length;
+    const p2Count = pushSubscriptions.filter((s) => s.partnerId === "p2").length;
+    res.json({
+      total: pushSubscriptions.length,
+      partnerSubscriptions: { p1: p1Count, p2: p2Count },
+      activePartnerSubs: partnerId
+        ? pushSubscriptions.filter((s) => s.partnerId === partnerId).length
+        : 0,
+    });
+  });
+
+  app.post("/api/push/subscribe", (req, res) => {
+    try {
+      const { partnerId, subscription, userAgent } = req.body;
+      if (!subscription || !subscription.endpoint || !subscription.keys) {
+        return res.status(400).json({ error: "Abonnement push invalide" });
+      }
+      const pid = partnerId === "p2" ? "p2" : "p1";
+      const nowIso = new Date().toISOString();
+
+      // Supprimer les doublons pour le même endpoint
+      pushSubscriptions = pushSubscriptions.filter(
+        (s) => s.subscription.endpoint !== subscription.endpoint
+      );
+
+      const record: PushSubscriptionRecord = {
+        id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        partnerId: pid,
+        subscription,
+        userAgent: userAgent || req.headers["user-agent"] || "",
+        createdAt: nowIso,
+        lastActiveAt: nowIso,
+      };
+
+      pushSubscriptions.push(record);
+      savePushSubscriptions(pushSubscriptions);
+
+      console.log(`Nouvel appareil push abonné pour ${pid} (total: ${pushSubscriptions.length})`);
+      return res.json({ success: true, count: pushSubscriptions.length });
+    } catch (err: any) {
+      console.error("Erreur enregistrement abonnement push:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/push/unsubscribe", (req, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (endpoint) {
+        pushSubscriptions = pushSubscriptions.filter(
+          (s) => s.subscription.endpoint !== endpoint
+        );
+        savePushSubscriptions(pushSubscriptions);
+      }
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/push/notify-partner", async (req, res) => {
+    try {
+      const { senderId, senderName, content, mediaType, targetPartnerId } = req.body;
+
+      const targetId = targetPartnerId || (senderId === "p1" ? "p2" : "p1");
+      const targets = pushSubscriptions.filter((s) => s.partnerId === targetId);
+
+      if (targets.length === 0) {
+        console.log(`Aucun appareil enregistré pour le partenaire cible (${targetId})`);
+        return res.json({
+          success: true,
+          sentCount: 0,
+          message: "Aucun appareil abonné pour le destinataire pour l'instant",
+        });
+      }
+
+      let previewText = content || "Nouveau mot doux de votre amour !";
+      if (mediaType === "image") {
+        previewText = "📷 Vous a envoyé une nouvelle photo dans le chat";
+      } else if (mediaType === "audio") {
+        previewText = "🎵 Vous a envoyé une note vocale d'amour";
+      }
+
+      if (previewText.length > 140) {
+        previewText = previewText.substring(0, 137) + "...";
+      }
+
+      const payload = JSON.stringify({
+        title: `${senderName || "Votre amour"} ❤️`,
+        body: previewText,
+        icon: "/pwa-192x192.png",
+        badge: "/favicon.png",
+        tag: `nid-damour-msg-${Date.now()}`,
+        timestamp: Date.now(),
+        data: {
+          url: "/?tab=chat",
+          tab: "chat",
+          senderId,
+        },
+      });
+
+      let sentCount = 0;
+      const deadEndpoints: string[] = [];
+
+      await Promise.all(
+        targets.map(async (record) => {
+          try {
+            await webpush.sendNotification(record.subscription, payload);
+            sentCount++;
+            record.lastActiveAt = new Date().toISOString();
+          } catch (err: any) {
+            console.warn(`Échec envoi push vers ${record.id}:`, err?.statusCode || err?.message);
+            if (err?.statusCode === 404 || err?.statusCode === 410) {
+              deadEndpoints.push(record.subscription.endpoint);
+            }
+          }
+        })
+      );
+
+      if (deadEndpoints.length > 0) {
+        pushSubscriptions = pushSubscriptions.filter(
+          (s) => !deadEndpoints.includes(s.subscription.endpoint)
+        );
+        savePushSubscriptions(pushSubscriptions);
+      }
+
+      console.log(`Push envoyé avec succès à ${sentCount}/${targets.length} appareils pour ${targetId}`);
+      return res.json({ success: true, sentCount, targetCount: targets.length });
+    } catch (err: any) {
+      console.error("Erreur diffusion push:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/push/test", async (req, res) => {
+    try {
+      const { partnerId, partnerName } = req.body;
+      const pid = partnerId === "p2" ? "p2" : "p1";
+      const targets = pushSubscriptions.filter((s) => s.partnerId === pid);
+
+      if (targets.length === 0) {
+        return res.json({
+          success: false,
+          message: "Cet appareil n'est pas encore abonné aux notifications push.",
+        });
+      }
+
+      const payload = JSON.stringify({
+        title: `Nid d'Amour - Alerte active 🔔`,
+        body: `Parfait ${partnerName || ""} ! Votre appareil est connecté. Vous recevrez les messages même lorsque l'application ou votre écran est éteint !`,
+        icon: "/pwa-192x192.png",
+        badge: "/favicon.png",
+        tag: `test-alert-${Date.now()}`,
+        data: { url: "/?tab=chat", tab: "chat" },
+      });
+
+      let sent = 0;
+      await Promise.all(
+        targets.map(async (r) => {
+          try {
+            await webpush.sendNotification(r.subscription, payload);
+            sent++;
+          } catch (e: any) {
+            console.warn("Échec test push:", e?.message);
+          }
+        })
+      );
+
+      return res.json({ success: sent > 0, sentCount: sent });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
   });
 
   // AI Date Idea Generator

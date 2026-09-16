@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Heart, Sparkles, Settings, ArrowLeftRight, Camera, MapPin, Lock, Cloud, CloudCheck, Download, Smartphone } from 'lucide-react';
+import {
+  Heart,
+  Sparkles,
+  Settings,
+  ArrowLeftRight,
+  Camera,
+  MapPin,
+  Lock,
+  Cloud,
+  CloudCheck,
+  Download,
+  Smartphone,
+  Bell,
+  BellRing,
+} from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
 import { PartnerAvatar } from './PartnerAvatar';
@@ -17,6 +31,8 @@ interface HeaderProps {
   onLockApp?: () => void;
   isFirebaseConnected?: boolean;
   onOpenInstallModal?: () => void;
+  onOpenNotifications?: () => void;
+  isNotificationsActive?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,6 +47,8 @@ export const Header: React.FC<HeaderProps> = ({
   onLockApp,
   isFirebaseConnected = true,
   onOpenInstallModal,
+  onOpenNotifications,
+  isNotificationsActive = false,
 }) => {
   const [showPulseMenu, setShowPulseMenu] = useState(false);
   const [pulseSending, setPulseSending] = useState(false);
@@ -157,6 +175,27 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Quick action buttons on mobile */}
           <div className="flex items-center gap-1 sm:hidden">
+            {onOpenNotifications && (
+              <button
+                onClick={onOpenNotifications}
+                className="relative text-stone-500 hover:text-rose-600 p-2 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
+                title="Alertes de messages & notifications"
+                id="btn-notifications-mobile"
+              >
+                {isNotificationsActive ? (
+                  <>
+                    <BellRing className="w-4 h-4 text-rose-500 animate-pulse" />
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full ring-1 ring-white" />
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-4 h-4 text-stone-500" />
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full ring-1 ring-white animate-ping" />
+                  </>
+                )}
+              </button>
+            )}
+
             {isPinEnabled && onLockApp && (
               <button
                 onClick={onLockApp}
@@ -198,6 +237,26 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-rose-100/60">
           {/* Desktop utility buttons */}
           <div className="hidden sm:flex items-center gap-1">
+            {onOpenNotifications && (
+              <button
+                onClick={onOpenNotifications}
+                className="relative text-stone-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer flex items-center gap-1"
+                title="Alertes de messages en arrière-plan (Web Push)"
+                id="btn-notifications-desktop"
+              >
+                {isNotificationsActive ? (
+                  <>
+                    <BellRing className="w-4 h-4 text-rose-500" />
+                    <span className="w-2 h-2 bg-emerald-500 rounded-full" />
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-4 h-4 text-stone-400" />
+                    <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                  </>
+                )}
+              </button>
+            )}
             {onOpenInstallModal && (
               <button
                 onClick={onOpenInstallModal}

@@ -126,10 +126,10 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   let data = {
     title: "Nid d'Amour ❤️",
-    body: 'Nouveau message ou mot doux de votre amour !',
+    body: 'Nouveau message de votre amour !',
     icon: '/pwa-192x192.png',
     badge: '/favicon.png',
-    tag: 'nid-damour-notification',
+    tag: `nid-damour-chat-${Date.now()}`,
   };
 
   if (event.data) {
@@ -140,22 +140,32 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  const targetTab = data.data?.tab || data.tab || 'chat';
+  const targetUrl = data.data?.url || data.url || '/?tab=' + targetTab;
+
   const options = {
     body: data.body,
     icon: data.icon || '/pwa-192x192.png',
     badge: data.badge || '/favicon.png',
-    vibrate: [200, 100, 200, 100, 200],
-    tag: data.tag || 'nid-damour-message',
+    vibrate: [250, 100, 250, 100, 250],
+    tag: data.tag || `chat-alert-${Date.now()}`,
     renotify: true,
+    requireInteraction: true,
     data: {
-      url: data.url || '/',
-      tab: data.tab || 'chat',
+      url: targetUrl,
+      tab: targetTab,
+      senderId: data.data?.senderId || data.senderId,
     },
     actions: [
-      { action: 'open_chat', title: '💬 Répondre' },
+      { action: 'open_chat', title: '💬 Ouvrir la discussion' },
       { action: 'dismiss', title: 'Fermer' },
     ],
   };
+
+  // Update App Badge on device icon if supported
+  if ('setAppBadge' in navigator && typeof navigator.setAppBadge === 'function') {
+    navigator.setAppBadge().catch(() => {});
+  }
 
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
@@ -166,7 +176,8 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'dismiss') return;
 
-  const targetUrl = '/';
+  const targetTab = event.notification.data?.tab || 'chat';
+  const targetUrl = event.notification.data?.url || `/?tab=${targetTab}`;
 
   event.waitUntil(
     self.clients
@@ -177,7 +188,7 @@ self.addEventListener('notificationclick', (event) => {
           if ('focus' in client) {
             client.postMessage({
               type: 'NAVIGATE_TAB',
-              tab: event.notification.data?.tab || 'chat',
+              tab: targetTab,
             });
             return client.focus();
           }

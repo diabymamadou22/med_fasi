@@ -39,7 +39,8 @@ import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/conf
 interface LexiconSectionProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
-  lexicon: EnglishLexiconItem[];
+  lexicon?: EnglishLexiconItem[];
+  words?: EnglishLexiconItem[];
   speechRate?: number;
   onSaveWord: (word: EnglishLexiconItem) => void;
   onDeleteWord: (wordId: string) => void;
@@ -72,6 +73,7 @@ export const LexiconSection: React.FC<LexiconSectionProps> = ({
   profile,
   activePartnerId,
   lexicon,
+  words,
   speechRate = 0.85,
   onSaveWord,
   onDeleteWord,
@@ -82,6 +84,7 @@ export const LexiconSection: React.FC<LexiconSectionProps> = ({
   initialPrefillWord,
   onClearPrefill,
 }) => {
+  const actualLexicon = words || lexicon || [];
   // Navigation inside Lexicon
   const [subView, setSubView] = useState<LexiconSubView>('list');
 
@@ -223,7 +226,7 @@ export const LexiconSection: React.FC<LexiconSectionProps> = ({
 
   // Filtered Lexicon Items
   const filteredLexicon = useMemo(() => {
-    return lexicon.filter((item) => {
+    return actualLexicon.filter((item) => {
       // 1. Search Query
       const q = searchQuery.toLowerCase().trim();
       if (q) {
@@ -252,14 +255,14 @@ export const LexiconSection: React.FC<LexiconSectionProps> = ({
 
       return true;
     });
-  }, [lexicon, searchQuery, selectedCategory, statusFilter, authorFilter]);
+  }, [actualLexicon, searchQuery, selectedCategory, statusFilter, authorFilter]);
 
   // Statistics
-  const totalCount = lexicon.length;
-  const masteredCount = lexicon.filter((w) => w.isMastered).length;
-  const favoriteCount = lexicon.filter((w) => w.isFavorite).length;
-  const p1Count = lexicon.filter((w) => w.addedBy === 'p1').length;
-  const p2Count = lexicon.filter((w) => w.addedBy === 'p2').length;
+  const totalCount = actualLexicon.length;
+  const masteredCount = actualLexicon.filter((w) => w.isMastered).length;
+  const favoriteCount = actualLexicon.filter((w) => w.isFavorite).length;
+  const p1Count = actualLexicon.filter((w) => w.addedBy === 'p1').length;
+  const p2Count = actualLexicon.filter((w) => w.addedBy === 'p2').length;
   const masteryPercentage = totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
 
   // Send to chat

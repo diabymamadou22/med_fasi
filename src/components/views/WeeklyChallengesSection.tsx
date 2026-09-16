@@ -250,66 +250,65 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
   };
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-4 sm:space-y-6 pb-6 sm:pb-8">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-900 via-rose-800 to-stone-900 text-white p-6 shadow-md border border-rose-700/40">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-rose-900 via-rose-800 to-stone-900 text-white p-4 sm:p-6 shadow-md border border-rose-700/40">
         <div className="absolute -right-8 -top-8 w-44 h-44 bg-rose-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-8 -bottom-8 w-44 h-44 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-xs font-semibold text-rose-200 tracking-wide">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>DÉFIS D'APPRENTISSAGE HEBDOMADAIRES</span>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
+          <div className="space-y-1 sm:space-y-1.5 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 text-[11px] sm:text-xs font-semibold text-rose-200 tracking-wide">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span>MISSION SECRÈTE DE LA SEMAINE 💌</span>
               <span className="text-white/40">•</span>
               <span className="text-amber-200 font-mono">{activeChallenge.weekKey}</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              Une expression à glisser dans le chat chaque semaine
+            <h2 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight text-white leading-snug">
+              Votre Mission Complice : Glissez cette phrase dans le chat !
             </h2>
-            <p className="text-sm text-rose-100/80 leading-relaxed">
-              Chaque semaine, apprenez un mot doux ou une tournure grammaticale anglaise.
-              Utilisez-la naturellement dans vos messages intimes pour débloquer des points de couple !
+            <p className="text-xs sm:text-sm text-rose-100/80 leading-relaxed">
+              Un mot doux ou une tournure complice à placer naturellement dans vos messages pour surprendre votre partenaire et débloquer vos cœurs de couple !
             </p>
           </div>
 
           {/* Quick Stats Pill */}
-          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/15 self-start md:self-auto shrink-0">
-            <div className="w-10 h-10 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-300 font-bold text-lg">
-              <Award className="w-5 h-5" />
+          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/15 self-start md:self-auto shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-300 font-bold text-base sm:text-lg shrink-0">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <div className="text-xs text-rose-200 font-medium">Points de Couple Gagnés</div>
-              <div className="text-xl font-extrabold text-amber-300 tracking-tight">
-                +{totalPointsEarned} <span className="text-xs font-semibold text-white/80">pts</span>
+              <div className="text-[10px] sm:text-xs text-rose-200 font-medium">Points de Couple Gagnés</div>
+              <div className="text-base sm:text-xl font-extrabold text-amber-300 tracking-tight">
+                +{totalPointsEarned} <span className="text-[10px] sm:text-xs font-semibold text-white/80">pts</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Mini progress tracker */}
-        <div className="mt-5 pt-4 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="bg-black/20 rounded-lg p-2.5">
-            <span className="text-rose-200/80 block text-[11px]">Défi actuel</span>
-            <span className="font-semibold text-white truncate block">
+        <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-white/15 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
+          <div className="bg-black/20 rounded-lg p-2 sm:p-2.5">
+            <span className="text-rose-200/80 block text-[10px] sm:text-[11px]">Défi actuel</span>
+            <span className="font-semibold text-white truncate block text-xs">
               {activeChallenge.targetEnglish}
             </span>
           </div>
-          <div className="bg-black/20 rounded-lg p-2.5">
-            <span className="text-rose-200/80 block text-[11px]">Défis duo réussis</span>
-            <span className="font-semibold text-amber-300">
+          <div className="bg-black/20 rounded-lg p-2 sm:p-2.5">
+            <span className="text-rose-200/80 block text-[10px] sm:text-[11px]">Défis duo réussis</span>
+            <span className="font-semibold text-amber-300 text-xs">
               {totalCompletedChallenges} semaine(s) 🏆
             </span>
           </div>
-          <div className="bg-black/20 rounded-lg p-2.5">
-            <span className="text-rose-200/80 block text-[11px]">Gain par partenaire</span>
-            <span className="font-semibold text-rose-200">
+          <div className="bg-black/20 rounded-lg p-2 sm:p-2.5">
+            <span className="text-rose-200/80 block text-[10px] sm:text-[11px]">Gain par partenaire</span>
+            <span className="font-semibold text-rose-200 text-xs">
               +{activeChallenge.pointsReward} pts chacun
             </span>
           </div>
-          <div className="bg-black/20 rounded-lg p-2.5">
-            <span className="text-rose-200/80 block text-[11px]">Bonus Duo</span>
-            <span className="font-semibold text-emerald-300">
+          <div className="bg-black/20 rounded-lg p-2 sm:p-2.5">
+            <span className="text-rose-200/80 block text-[10px] sm:text-[11px]">Bonus Duo</span>
+            <span className="font-semibold text-emerald-300 text-xs">
               +{activeChallenge.duoBonusPoints} pts en duo
             </span>
           </div>
@@ -317,28 +316,28 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
       </div>
 
       {/* Hero: Active Challenge Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-stone-200 overflow-hidden">
         {/* Top bar with category & week */}
-        <div className="bg-stone-50/80 px-6 py-3.5 border-b border-stone-200 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
+        <div className="bg-stone-50/80 px-4 py-3 sm:px-6 sm:py-3.5 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
             <span
-              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+              className={`px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold border ${
                 getCategoryBadge(activeChallenge.category).bg
               }`}
             >
               {getCategoryBadge(activeChallenge.category).label}
             </span>
-            <span className="text-xs font-medium text-stone-500 flex items-center gap-1">
+            <span className="text-[11px] sm:text-xs font-medium text-stone-500 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-stone-400" />
               Semaine {activeChallenge.weekNumber} ({activeChallenge.weekKey})
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
               type="button"
               onClick={() => setShowCustomModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-700 bg-white border border-stone-300 hover:bg-stone-50 transition-colors shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-stone-700 bg-white border border-stone-300 hover:bg-stone-50 transition-colors shadow-2xs min-h-[36px] touch-manipulation"
             >
               <Plus className="w-3.5 h-3.5 text-rose-500" />
               <span>Proposer un défi</span>
@@ -346,25 +345,25 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
           </div>
         </div>
 
-        <div className="p-6 sm:p-8 space-y-6">
+        <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
           {/* Spotlight Word / Grammar Structure */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-stone-100">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-stone-100">
             <div className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-rose-500" />
+              <div className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>Objectif de la semaine à utiliser dans le chat</span>
               </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h3 className="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-2xl sm:text-4xl font-extrabold text-stone-900 tracking-tight break-words">
                   {activeChallenge.targetEnglish}
                 </h3>
                 <button
                   type="button"
                   onClick={() => handlePronounce(activeChallenge.targetEnglish)}
                   title="Écouter la prononciation anglaise"
-                  className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors shadow-2xs border border-rose-200/80"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors shadow-2xs border border-rose-200/80 shrink-0 active:scale-95"
                 >
-                  <Volume2 className="w-5 h-5" />
+                  <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
               {activeChallenge.phonetic && (
@@ -372,17 +371,18 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                   {activeChallenge.phonetic}
                 </div>
               )}
-              <div className="text-base sm:text-lg font-medium text-stone-700 pt-1">
-                👉 <span className="font-semibold text-stone-900">{activeChallenge.targetFrench}</span>
+              <div className="text-sm sm:text-lg font-medium text-stone-700 pt-1 flex items-center gap-1.5">
+                <span className="text-base shrink-0">🇫🇷</span>
+                <span className="font-semibold text-stone-900">{activeChallenge.targetFrench}</span>
               </div>
             </div>
 
             {/* Quick Reward Badge */}
-            <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3.5 text-center min-w-[170px] self-start">
-              <div className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+            <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-center w-full sm:w-auto sm:min-w-[170px] self-start">
+              <div className="text-[11px] sm:text-xs font-semibold text-amber-800 uppercase tracking-wide">
                 Récompense
               </div>
-              <div className="text-2xl font-black text-amber-600 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">
                 +{activeChallenge.pointsReward}{' '}
                 <span className="text-xs font-bold text-amber-700">pts/pers.</span>
               </div>
@@ -393,29 +393,29 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
           </div>
 
           {/* Grammar formula & Explanation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {activeChallenge.grammarRule && (
-              <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/70 space-y-1.5">
+              <div className="p-3.5 sm:p-4 rounded-xl bg-amber-50/50 border border-amber-200/70 space-y-1.5">
                 <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <Lightbulb className="w-4 h-4 text-amber-600" />
+                  <Lightbulb className="w-4 h-4 text-amber-600 shrink-0" />
                   <span>RÈGLE & STRUCTURE SYNTAXIQUE</span>
                 </div>
-                <p className="text-xs font-mono font-semibold text-amber-950 bg-white/80 p-2.5 rounded-lg border border-amber-200/60 leading-relaxed">
+                <p className="text-xs font-mono font-semibold text-amber-950 bg-white/80 p-2.5 rounded-lg border border-amber-200/60 leading-relaxed break-words">
                   {activeChallenge.grammarRule}
                 </p>
               </div>
             )}
 
-            <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-1.5">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-1.5">
               <div className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-rose-500" />
+                <HelpCircle className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>POURQUOI C'EST TOUCHANT EN COUPLE</span>
               </div>
-              <p className="text-xs text-stone-600 leading-relaxed">
+              <p className="text-xs text-stone-600 leading-relaxed break-words">
                 {activeChallenge.description}
               </p>
               {activeChallenge.tips && (
-                <div className="text-[11px] text-rose-700 bg-rose-50/60 px-2 py-1 rounded-md mt-1 font-medium">
+                <div className="text-[11px] text-rose-700 bg-rose-50/60 px-2 py-1 rounded-md mt-1 font-medium break-words">
                   💡 <span className="font-semibold">Conseil complice :</span> {activeChallenge.tips}
                 </div>
               )}
@@ -423,10 +423,10 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
           </div>
 
           {/* Interactive Examples to practice & send in Chat */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2.5 sm:space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-rose-500" />
+                <BookOpen className="w-4 h-4 text-rose-500 shrink-0" />
                 <span>Exemples prêts à être envoyés dans votre conversation</span>
               </div>
               <span className="text-[11px] text-stone-500 italic hidden sm:inline">
@@ -438,34 +438,37 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
               {activeChallenge.exampleSentences.map((ex, idx) => (
                 <div
                   key={idx}
-                  className="group p-3.5 rounded-xl bg-stone-50/80 hover:bg-rose-50/40 border border-stone-200 hover:border-rose-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  className="group p-3 sm:p-3.5 rounded-xl bg-stone-50/80 hover:bg-rose-50/40 border border-stone-200 hover:border-rose-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3"
                 >
                   <div className="space-y-1 flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-2">
                       <button
                         type="button"
                         onClick={() => handlePronounce(ex.english)}
                         title="Écouter la phrase"
-                        className="w-7 h-7 rounded-full bg-white text-stone-600 hover:text-rose-600 flex items-center justify-center shrink-0 border border-stone-200 shadow-2xs"
+                        className="w-7 h-7 rounded-full bg-white text-stone-600 hover:text-rose-600 flex items-center justify-center shrink-0 border border-stone-200 shadow-2xs mt-0.5"
                       >
                         <Volume2 className="w-3.5 h-3.5" />
                       </button>
-                      <p className="text-sm font-semibold text-stone-900 group-hover:text-rose-950 transition-colors">
+                      <p className="text-xs sm:text-sm font-semibold text-stone-900 group-hover:text-rose-950 transition-colors break-words">
                         "{ex.english}"
                       </p>
                     </div>
-                    <p className="text-xs text-stone-500 pl-9 italic">
-                      "{ex.french}"
-                    </p>
+                    <div className="flex items-start gap-1.5 pl-9 pt-0.5">
+                      <span className="text-xs shrink-0">🇫🇷</span>
+                      <p className="text-[11px] sm:text-xs text-stone-500 italic break-words">
+                        "{ex.french}"
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 pl-9 sm:pl-0">
+                  <div className="flex items-center gap-2 w-full sm:w-auto sm:self-auto shrink-0 pl-9 sm:pl-0">
                     <button
                       type="button"
                       onClick={() => handleUseSentenceInChat(ex.english, idx)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs transition-colors min-h-[38px] touch-manipulation cursor-pointer"
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-3.5 h-3.5 shrink-0" />
                       <span>
                         {copiedSentenceIndex === idx ? 'Inséré !' : 'Utiliser dans le Chat'}
                       </span>
@@ -477,20 +480,20 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
           </div>
 
           {/* Validation Status of Both Partners */}
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-stone-50 via-rose-50/30 to-amber-50/30 border border-rose-100 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="p-3.5 sm:p-5 rounded-2xl bg-gradient-to-r from-stone-50 via-rose-50/30 to-amber-50/30 border border-rose-100 space-y-3.5 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-rose-600" />
-                <h4 className="text-sm font-bold text-stone-900">
+                <Users className="w-4 h-4 text-rose-600 shrink-0" />
+                <h4 className="text-xs sm:text-sm font-bold text-stone-900">
                   Progression du Couple pour ce défi
                 </h4>
               </div>
               {activeChallenge.bothCompleted ? (
-                <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1 border border-emerald-300">
+                <span className="self-start sm:self-auto px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] sm:text-xs flex items-center gap-1 border border-emerald-300">
                   🏆 DUO VALIDÉ (+100 PTS BONUS)
                 </span>
               ) : (
-                <span className="text-xs text-stone-500 font-medium">
+                <span className="text-[11px] sm:text-xs text-stone-500 font-medium">
                   {activeChallenge.partner1Completed || activeChallenge.partner2Completed
                     ? '1/2 partenaire a validé le mot'
                     : 'En attente d’utilisation dans le chat'}
@@ -498,10 +501,10 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
               {/* Partner 1 Card */}
               <div
-                className={`p-3.5 rounded-xl border transition-all ${
+                className={`p-3 sm:p-3.5 rounded-xl border transition-all ${
                   activeChallenge.partner1Completed
                     ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
                     : 'bg-white border-stone-200 text-stone-600'
@@ -509,7 +512,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-rose-200 text-rose-800 font-bold flex items-center justify-center text-xs overflow-hidden border border-rose-300 shadow-2xs">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-rose-200 text-rose-800 font-bold flex items-center justify-center text-xs overflow-hidden border border-rose-300 shadow-2xs shrink-0">
                       {profile.partner1.avatar ? (
                         <img
                           src={profile.partner1.avatar}
@@ -528,12 +531,12 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                       <div className="text-[11px]">
                         {activeChallenge.partner1Completed ? (
                           <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                             Défi relevé (+{activeChallenge.pointsReward} pts)
                           </span>
                         ) : (
                           <span className="text-stone-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
+                            <Clock className="w-3 h-3 shrink-0" />
                             Pas encore utilisé cette semaine
                           </span>
                         )}
@@ -542,7 +545,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                   </div>
                 </div>
                 {activeChallenge.partner1Snippet && (
-                  <div className="mt-2.5 pt-2 border-t border-emerald-200/60 text-[11px] italic text-emerald-900">
+                  <div className="mt-2.5 pt-2 border-t border-emerald-200/60 text-[11px] italic text-emerald-900 break-words">
                     « {activeChallenge.partner1Snippet} »
                   </div>
                 )}
@@ -550,7 +553,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
 
               {/* Partner 2 Card */}
               <div
-                className={`p-3.5 rounded-xl border transition-all ${
+                className={`p-3 sm:p-3.5 rounded-xl border transition-all ${
                   activeChallenge.partner2Completed
                     ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
                     : 'bg-white border-stone-200 text-stone-600'
@@ -558,7 +561,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-indigo-200 text-indigo-800 font-bold flex items-center justify-center text-xs overflow-hidden border border-indigo-300 shadow-2xs">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-indigo-200 text-indigo-800 font-bold flex items-center justify-center text-xs overflow-hidden border border-indigo-300 shadow-2xs shrink-0">
                       {profile.partner2.avatar ? (
                         <img
                           src={profile.partner2.avatar}
@@ -577,12 +580,12 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                       <div className="text-[11px]">
                         {activeChallenge.partner2Completed ? (
                           <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                             Défi relevé (+{activeChallenge.pointsReward} pts)
                           </span>
                         ) : (
                           <span className="text-stone-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
+                            <Clock className="w-3 h-3 shrink-0" />
                             Pas encore utilisé cette semaine
                           </span>
                         )}
@@ -591,7 +594,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                   </div>
                 </div>
                 {activeChallenge.partner2Snippet && (
-                  <div className="mt-2.5 pt-2 border-t border-emerald-200/60 text-[11px] italic text-emerald-900">
+                  <div className="mt-2.5 pt-2 border-t border-emerald-200/60 text-[11px] italic text-emerald-900 break-words">
                     « {activeChallenge.partner2Snippet} »
                   </div>
                 )}
@@ -599,13 +602,13 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
             </div>
 
             {/* Bottom action buttons */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleSaveActiveToLexicon}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 transition-colors shadow-2xs"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 transition-colors shadow-2xs min-h-[42px] touch-manipulation cursor-pointer"
               >
-                <BookOpen className="w-4 h-4 text-indigo-600" />
+                <BookOpen className="w-4 h-4 text-indigo-600 shrink-0" />
                 <span>
                   {savedToLexiconSuccess
                     ? '✓ Ajouté à Notre Lexique !'
@@ -616,9 +619,9 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
               <button
                 type="button"
                 onClick={() => handleUseSentenceInChat(activeChallenge.exampleSentences[0]?.english || activeChallenge.targetEnglish)}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white shadow-sm transition-all"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white shadow-sm transition-all min-h-[42px] touch-manipulation cursor-pointer"
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className="w-4 h-4 shrink-0" />
                 <span>Ouvrir le Chat pour relever le défi</span>
               </button>
             </div>
@@ -627,11 +630,11 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
       </div>
 
       {/* Archive / List of Other Weekly Challenges */}
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 space-y-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-stone-200 p-4 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-bold text-stone-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-rose-500" />
+            <h3 className="text-base sm:text-lg font-bold text-stone-900 flex items-center gap-2">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500 shrink-0" />
               <span>Calendrier & Archives des Défis Hebdomadaires</span>
             </h3>
             <p className="text-xs text-stone-500">
@@ -640,11 +643,11 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
           </div>
 
           {/* Category Filters */}
-          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-xl text-xs">
+          <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl text-xs overflow-x-auto scrollbar-none touch-pan-x w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setSelectedCategoryFilter('all')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap min-h-[34px] shrink-0 ${
                 selectedCategoryFilter === 'all'
                   ? 'bg-white text-stone-900 shadow-2xs font-semibold'
                   : 'text-stone-600 hover:text-stone-900'
@@ -655,7 +658,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
             <button
               type="button"
               onClick={() => setSelectedCategoryFilter('word')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap min-h-[34px] shrink-0 ${
                 selectedCategoryFilter === 'word'
                   ? 'bg-white text-rose-700 shadow-2xs font-semibold'
                   : 'text-stone-600 hover:text-stone-900'
@@ -666,7 +669,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
             <button
               type="button"
               onClick={() => setSelectedCategoryFilter('grammar')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap min-h-[34px] shrink-0 ${
                 selectedCategoryFilter === 'grammar'
                   ? 'bg-white text-amber-800 shadow-2xs font-semibold'
                   : 'text-stone-600 hover:text-stone-900'
@@ -677,7 +680,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
             <button
               type="button"
               onClick={() => setSelectedCategoryFilter('expression')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap min-h-[34px] shrink-0 ${
                 selectedCategoryFilter === 'expression'
                   ? 'bg-white text-indigo-700 shadow-2xs font-semibold'
                   : 'text-stone-600 hover:text-stone-900'
@@ -688,7 +691,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 pt-2">
           {filteredArchive.map((chal) => {
             const isCurrentActive = chal.id === activeChallenge.id;
             const badge = getCategoryBadge(chal.category);
@@ -696,7 +699,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
             return (
               <div
                 key={chal.id}
-                className={`p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 ${
+                className={`p-3.5 sm:p-4 rounded-xl border transition-all flex flex-col justify-between space-y-3 ${
                   isCurrentActive
                     ? 'bg-rose-50/50 border-rose-400 ring-2 ring-rose-300/40 shadow-xs'
                     : 'bg-white hover:bg-stone-50/70 border-stone-200'
@@ -715,7 +718,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                   </div>
 
                   <div>
-                    <h4 className="text-base font-bold text-stone-900 flex items-center gap-1.5">
+                    <h4 className="text-sm sm:text-base font-bold text-stone-900 flex items-center gap-1.5">
                       <span>{chal.targetEnglish}</span>
                     </h4>
                     <p className="text-xs text-stone-600 font-medium">
@@ -729,7 +732,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                 </div>
 
                 {/* Status & selection button */}
-                <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2 flex-wrap">
                   <div className="text-[11px]">
                     {chal.bothCompleted ? (
                       <span className="text-emerald-700 font-bold flex items-center gap-1">
@@ -755,7 +758,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                         onSelectActiveChallenge(chal.id);
                         soundEffects.playSoftTap();
                       }}
-                      className="px-2.5 py-1 rounded-md text-[11px] font-semibold text-stone-700 bg-stone-100 hover:bg-rose-100 hover:text-rose-700 transition-colors"
+                      className="px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-stone-700 bg-stone-100 hover:bg-rose-100 hover:text-rose-700 transition-colors min-h-[32px] touch-manipulation cursor-pointer"
                     >
                       Activer cette semaine
                     </button>
@@ -821,7 +824,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-stone-700 uppercase tracking-wide mb-1">
-                      Mot ou Structure en Anglais *
+                      🇬🇧 Mot ou Structure en Anglais *
                     </label>
                     <input
                       type="text"
@@ -834,7 +837,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-stone-700 uppercase tracking-wide mb-1">
-                      Traduction en Français *
+                      🇫🇷 Traduction en Français *
                     </label>
                     <input
                       type="text"
@@ -876,7 +879,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
 
                 <div>
                   <label className="block text-xs font-bold text-stone-700 uppercase tracking-wide mb-1">
-                    Exemple de phrase anglaise romantique
+                    🇬🇧 Exemple de phrase anglaise romantique
                   </label>
                   <input
                     type="text"
@@ -887,7 +890,7 @@ export const WeeklyChallengesSection: React.FC<WeeklyChallengesSectionProps> = (
                   />
                   <input
                     type="text"
-                    placeholder="Traduction française de la phrase..."
+                    placeholder="🇫🇷 Traduction française de la phrase..."
                     value={customExampleFr}
                     onChange={(e) => setCustomExampleFr(e.target.value)}
                     className="w-full px-3 py-2 text-sm rounded-xl border border-stone-300 focus:outline-hidden focus:ring-2 focus:ring-rose-500"

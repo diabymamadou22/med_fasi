@@ -74,17 +74,17 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-6">
+    <div className="max-w-6xl mx-auto px-2 sm:px-6 py-2 sm:py-4 space-y-4 sm:space-y-6">
       {/* LOVE VOUCHERS / CHÉQUIER DU CŒUR */}
-      <div className="space-y-6">
-        <div className="bg-white rounded-3xl border border-stone-200/80 p-5 sm:p-7 shadow-xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 mb-1">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3.5 sm:p-7 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 sm:mb-6">
+            <div className="space-y-0.5">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-bold bg-rose-100 text-rose-800 mb-1">
                 <Ticket className="w-3.5 h-3.5" />
                 <span>Coupons Romantiques</span>
               </span>
-              <h2 className="font-serif-romantic text-2xl font-bold text-stone-900">
+              <h2 className="font-serif-romantic text-xl sm:text-2xl font-bold text-stone-900 leading-snug">
                 Le Chéquier des Petits Privilèges d'Amour
               </h2>
               <p className="text-xs sm:text-sm text-stone-600">
@@ -92,23 +92,23 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="w-full sm:w-auto">
               <button
                 onClick={onOpenAddVoucherModal}
-                className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer min-h-[42px] touch-manipulation"
                 id="btn-add-voucher"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 shrink-0" />
                 <span>Créer un bon pour {otherPartner.name}</span>
               </button>
             </div>
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2 mb-6 text-xs">
+          {/* Filter Pills - Responsive horizontal scroll on mobile */}
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none touch-pan-x mb-4 sm:mb-6 text-xs pb-1">
             <button
               onClick={() => setVoucherFilter('available')}
-              className={`px-3 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-xl sm:rounded-full font-bold transition-all cursor-pointer whitespace-nowrap min-h-[38px] shrink-0 ${
                 voucherFilter === 'available'
                   ? 'bg-stone-900 text-white shadow-xs'
                   : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
@@ -118,7 +118,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
             </button>
             <button
               onClick={() => setVoucherFilter('used')}
-              className={`px-3 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-xl sm:rounded-full font-bold transition-all cursor-pointer whitespace-nowrap min-h-[38px] shrink-0 ${
                 voucherFilter === 'used'
                   ? 'bg-stone-900 text-white shadow-xs'
                   : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
@@ -128,7 +128,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
             </button>
             <button
               onClick={() => setVoucherFilter('all')}
-              className={`px-3 py-1.5 rounded-full font-bold transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-xl sm:rounded-full font-bold transition-all cursor-pointer whitespace-nowrap min-h-[38px] shrink-0 ${
                 voucherFilter === 'all'
                   ? 'bg-stone-900 text-white shadow-xs'
                   : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
@@ -139,7 +139,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
           </div>
 
           {/* Vouchers Grid Styled Like Vintage/Modern Tickets */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-5">
             {filteredVouchers.map((v, vIdx) => {
               const giver =
                 v.giverId === 'p1' ? profile.partner1 : profile.partner2;
@@ -149,7 +149,7 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
               return (
                 <div
                   key={v.id ? `${v.id}-${vIdx}` : `vouch-${vIdx}`}
-                  className={`relative rounded-3xl border overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
+                  className={`relative rounded-2xl sm:rounded-3xl border overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
                     v.isRedeemed
                       ? 'bg-stone-100/90 border-stone-200 opacity-75'
                       : 'bg-white border-rose-200'
@@ -157,27 +157,27 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                 >
                   {/* Voucher Top Header */}
                   <div
-                    className={`p-4 bg-gradient-to-r ${v.color} text-white flex items-center justify-between`}
+                    className={`p-3.5 sm:p-4 bg-gradient-to-r ${v.color} text-white flex items-center justify-between gap-2`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-xl bg-white/20 backdrop-blur-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-2 rounded-xl bg-white/20 backdrop-blur-xs shrink-0">
                         {getVoucherIcon(v.icon)}
                       </div>
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-white/80 block">
                           Bon d'Amour Officiel
                         </span>
-                        <h3 className="font-serif-romantic text-base sm:text-lg font-bold leading-tight">
+                        <h3 className="font-serif-romantic text-sm sm:text-lg font-bold leading-tight truncate">
                           {v.title}
                         </h3>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1 shrink-0">
                       {onEditVoucher && (
                         <button
                           type="button"
                           onClick={() => onEditVoucher(v)}
-                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
                           title="Modifier ce bon"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -187,13 +187,13 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteVoucher(v.id)}
-                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
                           title="Supprimer ce bon"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <Heart className="w-5 h-5 fill-white/30 text-white ml-1" />
+                      <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-white/30 text-white ml-0.5" />
                     </div>
                   </div>
 
@@ -204,32 +204,32 @@ export const VouchersAndBucketView: React.FC<VouchersAndBucketViewProps> = ({
                   </div>
 
                   {/* Voucher Body */}
-                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
+                  <div className="p-3.5 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
                     <div>
-                      <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-medium">
+                      <p className="text-xs sm:text-sm text-stone-700 leading-relaxed font-medium break-words">
                         {v.description}
                       </p>
                       {v.customTerms && (
-                        <p className="text-[11px] text-rose-700 italic mt-1 font-semibold">
+                        <p className="text-[11px] text-rose-700 italic mt-1 font-semibold break-words">
                           Note : {v.customTerms}
                         </p>
                       )}
                     </div>
 
-                    <div className="pt-2 border-t border-stone-100 flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="pt-2 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                       <div className="text-[11px] text-stone-500">
                         Offert par <strong>{giver.name}</strong> à{' '}
                         <strong>{receiver.name}</strong>
                       </div>
 
                       {v.isRedeemed ? (
-                        <div className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-xl border border-red-200 rotate-[-4deg] text-[11px] uppercase tracking-wider shadow-2xs">
+                        <div className="self-start sm:self-auto px-3 py-1 bg-red-100 text-red-700 font-bold rounded-xl border border-red-200 rotate-[-2deg] text-[11px] uppercase tracking-wider shadow-2xs">
                           Tamponné le {v.redeemedAt || 'récemment'}
                         </div>
                       ) : (
                         <button
                           onClick={() => handleUseVoucher(v)}
-                          className="px-4 py-1.5 rounded-xl bg-stone-900 hover:bg-rose-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-stone-900 hover:bg-rose-600 active:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer min-h-[42px] touch-manipulation flex items-center justify-center text-center"
                         >
                           Utiliser ce bon maintenant !
                         </button>

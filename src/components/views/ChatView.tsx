@@ -33,7 +33,10 @@ import {
   MoreVertical,
   Download,
   FileText,
+  Bell,
+  BellRing,
 } from 'lucide-react';
+import { NotificationActivationBanner } from '../NotificationActivationBanner';
 import {
   CoupleProfile,
   PartnerId,
@@ -73,6 +76,7 @@ export interface ChatViewProps {
   onExportChat?: (format?: 'txt' | 'json') => void;
   onEditMessage?: (id: string, newContent: string) => Promise<void> | void;
   onBack?: () => void;
+  onOpenNotificationModal?: () => void;
 }
 
 export type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
@@ -275,6 +279,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onExportChat,
   onEditMessage,
   onBack,
+  onOpenNotificationModal,
 }) => {
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -1371,6 +1376,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
           {/* Header Action Buttons: Direct Theme & Motif button + More Options */}
           <div className="flex items-center gap-1">
+            {onOpenNotificationModal && (
+              <button
+                type="button"
+                onClick={onOpenNotificationModal}
+                className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+                  chatTheme === 'velvet-night'
+                    ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
+                    : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
+                }`}
+                title="Gérer les alertes & notifications push hors-ligne"
+                aria-label="Alertes de messages"
+              >
+                <Bell className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -1457,6 +1478,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         Basculer ➔
                       </span>
                     </button>
+
+                    {onOpenNotificationModal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowMoreMenu(false);
+                          onOpenNotificationModal();
+                        }}
+                        className="w-full mt-1.5 flex items-center justify-between p-2 rounded-xl border border-rose-200/80 bg-rose-50/70 hover:bg-rose-100 text-xs font-semibold text-rose-900 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <BellRing className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span>Alertes & Notifications push</span>
+                        </div>
+                        <span className="text-[10px] text-rose-700 bg-white px-1.5 py-0.5 rounded-full font-bold">
+                          Ouvrir
+                        </span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Section: Actions Discussion (Clear Chat & Export) */}
@@ -1940,6 +1980,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
             onScroll={handleScroll}
             className="flex-1 overflow-y-auto no-scrollbar p-3 sm:p-5 space-y-4 relative z-10"
           >
+          {/* Notification Activation Banner (shown if push alerts not yet enabled on this device) */}
+          <NotificationActivationBanner
+            profile={profile}
+            activePartnerId={activePartnerId}
+            onOpenSettingsModal={onOpenNotificationModal}
+          />
+
           {/* Private Intimate Space Indicator */}
           <div className="flex justify-center my-1">
             <div className={`backdrop-blur-xs border text-[11px] px-3.5 py-1.5 rounded-full text-center max-w-sm shadow-2xs ${

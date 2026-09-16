@@ -44,6 +44,8 @@ import {
   requestNotificationPermission,
   areNotificationsSupported,
   triggerVibration,
+  subscribeToPushNotifications,
+  sendTestPushNotification,
 } from '../../lib/notificationService';
 import { PartnerAvatar } from '../PartnerAvatar';
 
@@ -1637,7 +1639,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           setNotifPermission(Notification.permission);
                         }
                         if (granted) {
-                          setNotifTestFeedback('Notifications activées avec succès !');
+                          await subscribeToPushNotifications('p1');
+                          setNotifTestFeedback('Notifications & push activés avec succès !');
                           soundEffects.playSuccessSparkle();
                         } else {
                           setNotifTestFeedback('Autorisation non accordée par le navigateur.');
@@ -1647,7 +1650,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Bell className="w-4 h-4" />
-                      <span>Activer les notifications sur cet appareil</span>
+                      <span>Activer les alertes push sur cet appareil</span>
                     </button>
                   ) : (
                     <button
@@ -1655,6 +1658,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       onClick={async () => {
                         triggerVibration([100, 50, 150]);
                         soundEffects.playHeartPulse();
+                        sendTestPushNotification('p1', profile.partner1.name).catch(() => {});
                         const sent = await sendSystemNotification({
                           title: 'Nid d’Amour 💕 Alerte Test',
                           body: 'Vos notifications push et alertes hors-ligne fonctionnent à merveille !',
@@ -1663,7 +1667,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           tag: 'test-notification',
                         });
                         if (sent) {
-                          setNotifTestFeedback('Notification envoyée sur votre écran !');
+                          setNotifTestFeedback('Notification & alerte push envoyées !');
                         } else {
                           setNotifTestFeedback('Vérifiez les paramètres de notification du système.');
                         }

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Clock, Images, MessageCircle, Languages } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Clock, Images, MessageCircle, Gamepad2 } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 
 export type MainTab = 'chat' | 'timeline' | 'gallery' | 'games';
@@ -41,10 +42,10 @@ export const Navigation: React.FC<NavigationProps> = ({
     },
     {
       id: 'games' as MainTab,
-      label: 'Anglais en Duo',
-      shortLabel: 'Anglais',
-      sublabel: 'Cours & Jeux Débutants',
-      icon: Languages,
+      label: 'Jeux & Flirt Duo',
+      shortLabel: 'Jeux & Flirt',
+      sublabel: 'Roue des gages, devinettes & mots doux',
+      icon: Gamepad2,
     },
   ];
 
@@ -62,30 +63,38 @@ export const Navigation: React.FC<NavigationProps> = ({
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <motion.button
                 key={`desktop-tab-${tab.id}`}
                 onClick={() => handleTabClick(tab.id)}
-                className={`relative flex items-center justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                whileTap={{ scale: 0.96 }}
+                className={`relative flex items-center justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer select-none ${
                   isActive
-                    ? 'bg-rose-500 text-white shadow-sm'
+                    ? 'text-white'
                     : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100/70'
                 }`}
                 id={`nav-tab-desktop-${tab.id}`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-rose-500'}`} />
-                <span className="hidden md:inline">{tab.label}</span>
-                <span className="md:hidden">{tab.shortLabel}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="desktop-active-pill"
+                    className="absolute inset-0 bg-rose-500 rounded-xl shadow-xs -z-10"
+                    transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                  />
+                )}
+                <Icon className={`w-4 h-4 relative z-10 ${isActive ? 'text-white' : 'text-rose-500'}`} />
+                <span className="relative z-10 hidden md:inline">{tab.label}</span>
+                <span className="relative z-10 md:hidden">{tab.shortLabel}</span>
 
                 {tab.badge && (
                   <span
-                    className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    className={`relative z-10 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${
                       isActive ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'
                     }`}
                   >
                     {tab.badge}
                   </span>
                 )}
-              </button>
+              </motion.button>
             );
           })}
         </nav>
@@ -100,23 +109,31 @@ export const Navigation: React.FC<NavigationProps> = ({
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
+            <motion.button
               key={`mobile-tab-${tab.id}`}
               onClick={() => handleTabClick(tab.id)}
-              className={`relative flex-1 flex flex-col items-center justify-center py-1 px-1 min-h-[48px] rounded-xl transition-all cursor-pointer ${
+              whileTap={{ scale: 0.92 }}
+              className={`relative flex-1 flex flex-col items-center justify-center py-1 px-1 min-h-[48px] rounded-xl cursor-pointer touch-manipulation select-none transition-colors ${
                 isActive
                   ? 'text-rose-600 font-bold'
                   : 'text-stone-500 hover:text-stone-800'
               }`}
               id={`nav-tab-mobile-${tab.id}`}
             >
+              {isActive && (
+                <motion.div
+                  layoutId="mobile-active-tab-highlight"
+                  className="absolute inset-x-1 inset-y-0.5 bg-rose-50/90 rounded-xl -z-10"
+                  transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+                />
+              )}
               <div
-                className={`relative p-1 rounded-full transition-all ${
-                  isActive ? 'bg-rose-100/80 -translate-y-0.5' : ''
+                className={`relative p-1 rounded-full transition-transform duration-200 ${
+                  isActive ? '-translate-y-0.5' : ''
                 }`}
               >
                 <Icon
-                  className={`w-5 h-5 transition-transform ${
+                  className={`w-5 h-5 transition-transform duration-200 ${
                     isActive ? 'text-rose-600 scale-110' : 'text-stone-500'
                   }`}
                 />
@@ -127,16 +144,20 @@ export const Navigation: React.FC<NavigationProps> = ({
                 )}
               </div>
               <span
-                className={`text-[10px] tracking-tight transition-all leading-tight mt-0.5 ${
+                className={`text-[10px] tracking-tight leading-tight mt-0.5 transition-all duration-200 ${
                   isActive ? 'text-rose-600 font-bold scale-105' : 'text-stone-500 font-medium'
                 }`}
               >
                 {tab.shortLabel}
               </span>
               {isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-0.5" />
+                <motion.span
+                  layoutId="mobile-active-tab-dot"
+                  className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-0.5"
+                  transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+                />
               )}
-            </button>
+            </motion.button>
           );
         })}
       </nav>

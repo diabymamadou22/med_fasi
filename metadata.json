@@ -1,6 +1,6 @@
 {
   "name": "Nid d'Amour - Espace Couple & Souvenirs",
-  "description": "Application pour couple : cours d'anglais débutant en duo avec prononciation audio, notre lexique personnalisé, défis hebdomadaires dans le chat, chat intime en direct avec vocaux et photos, galerie partagée, timeline de souvenirs, capsules temporelles, carte interactive, billets doux, quiz et carnet d'amour.",
+  "description": "Application pour couple : système d'alerte et notifications push de messages même application fermée, cours d'anglais débutant en duo avec prononciation audio, notre lexique personnalisé, défis hebdomadaires dans le chat, chat intime en direct avec vocaux et photos, galerie partagée, timeline de souvenirs, capsules temporelles, carte interactive, billets doux, quiz et carnet d'amour.",
   "requestFramePermissions": ["geolocation", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
