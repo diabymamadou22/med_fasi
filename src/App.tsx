@@ -1764,7 +1764,7 @@ export default function App() {
         >
           <Heart className="w-8 h-8 fill-rose-500 animate-pulse" />
         </motion.div>
-        <h2 className="text-xl font-bold text-gray-800 mb-1">Notre Nid d'Amour</h2>
+        <h2 className="text-xl font-bold text-gray-800 mb-1">NID</h2>
         <p className="text-sm text-gray-500">Connexion et synchronisation en direct...</p>
       </div>
     );

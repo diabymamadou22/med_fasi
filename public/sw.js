@@ -1,7 +1,7 @@
-// Service Worker for Nid d'Amour PWA
+// Service Worker for NID PWA
 // Offline caching, background push notifications & home screen badging
 
-const CACHE_NAME = 'nid-damour-cache-v4';
+const CACHE_NAME = 'nid-cache-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -132,11 +132,11 @@ self.addEventListener('fetch', (event) => {
 // Handle push notifications when app is closed / in background
 self.addEventListener('push', (event) => {
   let data = {
-    title: "Nid d'Amour ❤️",
+    title: "NID ❤️",
     body: 'Nouveau message de votre amour !',
     icon: '/pwa-192x192.png',
     badge: '/favicon.png',
-    tag: `nid-damour-chat-${Date.now()}`,
+    tag: `nid-chat-${Date.now()}`,
   };
 
   if (event.data) {

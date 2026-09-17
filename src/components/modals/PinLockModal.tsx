@@ -104,7 +104,7 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
           {profile.relationshipTitle}
         </h2>
         <p className="text-xs text-stone-400 mb-6">
-          Entrez votre code secret à 4 chiffres pour accéder à votre nid d'amour.
+          Entrez votre code secret à 4 chiffres pour accéder à votre espace NID.
         </p>
 
         {/* PIN dots */}

@@ -1,5 +1,5 @@
 /**
- * Image compression and processing utilities for Nid d'Amour
+ * Image compression and processing utilities for NID
  * Optimizes mobile camera photos (5-15 MB) into lightweight high-fidelity images (~150-250 KB)
  * preserving complete aspect ratios and preventing storage saturation.
  */

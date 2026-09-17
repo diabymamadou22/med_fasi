@@ -47,7 +47,7 @@ export const PWAInstallModal: React.FC<{ isOpen: boolean; onClose: () => void }>
               <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-xl ring-4 ring-rose-100/80 mb-3 border border-rose-200">
                 <img
                   src="/app-icon.png"
-                  alt="Icône de l'application Nid d'Amour"
+                  alt="Icône de l'application NID"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -57,7 +57,7 @@ export const PWAInstallModal: React.FC<{ isOpen: boolean; onClose: () => void }>
             </div>
 
             <h3 className="font-serif-romantic text-xl font-bold text-stone-900 mt-1">
-              Installer Nid d'Amour
+              Installer NID
             </h3>
             <p className="text-xs text-stone-500 mt-1 max-w-[260px] leading-relaxed">
               Ajoutez l'icône dorée et romantique directement sur l'écran d'accueil de votre téléphone !

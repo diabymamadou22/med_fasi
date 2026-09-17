@@ -1,5 +1,5 @@
 /**
- * Web Push & System Notification Service for Nid d'Amour
+ * Web Push & System Notification Service for NID
  * Handles system alert notifications, sound/vibration alerts,
  * Web Push background notifications (when app is closed),
  * and PWA App Icon Badging (navigator.setAppBadge).
@@ -285,8 +285,8 @@ export async function getPushStatus(
  */
 function sendWelcomeNotification(): void {
   sendSystemNotification({
-    title: "Nid d'Amour connecté ❤️",
-    body: 'Les alertes d’amour sont actives ! Vous recevrez vos messages même l’application ou l’écran éteint.',
+    title: "NID connecté ❤️",
+    body: 'Les alertes sont actives ! Vous recevrez vos messages même l’application ou l’écran éteint.',
     icon: '/pwa-192x192.png',
     tag: 'welcome-notification',
   });
@@ -318,7 +318,7 @@ export function startTabMessageAlert(senderName: string, _messagePreview?: strin
     state = !state;
     document.title = state
       ? `💌 Nouveau message de ${senderName} !`
-      : `❤️ Nid d'Amour`;
+      : `❤️ NID`;
   }, 1200);
 
   const onTabFocus = () => {
@@ -326,7 +326,7 @@ export function startTabMessageAlert(senderName: string, _messagePreview?: strin
       clearInterval(titleFlashInterval);
       titleFlashInterval = null;
     }
-    document.title = "Nid d'Amour - Espace Couple & Souvenirs";
+    document.title = "NID";
     window.removeEventListener('focus', onTabFocus);
   };
   window.addEventListener('focus', onTabFocus);
@@ -352,7 +352,7 @@ export function updateAppBadge(unreadCount: number): void {
 
   // 2. Update document title for background browser tabs
   if (typeof document !== 'undefined') {
-    const baseTitle = "Nid d'Amour - Espace Couple & Souvenirs";
+    const baseTitle = "NID";
     if (unreadCount > 0) {
       document.title = `(${unreadCount}) ${baseTitle}`;
     } else {

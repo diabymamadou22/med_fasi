@@ -1,5 +1,5 @@
 {
-  "name": "Nid d'Amour - Espace Couple Intime & Complice",
+  "name": "NID",
   "description": "Application raffinée pour couple : écran d'accueil chic et élégant, système d'alerte et notifications push de messages même application fermée, chat intime en direct avec vocaux et photos, cours d'anglais débutant en duo avec prononciation audio, défis hebdomadaires dans le chat, notre lexique personnalisé, salon de jeux et flirt en duo (roue des gages, blind test, cartes complices, jeux de rôle, bons d'amour), galerie partagée et carnet d'amour.",
   "requestFramePermissions": ["geolocation", "microphone", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

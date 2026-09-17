@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Nid d'Amour - Espace Couple & Souvenirs",
-  "short_name": "Nid d'Amour",
+  "name": "NID",
+  "short_name": "NID",
   "description": "Application intime pour couples : timeline de souvenirs, capsules temporelles, billets doux, quiz et humeur partagée.",
   "start_url": "/",
   "scope": "/",

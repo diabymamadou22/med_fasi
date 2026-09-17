@@ -402,7 +402,7 @@ export const NotificationAlertModal: React.FC<NotificationAlertModalProps> = ({
 
           {/* Footer */}
           <div className="px-5 py-3 bg-stone-50 border-t border-stone-100 flex items-center justify-between">
-            <span className="text-[11px] text-stone-500">Nid d'Amour • Alertes Web Push PWA</span>
+            <span className="text-[11px] text-stone-500">NID • Alertes Web Push PWA</span>
             <button
               onClick={onClose}
               className="px-4 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-xl text-xs sm:text-sm font-medium transition-colors"

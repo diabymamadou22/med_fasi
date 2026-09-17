@@ -1399,7 +1399,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       Sauvegarde & Transfert (Anti-perte de données)
                     </h4>
                     <p className="text-xs text-stone-600 mt-0.5">
-                      Téléchargez en un clic une sauvegarde complète de tout votre nid d'amour (vos photos, vos souvenirs, vos billets doux, vos capsules temporelles, votre bucket list). Vous pouvez la garder en lieu sûr ou la restaurer sur un autre téléphone.
+                      Téléchargez en un clic une sauvegarde complète de votre NID (vos photos, vos souvenirs, vos billets doux, vos capsules temporelles, votre bucket list). Vous pouvez la garder en lieu sûr ou la restaurer sur un autre téléphone.
                     </p>
                   </div>
                 </div>
@@ -1560,7 +1560,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-xl ring-4 ring-rose-200/80 border border-rose-200">
                     <img
                       src="/app-icon.png"
-                      alt="Icône Nid d'Amour"
+                      alt="Icône NID"
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -1572,19 +1572,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-center sm:justify-start gap-2">
                     <h4 className="font-serif-romantic text-base sm:text-lg font-bold text-stone-900">
-                      Icône Mobile « Nid d'Amour »
+                      Icône Mobile « NID »
                     </h4>
                     <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full">
                       PWA Prête
                     </span>
                   </div>
                   <p className="text-xs text-stone-600 mt-1 leading-relaxed">
-                    Icône luxueuse avec deux cœurs entrelacés en or et or rose, nichés dans un nid d'amour protecteur sur fond terracotta doux.
+                    Icône luxueuse avec deux cœurs entrelacés en or et or rose, nichés dans un nid protecteur sur fond terracotta doux.
                   </p>
                   <div className="flex items-center justify-center sm:justify-start gap-2 mt-2.5">
                     <a
                       href="/app-icon.png"
-                      download="nid-damour-icon.png"
+                      download="nid-icon.png"
                       className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold border border-stone-200 shadow-2xs flex items-center gap-1.5 transition-colors"
                     >
                       <Download className="w-3.5 h-3.5 text-rose-500" />
@@ -1660,7 +1660,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         soundEffects.playHeartPulse();
                         sendTestPushNotification('p1', profile.partner1.name).catch(() => {});
                         const sent = await sendSystemNotification({
-                          title: 'Nid d’Amour 💕 Alerte Test',
+                          title: 'NID 💕 Alerte Test',
                           body: 'Vos notifications push et alertes hors-ligne fonctionnent à merveille !',
                           icon: '/app-icon.png',
                           tab: 'chat',

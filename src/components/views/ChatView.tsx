@@ -339,7 +339,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     if (format === 'json') {
       const chatExportData = {
-        title: "Notre Nid d'Amour - Discussion de couple",
+        title: "NID - Discussion de couple",
         couple: `${p1Name} & ${p2Name}`,
         exportedAt: new Date().toISOString(),
         totalMessages: messages.length,
@@ -352,14 +352,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
       downloadAnchor.setAttribute('href', dataStr);
       downloadAnchor.setAttribute(
         'download',
-        `nid_damour_messages_${p1Name.toLowerCase()}_${p2Name.toLowerCase()}_${today}.json`
+        `nid_messages_${p1Name.toLowerCase()}_${p2Name.toLowerCase()}_${today}.json`
       );
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
     } else {
       let txtContent = `╔════════════════════════════════════════════════════════════════════╗\n`;
-      txtContent += `║           💕 NOTRE NID D'AMOUR - JOURNAL DE CONVERSATION 💕          ║\n`;
+      txtContent += `║                   💕 NID - JOURNAL DE CONVERSATION 💕                ║\n`;
       txtContent += `║                    ${p1Name} & ${p2Name}                           ║\n`;
       txtContent += `║      Exporté avec amour le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}          ║\n`;
       txtContent += `╚════════════════════════════════════════════════════════════════════╝\n\n`;

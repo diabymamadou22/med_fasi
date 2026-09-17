@@ -51,7 +51,7 @@ export function registerServiceWorker(): void {
           if (installingWorker) {
             installingWorker.onstatechange = () => {
               if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log("Nouvelle version de Nid d'Amour prête.");
+                console.log("Nouvelle version de NID prête.");
               }
             };
           }
