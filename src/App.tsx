@@ -1837,136 +1837,144 @@ export default function App() {
 
         {/* Views */}
         <div
-          className={`transition-opacity duration-200 ${
+          className={`relative ${
             activeTab === 'chat' ? 'flex-1 flex flex-col min-h-0 h-full overflow-hidden' : ''
           }`}
         >
           {activeTab === 'chat' && (
-            <ChatView
-              profile={profile}
-              activePartnerId={activePartnerId}
-              onSwitchPartner={handleSwitchPartner}
-              messages={messages}
-              onSendMessage={handleSendChatMessage}
-              onSendMissYouPulse={handleSendMissYouPulseFromChat}
-              onDeleteMessages={handleDeleteChatMessages}
-              onClearChat={handleClearChat}
-              onEditMessage={handleEditChatMessage}
-              onBack={handleBackFromChat}
-              weeklyChallenge={getActiveOrCurrentWeekChallenge(weeklyChallenges)}
-              onOpenWeeklyChallengeHub={() => {
-                setActiveTab('games');
-              }}
-              draftText={chatDraftText}
-              onClearDraftText={() => setChatDraftText('')}
-              onOpenNotificationModal={() => setShowNotificationModal(true)}
-            />
+            <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden animate-fade-in">
+              <ChatView
+                profile={profile}
+                activePartnerId={activePartnerId}
+                onSwitchPartner={handleSwitchPartner}
+                messages={messages}
+                onSendMessage={handleSendChatMessage}
+                onSendMissYouPulse={handleSendMissYouPulseFromChat}
+                onDeleteMessages={handleDeleteChatMessages}
+                onClearChat={handleClearChat}
+                onEditMessage={handleEditChatMessage}
+                onBack={handleBackFromChat}
+                weeklyChallenge={getActiveOrCurrentWeekChallenge(weeklyChallenges)}
+                onOpenWeeklyChallengeHub={() => {
+                  setActiveTab('games');
+                }}
+                draftText={chatDraftText}
+                onClearDraftText={() => setChatDraftText('')}
+                onOpenNotificationModal={() => setShowNotificationModal(true)}
+              />
+            </div>
           )}
 
           {activeTab === 'home' && (
-            <HomeView
-              profile={profile}
-              activePartnerId={activePartnerId}
-              onSwitchPartner={handleSwitchPartner}
-              onNavigateToTab={(tab) => handleSelectTab(tab)}
-              onNavigateToGame={(gameTab) => {
-                setSelectedGameTab(gameTab);
-                handleSelectTab('games');
-              }}
-              onSendMissYou={(vibe, msg) => handleSendMissYou(vibe, msg)}
-              onOpenWriteNoteModal={() => {
-                setEditingNote(null);
-                setShowWriteNoteModal(true);
-              }}
-              notes={notes}
-              messages={messages}
-              vouchers={vouchers}
-              lexicon={lexicon}
-              weeklyChallenges={weeklyChallenges}
-              onOpenChatWithDraft={(prefill) => {
-                setChatDraftText(prefill);
-                handleSelectTab('chat');
-              }}
-              onOpenProfileModal={(pId) => {
-                setProfileFocusPartner(pId);
-                setShowProfileModal(true);
-              }}
-            />
+            <div className="animate-fade-in">
+              <HomeView
+                profile={profile}
+                activePartnerId={activePartnerId}
+                onSwitchPartner={handleSwitchPartner}
+                onNavigateToTab={(tab) => handleSelectTab(tab)}
+                onNavigateToGame={(gameTab) => {
+                  setSelectedGameTab(gameTab);
+                  handleSelectTab('games');
+                }}
+                onSendMissYou={(vibe, msg) => handleSendMissYou(vibe, msg)}
+                onOpenWriteNoteModal={() => {
+                  setEditingNote(null);
+                  setShowWriteNoteModal(true);
+                }}
+                notes={notes}
+                messages={messages}
+                vouchers={vouchers}
+                lexicon={lexicon}
+                weeklyChallenges={weeklyChallenges}
+                onOpenChatWithDraft={(prefill) => {
+                  setChatDraftText(prefill);
+                  handleSelectTab('chat');
+                }}
+                onOpenProfileModal={(pId) => {
+                  setProfileFocusPartner(pId);
+                  setShowProfileModal(true);
+                }}
+              />
+            </div>
           )}
 
           {activeTab === 'gallery' && (
-            <SharedGalleryView
-              profile={profile}
-              activePartnerId={activePartnerId}
-              memories={memories}
-              locations={locations}
-              capsules={capsules}
-              challenges={challenges}
-              onLikeMemory={handleLikeMemory}
-              onAddMemory={handleAddMemory}
-              onOpenAddMemoryModal={() => {
-                setEditingMemory(null);
-                setShowAddMemoryModal(true);
-              }}
-              onOpenProfileModal={(pId) => {
-                setProfileFocusPartner(pId);
-                setShowProfileModal(true);
-              }}
-              onEditMemory={(mem) => setEditingMemory(mem)}
-              onDeleteMemory={handleDeleteMemory}
-              onDeleteMediaItem={handleDeleteMediaItem}
-              onRemovePhotoOnly={handleRemovePhotoOnly}
-            />
+            <div className="animate-fade-in">
+              <SharedGalleryView
+                profile={profile}
+                activePartnerId={activePartnerId}
+                memories={memories}
+                locations={locations}
+                capsules={capsules}
+                challenges={challenges}
+                onLikeMemory={handleLikeMemory}
+                onAddMemory={handleAddMemory}
+                onOpenAddMemoryModal={() => {
+                  setEditingMemory(null);
+                  setShowAddMemoryModal(true);
+                }}
+                onOpenProfileModal={(pId) => {
+                  setProfileFocusPartner(pId);
+                  setShowProfileModal(true);
+                }}
+                onEditMemory={(mem) => setEditingMemory(mem)}
+                onDeleteMemory={handleDeleteMemory}
+                onDeleteMediaItem={handleDeleteMediaItem}
+                onRemovePhotoOnly={handleRemovePhotoOnly}
+              />
+            </div>
           )}
 
           {activeTab === 'games' && (
-            <GamesView
-              profile={profile}
-              activePartnerId={activePartnerId}
-              quizzes={quizzes}
-              dateIdeas={dateIdeas}
-              challenges={challenges}
-              initialTab={selectedGameTab}
-              lexicon={lexicon}
-              onSaveLexiconWord={handleSaveLexiconWord}
-              onDeleteLexiconWord={handleDeleteLexiconWord}
-              onToggleLexiconFavorite={handleToggleLexiconFavorite}
-              onToggleLexiconMastered={handleToggleLexiconMastered}
-              weeklyChallenges={weeklyChallenges}
-              onSelectActiveWeeklyChallenge={(challengeId) => {
-                const updated = weeklyChallenges.map((c) => ({
-                  ...c,
-                  isActive: c.id === challengeId,
-                }));
-                setWeeklyChallenges(updated);
-                const chosen = updated.find((c) => c.id === challengeId);
-                if (chosen) {
-                  saveWeeklyLearningChallenge(chosen).catch(console.error);
-                }
-              }}
-              onSaveWeeklyChallenge={(ch) => {
-                setWeeklyChallenges((prev) => {
-                  const idx = prev.findIndex((c) => c.id === ch.id);
-                  if (idx >= 0) {
-                    const copy = [...prev];
-                    copy[idx] = ch;
-                    return copy;
+            <div className="animate-fade-in">
+              <GamesView
+                profile={profile}
+                activePartnerId={activePartnerId}
+                quizzes={quizzes}
+                dateIdeas={dateIdeas}
+                challenges={challenges}
+                initialTab={selectedGameTab}
+                lexicon={lexicon}
+                onSaveLexiconWord={handleSaveLexiconWord}
+                onDeleteLexiconWord={handleDeleteLexiconWord}
+                onToggleLexiconFavorite={handleToggleLexiconFavorite}
+                onToggleLexiconMastered={handleToggleLexiconMastered}
+                weeklyChallenges={weeklyChallenges}
+                onSelectActiveWeeklyChallenge={(challengeId) => {
+                  const updated = weeklyChallenges.map((c) => ({
+                    ...c,
+                    isActive: c.id === challengeId,
+                  }));
+                  setWeeklyChallenges(updated);
+                  const chosen = updated.find((c) => c.id === challengeId);
+                  if (chosen) {
+                    saveWeeklyLearningChallenge(chosen).catch(console.error);
                   }
-                  return [ch, ...prev];
-                });
-                saveWeeklyLearningChallenge(ch).catch(console.error);
-              }}
-              onOpenChatWithDraft={(prefill) => {
-                setChatDraftText(prefill);
-                setActiveTab('chat');
-              }}
-              onAnswerQuiz={handleAnswerQuiz}
-              onSaveDateIdea={handleSaveDateIdea}
-              onToggleChallenge={handleToggleChallenge}
-              onAddNewQuiz={handleAddNewQuiz}
-              onAddNewDateIdea={handleAddNewDateIdea}
-              onSendChatMessage={handleSendChatMessage}
-            />
+                }}
+                onSaveWeeklyChallenge={(ch) => {
+                  setWeeklyChallenges((prev) => {
+                    const idx = prev.findIndex((c) => c.id === ch.id);
+                    if (idx >= 0) {
+                      const copy = [...prev];
+                      copy[idx] = ch;
+                      return copy;
+                    }
+                    return [ch, ...prev];
+                  });
+                  saveWeeklyLearningChallenge(ch).catch(console.error);
+                }}
+                onOpenChatWithDraft={(prefill) => {
+                  setChatDraftText(prefill);
+                  setActiveTab('chat');
+                }}
+                onAnswerQuiz={handleAnswerQuiz}
+                onSaveDateIdea={handleSaveDateIdea}
+                onToggleChallenge={handleToggleChallenge}
+                onAddNewQuiz={handleAddNewQuiz}
+                onAddNewDateIdea={handleAddNewDateIdea}
+                onSendChatMessage={handleSendChatMessage}
+              />
+            </div>
           )}
         </div>
       </main>

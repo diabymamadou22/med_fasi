@@ -30,6 +30,10 @@ export interface TimelineMemory {
   category: 'voyage' | 'rencard' | 'anecdote' | 'etape' | 'fourire';
   description: string;
   photoUrl?: string;
+  videoUrl?: string;
+  mediaType?: 'image' | 'video';
+  videoDuration?: number; // duration in seconds
+  videoThumbnail?: string;
   locationName?: string;
   coordinates?: { lat: number; lng: number };
   audioDuration?: string;
@@ -181,7 +185,9 @@ export interface ChatMessage {
   timestamp: string; // ISO string
   timestampMs?: number; // Exact millisecond timestamp for strict chronological order
   mediaUrl?: string;
-  mediaType?: 'image' | 'audio';
+  mediaType?: 'image' | 'audio' | 'video';
+  videoDuration?: number; // duration in seconds
+  videoThumbnail?: string;
   audioDuration?: number; // duration in seconds
   reactions?: Record<string, string>; // e.g. { p1: '❤️', p2: '😂' }
   replyTo?: {
@@ -189,6 +195,7 @@ export interface ChatMessage {
     senderId: PartnerId;
     content: string;
     mediaUrl?: string;
+    mediaType?: 'image' | 'audio' | 'video';
   };
   status?: 'sent' | 'delivered' | 'read';
   readStatus?: 'sent' | 'delivered' | 'read' | 'unread' | boolean;

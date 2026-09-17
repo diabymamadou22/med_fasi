@@ -36,10 +36,13 @@ import {
   Bell,
   BellRing,
   Camera,
+  Video,
 } from 'lucide-react';
 import { NotificationActivationBanner } from '../NotificationActivationBanner';
 import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
 import { CameraCaptureModal } from '../modals/CameraCaptureModal';
+import { ChatVideoBubble } from '../chat/ChatVideoBubble';
+import { extractVideoThumbnail, storeMediaBlob, formatVideoDuration } from '../../lib/videoUtils';
 import {
   CoupleProfile,
   PartnerId,
@@ -65,6 +68,7 @@ import {
   formatMessageTime,
 } from '../../lib/chatUtils';
 import { soundEffects } from '../../lib/audio';
+import { triggerHeartConfetti } from '../../lib/confetti';
 import { processPhotoWithoutCropping, compressImageWithStats, formatBytes } from '../../lib/imageUtils';
 
 export interface ChatViewProps {
@@ -507,15 +511,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [showQuickPhrases, setShowQuickPhrases] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'audio' | 'loveNote'>('all');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'audio' | 'loveNote'>('all');
 
   // Mobile & Desktop Swipeable Photo Lightbox
   const [activeChatPhotoIndex, setActiveChatPhotoIndex] = useState<number | null>(null);
 
-  // Compile all chat image messages into swipeable photo items
+  // Compile all chat image and video messages into swipeable photo items
   const chatPhotoItems: PhotoViewerItem[] = useMemo(() => {
     return messages
-      .filter((m) => m.mediaType === 'image' && m.mediaUrl)
+      .filter(
+        (m) =>
+          ((m.mediaType === 'image' || m.mediaType === 'video') && (m.mediaUrl || m.videoUrl))
+      )
       .map((m) => {
         const sender = m.senderId === 'p1' ? profile.partner1 : profile.partner2;
         let dateStr = '';
@@ -531,14 +538,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
           }
         } catch {}
 
+        const isVideo = m.mediaType === 'video' || Boolean(m.videoUrl);
+
         return {
           id: m.id,
-          photoUrl: m.mediaUrl!,
-          title: m.text ? m.text : `Photo partagée par ${sender?.name || 'mon amour'}`,
+          photoUrl: m.videoThumbnail || m.mediaUrl!,
+          videoUrl: isVideo ? (m.videoUrl || m.mediaUrl) : undefined,
+          mediaType: isVideo ? 'video' : 'image',
+          videoDuration: m.videoDuration,
+          title: m.text
+            ? m.text
+            : isVideo
+            ? `Vidéo partagée par ${sender?.name || 'mon amour'}`
+            : `Photo partagée par ${sender?.name || 'mon amour'}`,
           description: m.text || undefined,
           date: dateStr,
-          badgeLabel: 'Salon Privé',
-          badgeBg: 'bg-rose-500/30 text-rose-200 border-rose-400/40',
+          badgeLabel: isVideo ? 'Vidéo Privée' : 'Salon Privé',
+          badgeBg: isVideo
+            ? 'bg-purple-500/30 text-purple-200 border-purple-400/40'
+            : 'bg-rose-500/30 text-rose-200 border-rose-400/40',
           authorId: m.senderId,
           authorName: sender?.name,
           authorAvatar: sender?.avatar,
@@ -581,6 +599,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [showCameraModal, setShowCameraModal] = useState(false);
 
   const handlePhotoCapturedFromCamera = (dataUrl: string, caption?: string) => {
@@ -909,10 +928,68 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
+  // Video Upload & Compression / IndexedDB Storage handler
+  const handleVideoFile = async (file: File) => {
+    try {
+      setCompressingStats({
+        isCompressing: true,
+        filename: file.name,
+        originalSize: file.size,
+      });
+
+      const meta = await extractVideoThumbnail(file);
+      const mediaKey = `vid_chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const idbRef = await storeMediaBlob(mediaKey, file);
+
+      setCompressingStats({
+        isCompressing: false,
+        filename: file.name,
+        originalSize: file.size,
+        compressedSize: meta.sizeBytes,
+        reduction: 0,
+      });
+
+      onSendMessage({
+        senderId: activePartnerId,
+        content: `🎬 Vidéo partagée (${meta.formattedDuration})`,
+        mediaType: 'video',
+        mediaUrl: idbRef,
+        videoUrl: idbRef,
+        videoThumbnail: meta.thumbnailDataUrl,
+        videoDuration: meta.duration,
+      });
+
+      soundEffects.playMessageSent();
+      triggerHeartConfetti();
+
+      setTimeout(() => {
+        setCompressingStats(null);
+      }, 3500);
+    } catch (err: any) {
+      console.error('Erreur traitement vidéo chat:', err);
+      setCompressingStats(null);
+      alert('Impossible d’importer cette vidéo. Format ou codec non pris en charge.');
+    } finally {
+      if (videoInputRef.current) videoInputRef.current.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleVideoFile(file);
+  };
+
   // Image Upload handler with smart mobile photo auto-compression
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.type.startsWith('video/')) {
+      handleVideoFile(file);
+      return;
+    }
 
     try {
       setCompressingStats({
@@ -2199,6 +2276,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           </div>
                         )}
 
+                        {/* Video Content */}
+                        {(msg.mediaType === 'video' || msg.videoUrl) && (
+                          <ChatVideoBubble
+                            message={msg}
+                            isMe={isMe}
+                            chatTheme={chatTheme}
+                            onOpenFullscreen={() => {
+                              const idx = chatPhotoItems.findIndex(
+                                (p) =>
+                                  p.id === msg.id ||
+                                  p.videoUrl === (msg.videoUrl || msg.mediaUrl) ||
+                                  p.photoUrl === msg.videoThumbnail
+                              );
+                              setActiveChatPhotoIndex(idx >= 0 ? idx : 0);
+                            }}
+                          />
+                        )}
+
                         {/* Enhanced Voice Note Player */}
                         {msg.mediaType === 'audio' && (
                           <div className="flex items-center gap-3 py-1 px-1 min-w-[210px] sm:min-w-[250px]">
@@ -2663,7 +2758,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
                   <ImageIcon className="w-4 h-4" />
                 </div>
-                <span>Choisir depuis la galerie</span>
+                <span>Choisir une photo</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  videoInputRef.current?.click();
+                  setShowAttachmentMenu(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-purple-500/10 hover:text-purple-600 transition-colors text-left cursor-pointer"
+              >
+                <div className="p-1.5 rounded-lg bg-purple-100 text-purple-600">
+                  <Video className="w-4 h-4" />
+                </div>
+                <span>Importer une vidéo</span>
               </button>
 
               <button
@@ -2820,6 +2928,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </button>
           )}
         </div>
+
+        {/* Hidden inputs for image and video uploads */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          onChange={handleVideoSelect}
+          className="hidden"
+        />
       </div>
 
       {/* ================================================================= */}

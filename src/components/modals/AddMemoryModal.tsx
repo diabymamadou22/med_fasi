@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   X,
@@ -8,11 +8,20 @@ import {
   Trash2,
   Link as LinkIcon,
   Sparkles,
+  Video,
+  Play,
+  Film,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, TimelineMemory } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
 import { processPhotoWithoutCropping } from '../../lib/imageUtils';
+import {
+  extractVideoThumbnail,
+  storeMediaBlob,
+  formatVideoDuration,
+  resolveMediaUrl,
+} from '../../lib/videoUtils';
 import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface AddMemoryModalProps {
@@ -36,28 +45,88 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
 }) => {
   const isEditing = Boolean(initialMemory);
 
-  const [photoUrl, setPhotoUrl] = useState(initialMemory?.photoUrl || '');
+  const [photoUrl, setPhotoUrl] = useState(initialMemory?.photoUrl || initialMemory?.videoThumbnail || '');
+  const [videoUrl, setVideoUrl] = useState(initialMemory?.videoUrl || '');
+  const [mediaType, setMediaType] = useState<'image' | 'video'>(
+    initialMemory?.mediaType || (initialMemory?.videoUrl ? 'video' : 'image')
+  );
+  const [videoDuration, setVideoDuration] = useState<number | undefined>(initialMemory?.videoDuration);
+  const [resolvedVideoSrc, setResolvedVideoSrc] = useState<string>('');
+
   const [caption, setCaption] = useState(initialMemory?.title || '');
-  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [isProcessingMedia, setIsProcessingMedia] = useState(false);
+  const [processingStatusText, setProcessingStatusText] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [showCameraModal, setShowCameraModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Resolve video blob URL if videoUrl changes
+  useEffect(() => {
+    if (videoUrl) {
+      resolveMediaUrl(videoUrl).then((url) => {
+        setResolvedVideoSrc(url);
+      });
+    } else {
+      setResolvedVideoSrc('');
+    }
+  }, [videoUrl]);
+
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setIsProcessingPhoto(true);
+
+    if (file.type.startsWith('video/')) {
+      handleVideoFile(file);
+      return;
+    }
+
+    setIsProcessingMedia(true);
+    setProcessingStatusText('Optimisation de la photo...');
     try {
-      // Process photo keeping 100% original aspect ratio without any crop
       const dataUrl = await processPhotoWithoutCropping(file, 1400, 0.85);
       setPhotoUrl(dataUrl);
+      setVideoUrl('');
+      setMediaType('image');
+      setVideoDuration(undefined);
       soundEffects.playSuccessSparkle();
     } catch (err: any) {
       alert(err?.message || 'Erreur lors du traitement de la photo.');
     } finally {
-      setIsProcessingPhoto(false);
+      setIsProcessingMedia(false);
+      setProcessingStatusText('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleVideoFile = async (file: File) => {
+    setIsProcessingMedia(true);
+    setProcessingStatusText('Préparation de la vidéo...');
+    try {
+      const meta = await extractVideoThumbnail(file);
+      const mediaKey = `vid_mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const idbRef = await storeMediaBlob(mediaKey, file);
+
+      setPhotoUrl(meta.thumbnailDataUrl);
+      setVideoUrl(idbRef);
+      setMediaType('video');
+      setVideoDuration(meta.duration);
+
+      if (!caption.trim()) {
+        setCaption('Notre vidéo complice');
+      }
+
+      soundEffects.playSuccessSparkle();
+      triggerHeartConfetti();
+    } catch (err: any) {
+      console.error('Erreur traitement vidéo:', err);
+      alert('Impossible d’importer cette vidéo. Format ou codec non pris en charge.');
+    } finally {
+      setIsProcessingMedia(false);
+      setProcessingStatusText('');
+      if (videoInputRef.current) videoInputRef.current.value = '';
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -65,6 +134,9 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
   const handleApplyUrl = () => {
     if (urlDraft.trim()) {
       setPhotoUrl(urlDraft.trim());
+      setVideoUrl('');
+      setMediaType('image');
+      setVideoDuration(undefined);
       setShowUrlInput(false);
       setUrlDraft('');
       soundEffects.playSuccessSparkle();
@@ -74,20 +146,26 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!photoUrl.trim() && !caption.trim()) {
-      alert('Veuillez sélectionner une photo à ajouter !');
+    if (!photoUrl.trim() && !videoUrl.trim() && !caption.trim()) {
+      alert('Veuillez sélectionner une photo ou une vidéo à ajouter !');
       return;
     }
 
-    const safeTitle = caption.trim() || 'Notre doux souvenir';
+    const safeTitle = caption.trim() || (mediaType === 'video' ? 'Notre vidéo complice' : 'Notre doux souvenir');
     const safeDate = initialMemory?.date || new Date().toISOString().split('T')[0];
     const safeCategory = initialMemory?.category || 'rencard';
     const safeDescription = initialMemory?.description || '';
     const safePhotoUrl = photoUrl.trim();
+    const safeVideoUrl = mediaType === 'video' && videoUrl ? videoUrl.trim() : undefined;
     const safeLocationName = initialMemory?.locationName || '';
-    const safeTags = initialMemory?.tags && initialMemory.tags.length > 0
-      ? initialMemory.tags
-      : ['Amour', 'Photo'];
+    const initialTags =
+      initialMemory?.tags && initialMemory.tags.length > 0
+        ? initialMemory.tags
+        : ['Amour'];
+
+    const safeTags = Array.from(
+      new Set([...initialTags, mediaType === 'video' ? 'Vidéo' : 'Photo'])
+    );
 
     if (isEditing && initialMemory && onUpdateMemory) {
       onUpdateMemory({
@@ -97,6 +175,10 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         category: safeCategory,
         description: safeDescription,
         photoUrl: safePhotoUrl,
+        videoUrl: safeVideoUrl,
+        mediaType: mediaType,
+        videoDuration: videoDuration,
+        videoThumbnail: mediaType === 'video' ? safePhotoUrl : undefined,
         locationName: safeLocationName,
         tags: safeTags,
       });
@@ -108,6 +190,10 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         category: safeCategory,
         description: safeDescription,
         photoUrl: safePhotoUrl,
+        videoUrl: safeVideoUrl,
+        mediaType: mediaType,
+        videoDuration: videoDuration,
+        videoThumbnail: mediaType === 'video' ? safePhotoUrl : undefined,
         locationName: safeLocationName,
         tags: safeTags,
         authorId: activePartnerId,
@@ -141,18 +227,28 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <div className="p-2.5 rounded-2xl bg-rose-100 text-rose-600 shadow-2xs">
-            <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
+            {mediaType === 'video' ? (
+              <Video className="w-5 h-5 text-purple-600" />
+            ) : (
+              <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
+            )}
           </div>
           <div>
             <h3 className="font-serif-romantic text-lg sm:text-xl font-bold text-stone-900">
-              {isEditing ? 'Modifier la photo' : 'Ajouter une Photo'}
+              {isEditing
+                ? mediaType === 'video'
+                  ? 'Modifier la vidéo'
+                  : 'Modifier la photo'
+                : mediaType === 'video'
+                ? 'Ajouter une Vidéo'
+                : 'Ajouter une Photo ou Vidéo'}
             </h3>
             <p className="text-xs text-stone-500">
               {isEditing ? (
-                'Ajustez votre photo de souvenir'
+                'Ajustez votre souvenir de couple'
               ) : (
                 <>
-                  Partagée par <span className="font-semibold text-rose-600">{authorName}</span>
+                  Partagé par <span className="font-semibold text-rose-600">{authorName}</span>
                 </>
               )}
             </p>
@@ -160,33 +256,76 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Main Photo Dropzone / Upload Area */}
+          {/* Main Media Dropzone / Upload Area */}
           <div className="space-y-2">
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={handleFileChange}
+              onChange={handlePhotoFileChange}
+              className="hidden"
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleVideoFile(file);
+              }}
               className="hidden"
             />
 
-            {photoUrl && photoUrl.trim() !== '' ? (
+            {/* Processing banner */}
+            {isProcessingMedia && (
+              <div className="p-3 bg-purple-50 border border-purple-200 text-purple-900 rounded-2xl text-xs flex items-center gap-2.5 animate-pulse">
+                <Sparkles className="w-4 h-4 text-purple-600 animate-spin shrink-0" />
+                <span className="font-medium">{processingStatusText || 'Traitement en cours...'}</span>
+              </div>
+            )}
+
+            {(photoUrl && photoUrl.trim() !== '') || (videoUrl && videoUrl.trim() !== '') ? (
               <div className="relative rounded-2xl overflow-hidden border-2 border-rose-200 bg-stone-900/5 group">
                 {/* Ambient blur background */}
-                <img
-                  src={photoUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute inset-0 w-full h-full object-cover blur-xl opacity-25 scale-110 pointer-events-none"
-                />
-                {/* 100% Uncropped preview */}
-                <div className="relative flex items-center justify-center min-h-[220px] max-h-[340px] p-2">
+                {photoUrl && (
                   <img
                     src={photoUrl}
-                    alt="Aperçu du souvenir"
-                    className="max-h-[320px] w-auto max-w-full object-contain rounded-xl drop-shadow-sm"
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover blur-xl opacity-25 scale-110 pointer-events-none"
                   />
+                )}
+
+                {/* Uncropped preview or Video Player */}
+                <div className="relative flex items-center justify-center min-h-[200px] max-h-[320px] p-2 bg-black/5">
+                  {mediaType === 'video' ? (
+                    <div className="relative max-h-[300px] w-full flex items-center justify-center">
+                      <video
+                        src={resolvedVideoSrc || videoUrl || photoUrl}
+                        poster={photoUrl}
+                        controls
+                        playsInline
+                        className="max-h-[300px] max-w-full rounded-xl shadow-md bg-black"
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={photoUrl}
+                      alt="Aperçu du souvenir"
+                      className="max-h-[300px] w-auto max-w-full object-contain rounded-xl drop-shadow-sm"
+                    />
+                  )}
                 </div>
+
+                {/* Top left duration badge if video */}
+                {mediaType === 'video' && (
+                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10 pointer-events-none">
+                    <span className="px-2.5 py-1 rounded-full bg-black/75 text-purple-300 backdrop-blur-md text-[11px] font-bold border border-purple-400/40 flex items-center gap-1 shadow-md">
+                      <Video className="w-3.5 h-3.5" />
+                      <span>{videoDuration ? formatVideoDuration(videoDuration) : 'Vidéo'}</span>
+                    </span>
+                  </div>
+                )}
 
                 {/* Top action buttons */}
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
@@ -194,68 +333,96 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
                     type="button"
                     onClick={() => setShowCameraModal(true)}
                     className="px-2.5 py-1.5 bg-black/75 hover:bg-black/90 text-white rounded-xl text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                    title="Prendre une autre photo en direct"
+                    title="Prendre une photo en direct"
                   >
                     <Camera className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Caméra</span>
+                    <span className="hidden sm:inline">Caméra</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="px-2.5 py-1.5 bg-black/75 hover:bg-black/90 text-white rounded-xl text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                    title="Changer via vos fichiers"
+                    title="Changer de photo"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    <span>Fichier</span>
+                    <span className="hidden sm:inline">Photo</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPhotoUrl('')}
+                    onClick={() => videoInputRef.current?.click()}
+                    className="px-2.5 py-1.5 bg-purple-900/80 hover:bg-purple-900 text-white rounded-xl text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 shadow-md transition-all cursor-pointer border border-purple-400/30"
+                    title="Changer de vidéo"
+                  >
+                    <Video className="w-3.5 h-3.5 text-purple-300" />
+                    <span className="hidden sm:inline">Vidéo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoUrl('');
+                      setVideoUrl('');
+                      setMediaType('image');
+                      setVideoDuration(undefined);
+                      setResolvedVideoSrc('');
+                    }}
                     className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs backdrop-blur-md shadow-md transition-all cursor-pointer"
-                    title="Retirer la photo"
+                    title="Retirer ce média"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             ) : (
-              /* Two distinct options: Direct Live Camera & File Upload */
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              /* Three distinct options: Direct Live Camera & File Upload & Video Upload */
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {/* 1. Direct Live Camera Capture */}
                 <button
                   type="button"
                   onClick={() => setShowCameraModal(true)}
-                  className="border-2 border-rose-300 hover:border-rose-500 bg-rose-50/60 hover:bg-rose-100/70 rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center group shadow-xs active:scale-98"
+                  className="border-2 border-rose-200 hover:border-rose-400 bg-rose-50/50 hover:bg-rose-100/60 rounded-2xl p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center group shadow-2xs active:scale-98"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-md mb-2.5 group-hover:scale-110 transition-transform">
-                    <Camera className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-md mb-2 group-hover:scale-110 transition-transform">
+                    <Camera className="w-5 h-5" />
                   </div>
-                  <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
-                    Prendre une photo
+                  <h4 className="font-bold text-stone-900 text-xs">
+                    Prendre photo
                   </h4>
-                  <p className="text-[11px] text-stone-500 mt-1 leading-tight">
-                    En direct avec la caméra
+                  <p className="text-[10px] text-stone-500 mt-0.5 leading-tight">
+                    Caméra directe
                   </p>
                 </button>
 
-                {/* 2. Choose from files / phone library */}
+                {/* 2. Choose from files / photo library */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-stone-300 hover:border-stone-400 bg-stone-50/70 hover:bg-stone-100/80 rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center group active:scale-98"
+                  className="border-2 border-dashed border-stone-200 hover:border-stone-400 bg-stone-50/70 hover:bg-stone-100/80 rounded-2xl p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center group active:scale-98"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-stone-700 text-white flex items-center justify-center shadow-md mb-2.5 group-hover:scale-110 transition-transform">
-                    {isProcessingPhoto ? (
-                      <Sparkles className="w-6 h-6 animate-spin text-rose-300" />
-                    ) : (
-                      <Upload className="w-6 h-6" />
-                    )}
+                  <div className="w-10 h-10 rounded-2xl bg-stone-700 text-white flex items-center justify-center shadow-md mb-2 group-hover:scale-110 transition-transform">
+                    <Upload className="w-5 h-5" />
                   </div>
-                  <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
-                    Choisir un fichier
+                  <h4 className="font-bold text-stone-900 text-xs">
+                    Choisir photo
                   </h4>
-                  <p className="text-[11px] text-stone-500 mt-1 leading-tight">
-                    Depuis la pellicule du smartphone
+                  <p className="text-[10px] text-stone-500 mt-0.5 leading-tight">
+                    Pellicule images
+                  </p>
+                </button>
+
+                {/* 3. Choose video */}
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="border-2 border-purple-200 hover:border-purple-400 bg-purple-50/50 hover:bg-purple-100/60 rounded-2xl p-3 text-center cursor-pointer transition-all flex flex-col items-center justify-center group shadow-2xs active:scale-98"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md mb-2 group-hover:scale-110 transition-transform">
+                    <Video className="w-5 h-5" />
+                  </div>
+                  <h4 className="font-bold text-stone-900 text-xs text-purple-900">
+                    Importer vidéo
+                  </h4>
+                  <p className="text-[10px] text-stone-500 mt-0.5 leading-tight">
+                    Fichiers MP4/MOV
                   </p>
                 </button>
               </div>
@@ -303,7 +470,7 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
             </div>
           </div>
 
-          {/* Simple Optional Note / Caption (Optionnel) */}
+          {/* Simple Optional Note / Caption */}
           <div>
             <label className="text-xs font-semibold text-stone-600 block mb-1">
               Légende ou mot doux <span className="text-stone-400 font-normal">(optionnel)</span>
@@ -312,7 +479,7 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
               type="text"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="Ex: Mon amour, notre soirée..."
+              placeholder={mediaType === 'video' ? 'Ex: Notre danse complice...' : 'Ex: Mon amour, notre soirée...'}
               className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs sm:text-sm text-stone-800 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-rose-400"
             />
           </div>
@@ -323,8 +490,10 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  onDeleteMemory(initialMemory.id);
-                  onClose();
+                  if (confirm('Voulez-vous vraiment supprimer ce souvenir ?')) {
+                    onDeleteMemory(initialMemory.id);
+                    onClose();
+                  }
                 }}
                 className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
@@ -345,15 +514,21 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
               </button>
               <button
                 type="submit"
-                disabled={!photoUrl && !caption.trim()}
+                disabled={isProcessingMedia || (!photoUrl && !videoUrl && !caption.trim())}
                 className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 ${
-                  !photoUrl && !caption.trim()
+                  !photoUrl && !videoUrl && !caption.trim()
                     ? 'bg-stone-300 cursor-not-allowed opacity-70'
                     : 'bg-rose-500 hover:bg-rose-600 hover:scale-[1.02] active:scale-95 cursor-pointer'
                 }`}
               >
                 <Heart className="w-3.5 h-3.5 fill-white" />
-                <span>{isEditing ? 'Enregistrer' : 'Ajouter la photo'}</span>
+                <span>
+                  {isEditing
+                    ? 'Enregistrer'
+                    : mediaType === 'video'
+                    ? 'Ajouter la vidéo'
+                    : 'Ajouter la photo'}
+                </span>
               </button>
             </div>
           </div>
@@ -366,6 +541,9 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
         onClose={() => setShowCameraModal(false)}
         onPhotoCaptured={(capturedUrl, cap) => {
           setPhotoUrl(capturedUrl);
+          setVideoUrl('');
+          setMediaType('image');
+          setVideoDuration(undefined);
           if (cap && !caption.trim()) {
             setCaption(cap);
           }

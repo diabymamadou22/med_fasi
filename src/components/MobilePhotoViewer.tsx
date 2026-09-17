@@ -17,16 +17,26 @@ import {
   Tag,
   Maximize2,
   Sparkles,
+  Play,
+  Video,
 } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 import { triggerHeartConfetti } from '../lib/confetti';
 import { triggerVibration } from '../lib/notificationService';
 import { PartnerAvatar } from './PartnerAvatar';
 import { PartnerId } from '../types';
+import {
+  isVideoMediaType,
+  resolveMediaUrl,
+  formatVideoDuration,
+} from '../lib/videoUtils';
 
 export interface PhotoViewerItem {
   id: string;
   photoUrl: string;
+  videoUrl?: string;
+  mediaType?: 'image' | 'video';
+  videoDuration?: number;
   title?: string;
   description?: string;
   date?: string;
@@ -116,6 +126,25 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   }, [currentIndex]);
 
   const activeItem = items[currentIndex] || null;
+
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>('');
+
+  const isCurrentItemVideo = Boolean(
+    activeItem &&
+      (activeItem.mediaType === 'video' ||
+        isVideoMediaType(activeItem.videoUrl || activeItem.photoUrl, activeItem.mediaType))
+  );
+
+  useEffect(() => {
+    if (!activeItem || !isCurrentItemVideo) {
+      setResolvedVideoUrl('');
+      return;
+    }
+    const mediaToResolve = activeItem.videoUrl || activeItem.photoUrl;
+    resolveMediaUrl(mediaToResolve).then((url) => {
+      setResolvedVideoUrl(url);
+    });
+  }, [activeItem, isCurrentItemVideo]);
 
   // Reset zoom and pan
   const resetZoom = useCallback(() => {
@@ -464,15 +493,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               </button>
             )}
 
-            {/* Direct Image Download */}
+            {/* Direct Media Download */}
             <a
-              href={activeItem.photoUrl}
-              download={`souvenir-amoureux-${currentIndex + 1}.jpg`}
+              href={isCurrentItemVideo ? (resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl) : activeItem.photoUrl}
+              download={isCurrentItemVideo ? `souvenir-video-${currentIndex + 1}.mp4` : `souvenir-amoureux-${currentIndex + 1}.jpg`}
               target="_blank"
               rel="noreferrer"
               className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer"
-              title="Télécharger / Ouvrir en taille réelle"
-              aria-label="Télécharger la photo"
+              title={isCurrentItemVideo ? "Télécharger la vidéo" : "Télécharger / Ouvrir en taille réelle"}
+              aria-label={isCurrentItemVideo ? "Télécharger la vidéo" : "Télécharger la photo"}
             >
               <Download className="w-4 h-4 sm:w-5 sm:h-5" />
             </a>
@@ -480,7 +509,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         </div>
 
         {/* =========================================================
-            2. MAIN INTERACTIVE PHOTO STAGE (SWIPE, PINCH, PAN)
+            2. MAIN INTERACTIVE PHOTO/VIDEO STAGE (SWIPE, PINCH, PAN)
            ========================================================= */}
         <div
           ref={containerRef}
@@ -505,8 +534,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   goPrev();
                 }}
                 className="absolute left-2 sm:left-5 top-1/2 -translate-y-1/2 z-40 p-3 sm:p-4 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md border border-white/10 hidden sm:flex items-center justify-center shadow-xl"
-                title="Photo précédente"
-                aria-label="Photo précédente"
+                title="Précédent"
+                aria-label="Précédent"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
@@ -517,15 +546,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   goNext();
                 }}
                 className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 z-40 p-3 sm:p-4 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md border border-white/10 hidden sm:flex items-center justify-center shadow-xl"
-                title="Photo suivante"
-                aria-label="Photo suivante"
+                title="Suivant"
+                aria-label="Suivant"
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
             </>
           )}
 
-          {/* Render Active Image with smooth Pan/Zoom & Swipe translation */}
+          {/* Render Active Image / Video with smooth Pan/Zoom & Swipe translation */}
           <motion.div
             key={activeItem.id}
             initial={{ opacity: 0, x: direction * 40 }}
@@ -549,12 +578,29 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             }}
             className="relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6"
           >
-            <img
-              src={activeItem.photoUrl}
-              alt={activeItem.title || 'Photo complice'}
-              draggable={false}
-              className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto object-contain rounded-xl sm:rounded-2xl shadow-2xl select-none"
-            />
+            {isCurrentItemVideo ? (
+              <div
+                className="relative max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <video
+                  key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                  src={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                  poster={activeItem.photoUrl}
+                  controls
+                  playsInline
+                  autoPlay
+                  className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto rounded-xl sm:rounded-2xl shadow-2xl bg-black"
+                />
+              </div>
+            ) : (
+              <img
+                src={activeItem.photoUrl}
+                alt={activeItem.title || 'Photo complice'}
+                draggable={false}
+                className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto object-contain rounded-xl sm:rounded-2xl shadow-2xl select-none"
+              />
+            )}
           </motion.div>
 
           {/* Dynamic Pinch & Zoom HUD Badge */}
@@ -580,7 +626,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               showUiChrome && scale <= 1 ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            Pincer pour zoomer • Glisser pour défiler
+            {isCurrentItemVideo ? 'Lecture vidéo complice' : 'Pincer pour zoomer • Glisser pour défiler'}
           </div>
         </div>
 
@@ -598,28 +644,36 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               ref={thumbnailStripRef}
               className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none snap-x"
             >
-              {items.map((item, idx) => (
-                <button
-                  key={item.id}
-                  onClick={() => goToIndex(idx)}
-                  className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer snap-center ${
-                    idx === currentIndex
-                      ? 'border-rose-500 scale-105 shadow-md shadow-rose-500/30 ring-2 ring-rose-400/40'
-                      : 'border-white/20 opacity-50 hover:opacity-90'
-                  }`}
-                  title={item.title || `Photo ${idx + 1}`}
-                >
-                  <img
-                    src={item.photoUrl}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  {idx === currentIndex && (
-                    <div className="absolute inset-0 bg-rose-500/10 pointer-events-none" />
-                  )}
-                </button>
-              ))}
+              {items.map((item, idx) => {
+                const itemIsVideo = item.mediaType === 'video' || isVideoMediaType(item.videoUrl, item.mediaType);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => goToIndex(idx)}
+                    className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer snap-center ${
+                      idx === currentIndex
+                        ? 'border-rose-500 scale-105 shadow-md shadow-rose-500/30 ring-2 ring-rose-400/40'
+                        : 'border-white/20 opacity-50 hover:opacity-90'
+                    }`}
+                    title={item.title || `Média ${idx + 1}`}
+                  >
+                    <img
+                      src={item.photoUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {itemIsVideo && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Play className="w-3.5 h-3.5 text-white fill-white" />
+                      </div>
+                    )}
+                    {idx === currentIndex && (
+                      <div className="absolute inset-0 bg-rose-500/10 pointer-events-none" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -627,6 +681,12 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap text-xs">
+                {isCurrentItemVideo && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md bg-purple-500/30 border-purple-400/50 text-purple-200 flex items-center gap-1">
+                    <Video className="w-3 h-3" />
+                    <span>Vidéo {activeItem.videoDuration ? `(${formatVideoDuration(activeItem.videoDuration)})` : ''}</span>
+                  </span>
+                )}
                 {activeItem.badgeLabel && (
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md ${
