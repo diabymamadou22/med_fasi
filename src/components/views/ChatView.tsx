@@ -35,8 +35,11 @@ import {
   FileText,
   Bell,
   BellRing,
+  Camera,
 } from 'lucide-react';
 import { NotificationActivationBanner } from '../NotificationActivationBanner';
+import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
+import { CameraCaptureModal } from '../modals/CameraCaptureModal';
 import {
   CoupleProfile,
   PartnerId,
@@ -506,8 +509,42 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'audio' | 'loveNote'>('all');
 
-  // Lightbox for photos
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  // Mobile & Desktop Swipeable Photo Lightbox
+  const [activeChatPhotoIndex, setActiveChatPhotoIndex] = useState<number | null>(null);
+
+  // Compile all chat image messages into swipeable photo items
+  const chatPhotoItems: PhotoViewerItem[] = useMemo(() => {
+    return messages
+      .filter((m) => m.mediaType === 'image' && m.mediaUrl)
+      .map((m) => {
+        const sender = m.senderId === 'p1' ? profile.partner1 : profile.partner2;
+        let dateStr = '';
+        try {
+          const d = new Date(m.timestamp);
+          if (!isNaN(d.getTime())) {
+            dateStr = d.toLocaleDateString('fr-FR', {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          }
+        } catch {}
+
+        return {
+          id: m.id,
+          photoUrl: m.mediaUrl!,
+          title: m.text ? m.text : `Photo partagée par ${sender?.name || 'mon amour'}`,
+          description: m.text || undefined,
+          date: dateStr,
+          badgeLabel: 'Salon Privé',
+          badgeBg: 'bg-rose-500/30 text-rose-200 border-rose-400/40',
+          authorId: m.senderId,
+          authorName: sender?.name,
+          authorAvatar: sender?.avatar,
+        };
+      });
+  }, [messages, profile.partner1, profile.partner2]);
 
   // Audio playback state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -544,6 +581,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+
+  const handlePhotoCapturedFromCamera = (dataUrl: string, caption?: string) => {
+    onSendMessage({
+      senderId: activePartnerId,
+      content: caption && caption.trim() ? caption.trim() : '📷 Photo partagée en direct',
+      mediaType: 'image',
+      mediaUrl: dataUrl,
+    });
+    soundEffects.playMessageSent();
+  };
 
   // Subscribe to real-time presence and typing status
   useEffect(() => {
@@ -2137,7 +2185,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
                             <img
                               src={msg.mediaUrl}
                               alt="Photo partagée"
-                              onClick={() => setLightboxImage(msg.mediaUrl!)}
+                              onClick={() => {
+                                const idx = chatPhotoItems.findIndex(
+                                  (p) => p.id === msg.id || p.photoUrl === msg.mediaUrl
+                                );
+                                setActiveChatPhotoIndex(idx >= 0 ? idx : 0);
+                              }}
                               className="max-h-72 w-auto object-contain rounded-xl hover:opacity-95 transition-opacity"
                             />
                             <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none text-xs font-semibold">
@@ -2580,7 +2633,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              className={`absolute bottom-16 left-12 rounded-2xl shadow-xl border p-2 z-30 flex flex-col gap-1 min-w-[210px] ${
+              className={`absolute bottom-16 left-12 rounded-2xl shadow-xl border p-2 z-30 flex flex-col gap-1 min-w-[220px] ${
                 chatTheme === 'velvet-night'
                   ? 'bg-slate-900 border-slate-700 text-slate-200'
                   : 'bg-white border-rose-100 text-stone-700'
@@ -2588,15 +2641,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
             >
               <button
                 onClick={() => {
-                  fileInputRef.current?.click();
+                  soundEffects.playSoftTap();
+                  setShowCameraModal(true);
                   setShowAttachmentMenu(false);
                 }}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-rose-500/10 hover:text-rose-500 transition-colors text-left cursor-pointer"
               >
                 <div className="p-1.5 rounded-lg bg-rose-100 text-rose-600">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <span>Prendre une photo en direct</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setShowAttachmentMenu(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-rose-500/10 hover:text-rose-500 transition-colors text-left cursor-pointer"
+              >
+                <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
                   <ImageIcon className="w-4 h-4" />
                 </div>
-                <span>Envoyer une photo</span>
+                <span>Choisir depuis la galerie</span>
               </button>
 
               <button
@@ -2622,7 +2689,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         {/* ================================================================= */}
         {/* 7. CHAT BOTTOM INPUT BAR */}
         {/* ================================================================= */}
-        <div className={`${themeStyles.headerBg} px-2 sm:px-4 py-2.5 flex items-center gap-2 border-t z-20 shrink-0 transition-colors`}>
+        <div className={`${themeStyles.headerBg} px-2 sm:px-4 py-2.5 flex items-center gap-1.5 sm:gap-2 border-t z-20 shrink-0 transition-colors`}>
           {/* Emoji Toggle */}
           <button
             type="button"
@@ -2659,6 +2726,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
             title="Joindre une photo ou mot doux"
           >
             <Paperclip className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+
+          {/* Direct Camera Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setShowCameraModal(true);
+              setShowAttachmentMenu(false);
+              setShowEmojiPicker(false);
+            }}
+            className={`p-2 rounded-full transition-colors cursor-pointer ${
+              showCameraModal
+                ? 'text-rose-600 bg-rose-100'
+                : chatTheme === 'velvet-night'
+                ? 'text-slate-400 hover:text-rose-400'
+                : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
+            }`}
+            title="Prendre une photo en direct"
+            id="chat-camera-btn"
+          >
+            <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
           {/* Voice recording in-progress display OR text input */}
@@ -2734,31 +2823,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* ================================================================= */}
-      {/* 8. FULLSCREEN PHOTO LIGHTBOX */}
+      {/* 8. FULLSCREEN PHOTO VIEWER (SWIPE & PINCH-TO-ZOOM LIKE PHONE) */}
       {/* ================================================================= */}
-      <AnimatePresence>
-        {lightboxImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setLightboxImage(null)}
-            className="fixed inset-0 z-50 bg-stone-950/90 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
-          >
-            <button
-              onClick={() => setLightboxImage(null)}
-              className="absolute top-4 right-4 text-white p-2 rounded-full bg-white/10 hover:bg-white/20 cursor-pointer"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img
-              src={lightboxImage}
-              alt="Agrandissement"
-              className="max-h-[90vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MobilePhotoViewer
+        items={chatPhotoItems}
+        initialIndex={activeChatPhotoIndex ?? 0}
+        isOpen={activeChatPhotoIndex !== null}
+        onClose={() => setActiveChatPhotoIndex(null)}
+        onIndexChange={(newIdx) => setActiveChatPhotoIndex(newIdx)}
+      />
 
       {/* ================================================================= */}
       {/* 9. EDIT MESSAGE MODAL */}
@@ -3082,6 +3155,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Live In-App Camera Viewfinder Modal for Chat */}
+      <CameraCaptureModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onPhotoCaptured={handlePhotoCapturedFromCamera}
+        title="Prendre une photo pour le chat"
+        subtitle="Capturez et envoyez directement votre photo à votre moitié"
+        submitLabel="Envoyer dans le chat"
+        allowCaption={true}
+      />
     </div>
   );
 };

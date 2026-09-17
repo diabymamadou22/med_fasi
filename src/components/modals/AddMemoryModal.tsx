@@ -13,6 +13,7 @@ import { CoupleProfile, PartnerId, TimelineMemory } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
 import { processPhotoWithoutCropping } from '../../lib/imageUtils';
+import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface AddMemoryModalProps {
   profile: CoupleProfile;
@@ -40,6 +41,7 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
+  const [showCameraModal, setShowCameraModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,12 +192,21 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 bg-black/70 hover:bg-black/85 text-white rounded-xl text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-                    title="Changer de photo"
+                    onClick={() => setShowCameraModal(true)}
+                    className="px-2.5 py-1.5 bg-black/75 hover:bg-black/90 text-white rounded-xl text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                    title="Prendre une autre photo en direct"
                   >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Changer</span>
+                    <Camera className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Caméra</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-2.5 py-1.5 bg-black/75 hover:bg-black/90 text-white rounded-xl text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                    title="Changer via vos fichiers"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Fichier</span>
                   </button>
                   <button
                     type="button"
@@ -208,35 +219,45 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
                 </div>
               </div>
             ) : (
-              /* Big friendly tap-to-upload button */
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 text-center cursor-pointer transition-all ${
-                  isProcessingPhoto
-                    ? 'bg-rose-50/70 border-rose-300'
-                    : 'bg-rose-50/40 hover:bg-rose-50/80 border-rose-300 hover:border-rose-400 hover:shadow-xs'
-                }`}
-              >
-                <div className="w-14 h-14 rounded-2xl bg-rose-500 text-white flex items-center justify-center mx-auto shadow-md mb-3 group-hover:scale-105 transition-transform">
-                  {isProcessingPhoto ? (
-                    <Sparkles className="w-7 h-7 animate-spin" />
-                  ) : (
-                    <Camera className="w-7 h-7" />
-                  )}
-                </div>
-                <h4 className="font-bold text-stone-800 text-sm sm:text-base">
-                  {isProcessingPhoto ? 'Optimisation de la photo...' : 'Touchez pour choisir une photo'}
-                </h4>
-                <p className="text-xs text-stone-500 mt-1 max-w-xs mx-auto">
-                  Prenez une photo en direct ou choisissez-la dans votre galerie
-                </p>
+              /* Two distinct options: Direct Live Camera & File Upload */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Direct Live Camera Capture */}
+                <button
+                  type="button"
+                  onClick={() => setShowCameraModal(true)}
+                  className="border-2 border-rose-300 hover:border-rose-500 bg-rose-50/60 hover:bg-rose-100/70 rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center group shadow-xs active:scale-98"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-md mb-2.5 group-hover:scale-110 transition-transform">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
+                    Prendre une photo
+                  </h4>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-tight">
+                    En direct avec la caméra
+                  </p>
+                </button>
 
-                <div className="mt-4 flex items-center justify-center">
-                  <span className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold shadow-xs inline-flex items-center gap-2">
-                    <Upload className="w-4 h-4" />
-                    <span>Sélectionner une photo</span>
-                  </span>
-                </div>
+                {/* 2. Choose from files / phone library */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-stone-300 hover:border-stone-400 bg-stone-50/70 hover:bg-stone-100/80 rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center group active:scale-98"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-stone-700 text-white flex items-center justify-center shadow-md mb-2.5 group-hover:scale-110 transition-transform">
+                    {isProcessingPhoto ? (
+                      <Sparkles className="w-6 h-6 animate-spin text-rose-300" />
+                    ) : (
+                      <Upload className="w-6 h-6" />
+                    )}
+                  </div>
+                  <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
+                    Choisir un fichier
+                  </h4>
+                  <p className="text-[11px] text-stone-500 mt-1 leading-tight">
+                    Depuis la pellicule du smartphone
+                  </p>
+                </button>
               </div>
             )}
 
@@ -338,6 +359,22 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
           </div>
         </form>
       </motion.div>
+
+      {/* Live In-App Camera Viewfinder Modal */}
+      <CameraCaptureModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onPhotoCaptured={(capturedUrl, cap) => {
+          setPhotoUrl(capturedUrl);
+          if (cap && !caption.trim()) {
+            setCaption(cap);
+          }
+        }}
+        title="Prendre une photo"
+        subtitle="Capturez votre souvenir directement"
+        submitLabel="Utiliser cette photo"
+        allowCaption={true}
+      />
     </div>
   );
 };

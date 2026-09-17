@@ -109,6 +109,36 @@ class RomanticSoundEffects {
       osc.stop(ctx.currentTime + 0.05);
     } catch {}
   }
+  playCameraShutter() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // First click
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(1200, ctx.currentTime);
+      osc1.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.04);
+      gain1.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start();
+      osc1.stop(ctx.currentTime + 0.04);
+
+      // Mechanical release click
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(800, ctx.currentTime + 0.06);
+      osc2.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.11);
+      gain2.gain.setValueAtTime(0.12, ctx.currentTime + 0.06);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.11);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(ctx.currentTime + 0.06);
+      osc2.stop(ctx.currentTime + 0.11);
+    } catch {}
+  }
   playTrashDelete() {}
 
   // WhatsApp-style sound effects

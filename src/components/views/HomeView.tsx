@@ -8,21 +8,15 @@ import {
   Images,
   Volume2,
   ArrowRight,
-  Gift,
-  Clock,
-  Flame,
   Send,
-  Camera,
-  Layers,
-  Smile,
-  ShieldCheck,
-  CheckCircle2,
-  Dices,
-  Sparkle,
   Feather,
+  Smile,
   Quote,
-  Star,
   ChevronRight,
+  Flame,
+  Radio,
+  Sparkle,
+  Dices,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -36,7 +30,7 @@ import {
 } from '../../types';
 import { PartnerAvatar } from '../PartnerAvatar';
 import { soundEffects } from '../../lib/audio';
-import { triggerHeartConfetti, triggerCelebrationConfetti } from '../../lib/confetti';
+import { triggerHeartConfetti } from '../../lib/confetti';
 import { speakEnglish } from '../../lib/englishSpeech';
 import { triggerVibration } from '../../lib/notificationService';
 import { EnglishGameTab } from './GamesView';
@@ -58,6 +52,44 @@ interface HomeViewProps {
   onOpenProfileModal?: (partnerId?: PartnerId) => void;
 }
 
+// Romantic quick pulses configuration
+const QUICK_PULSES: {
+  vibe: MissYouPulse['vibe'];
+  icon: string;
+  label: string;
+  message: string;
+  tagColor: string;
+}[] = [
+  {
+    vibe: 'hug',
+    icon: '🧸',
+    label: 'Câlin doux',
+    message: 'Gros câlin télépathique tout doux 🧸',
+    tagColor: 'hover:border-rose-300 hover:bg-rose-50/70',
+  },
+  {
+    vibe: 'kiss',
+    icon: '💋',
+    label: 'Bisou tendre',
+    message: 'Pluie de doux baisers sur tes joues 💋',
+    tagColor: 'hover:border-pink-300 hover:bg-pink-50/70',
+  },
+  {
+    vibe: 'flame',
+    icon: '🔥',
+    label: 'Flamme coquine',
+    message: 'Petite flamme complice qui crépite pour toi 🔥',
+    tagColor: 'hover:border-amber-300 hover:bg-amber-50/70',
+  },
+  {
+    vibe: 'thought',
+    icon: '✨',
+    label: 'Pensée magique',
+    message: 'Une pensée d’amour pour illuminer ta journée ✨',
+    tagColor: 'hover:border-violet-300 hover:bg-violet-50/70',
+  },
+];
+
 export const HomeView: React.FC<HomeViewProps> = ({
   profile,
   activePartnerId,
@@ -69,7 +101,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
   notes = [],
   messages = [],
   vouchers = [],
-  lexicon = [],
   weeklyChallenges = [],
   onOpenChatWithDraft,
   onOpenProfileModal,
@@ -77,9 +108,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
 
-  const [activePulseMenu, setActivePulseMenu] = useState(false);
-  const [pulseSentFeedback, setPulseSentFeedback] = useState<string | null>(null);
+  const [pulseFeedback, setPulseFeedback] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // Time-based romantic greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Bonjour mon amour';
+    if (hour >= 12 && hour < 18) return 'Bel après-midi complice';
+    if (hour >= 18 && hour < 23) return 'Douce soirée à deux';
+    return 'Bonne nuit tendresse';
+  };
 
   // Calculate days together
   const daysTogether = Math.max(
@@ -90,16 +129,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
     )
   );
 
-  // Formatted anniversary date
   const formattedAnniversary = new Date(profile.anniversaryDate).toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
 
-  // Latest message received from partner
+  // Latest chat message
   const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-  const unreadMessagesCount = messages.filter(
+  const unreadCount = messages.filter(
     (m) => m.senderId !== activePartnerId && !m.readStatus
   ).length;
 
@@ -108,25 +146,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Active weekly challenge
   const activeWeeklyChallenge =
-    weeklyChallenges.find((c) => c.isActive) ||
-    weeklyChallenges[0] ||
-    null;
+    weeklyChallenges.find((c) => c.isActive) || weeklyChallenges[0] || null;
 
-  // Active unredeemed vouchers
-  const unredeemedVouchers = vouchers.filter((v) => !v.isRedeemed);
-
-  const handlePulseAction = (vibe: MissYouPulse['vibe'], message: string, label: string) => {
+  // Handle instant love pulse
+  const handleSendPulse = (vibe: MissYouPulse['vibe'], message: string, label: string) => {
     soundEffects.playHeartPulse();
     triggerHeartConfetti();
-    triggerVibration([100, 50, 100]);
+    triggerVibration([80, 40, 80]);
     onSendMissYou(vibe, message);
-    setPulseSentFeedback(label);
-    setActivePulseMenu(false);
+    setPulseFeedback(label);
     setTimeout(() => {
-      setPulseSentFeedback(null);
+      setPulseFeedback(null);
     }, 2800);
   };
 
+  // English pronunciation
   const handlePlayPronunciation = (text: string) => {
     setIsPlayingAudio(true);
     speakEnglish(text, {
@@ -138,9 +172,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }, 2500);
   };
 
+  // Quick challenge jump to chat
   const handleLaunchChallengeInChat = (challenge: WeeklyLearningChallenge) => {
     soundEffects.playSoftTap();
-    const draft = `🇬🇧 Défi Anglais du Cœur : "${challenge.targetEnglish}" (${challenge.targetFrench}) — À toi de me le dire ou me répondre ! ✨`;
+    const draft = `🇬🇧 Défi Anglais du Cœur : "${challenge.targetEnglish}" (${challenge.targetFrench}) — À toi de jouer ! ✨`;
     if (onOpenChatWithDraft) {
       onOpenChatWithDraft(draft);
     } else {
@@ -148,46 +183,43 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }
   };
 
-  const handleLaunchGame = (gameTab: EnglishGameTab) => {
-    soundEffects.playSoftTap();
-    if (onNavigateToGame) {
-      onNavigateToGame(gameTab);
-    } else {
-      onNavigateToTab('games');
-    }
-  };
-
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8 animate-fadeIn">
-      {/* 1. Haute Couture Hero Banner */}
-      <section
-        aria-label="Accueil couple"
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-[#FFFDFB] via-[#FAF6F2] to-[#F5EFEB] border border-stone-200/80 shadow-[0_10px_35px_rgba(0,0,0,0.03)] p-5 sm:p-8"
+    <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
+      {/* ========================================================
+          1. HERO COMPLICE : ACCUEIL CHIC, PUR & ÉLÉGANT
+         ======================================================== */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#FCF9F7] to-[#F8F2EE] border border-stone-200/70 p-5 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)]"
+        aria-label="Espace d'accueil du couple"
       >
-        {/* Subtle decorative background watermarks */}
-        <div className="absolute -top-16 -right-16 w-64 h-64 bg-rose-200/25 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-amber-200/20 rounded-full blur-3xl pointer-events-none" />
+        {/* Soft background ambient glows */}
+        <div className="absolute -top-16 -right-16 w-56 h-56 bg-rose-200/30 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-amber-200/25 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col items-center text-center">
-          {/* Top refined badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-stone-200/70 text-[11px] font-medium text-stone-600 shadow-2xs mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span className="tracking-wide uppercase font-serif text-[10px] text-stone-700">
-              Espace Intime & Exclusif
-            </span>
+          {/* Top refined pill with greeting */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-stone-200/80 shadow-2xs text-xs text-stone-600 mb-4">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin-slow" />
+            <span className="font-serif italic text-stone-700">{getGreeting()}</span>
             <span className="text-stone-300">•</span>
             <span className="text-rose-600 font-semibold">{profile.relationshipTitle}</span>
           </div>
 
-          {/* Couple Avatars with romantic animated heart bridge */}
-          <div className="flex items-center justify-center gap-4 sm:gap-6 my-2">
+          {/* Couple Avatars with Living Heartbeat Link */}
+          <div className="flex items-center justify-center gap-5 sm:gap-8 my-2">
             {/* Partner 1 */}
-            <div
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => onOpenProfileModal && onOpenProfileModal('p1')}
-              className="flex flex-col items-center group cursor-pointer"
-              title={`Voir le profil de ${profile.partner1.name}`}
+              className="flex flex-col items-center cursor-pointer group"
+              title={`Profil de ${profile.partner1.name}`}
+              id="hero-avatar-p1"
             >
-              <div className="relative p-1 rounded-full bg-gradient-to-tr from-rose-300 to-amber-200 shadow-sm transition-transform group-hover:scale-105 duration-300">
+              <div className="relative p-1 rounded-full bg-gradient-to-tr from-rose-300 via-rose-200 to-amber-200 shadow-xs">
                 <PartnerAvatar
                   name={profile.partner1.name}
                   avatar={profile.partner1.avatar}
@@ -196,43 +228,46 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   className="border-2 border-white"
                 />
                 {activePartnerId === 'p1' && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-2xs">
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-xs">
                     Moi
                   </span>
                 )}
               </div>
-              <span className="mt-2 text-xs sm:text-sm font-semibold text-stone-800 tracking-tight">
+              <span className="mt-2 text-sm font-semibold text-stone-800 tracking-tight">
                 {profile.partner1.name}
               </span>
-              <span className="text-[10px] text-stone-500 max-w-[90px] truncate">
+              <span className="text-[11px] text-stone-500 max-w-[100px] truncate">
                 {profile.partner1.mood?.status || 'Rayonnante'}
               </span>
-            </div>
+            </motion.div>
 
-            {/* Central Animated Heart Pulse */}
-            <div className="flex flex-col items-center justify-center px-1">
+            {/* Central Living Pulsing Heart */}
+            <div className="flex flex-col items-center justify-center">
               <div className="relative flex items-center justify-center">
                 <motion.div
-                  animate={{ scale: [1, 1.15, 1] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-rose-500/10 flex items-center justify-center"
+                  animate={{ scale: [1, 1.18, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-rose-500/10 border border-rose-200/60 flex items-center justify-center shadow-xs"
                 >
-                  <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-rose-500 fill-rose-500 drop-shadow-xs" />
+                  <Heart className="w-6 h-6 sm:w-7 sm:h-7 text-rose-500 fill-rose-500 drop-shadow-xs" />
                 </motion.div>
-                <div className="absolute -inset-1 border border-rose-300/40 rounded-full animate-ping opacity-30 pointer-events-none" />
+                <div className="absolute -inset-1.5 border border-rose-300/40 rounded-full animate-ping opacity-35 pointer-events-none" />
               </div>
-              <span className="text-[10px] font-mono text-rose-400 mt-1 font-semibold tracking-wider">
-                DUO
+              <span className="text-[10px] font-bold font-mono text-rose-500/80 mt-1 tracking-wider uppercase">
+                Complices
               </span>
             </div>
 
             {/* Partner 2 */}
-            <div
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => onOpenProfileModal && onOpenProfileModal('p2')}
-              className="flex flex-col items-center group cursor-pointer"
-              title={`Voir le profil de ${profile.partner2.name}`}
+              className="flex flex-col items-center cursor-pointer group"
+              title={`Profil de ${profile.partner2.name}`}
+              id="hero-avatar-p2"
             >
-              <div className="relative p-1 rounded-full bg-gradient-to-tr from-sky-300 to-indigo-200 shadow-sm transition-transform group-hover:scale-105 duration-300">
+              <div className="relative p-1 rounded-full bg-gradient-to-tr from-sky-300 via-sky-200 to-indigo-200 shadow-xs">
                 <PartnerAvatar
                   name={profile.partner2.name}
                   avatar={profile.partner2.avatar}
@@ -241,238 +276,342 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   className="border-2 border-white"
                 />
                 {activePartnerId === 'p2' && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-sky-600 text-white text-[9px] font-bold shadow-2xs">
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-sky-600 text-white text-[9px] font-bold shadow-xs">
                     Moi
                   </span>
                 )}
               </div>
-              <span className="mt-2 text-xs sm:text-sm font-semibold text-stone-800 tracking-tight">
+              <span className="mt-2 text-sm font-semibold text-stone-800 tracking-tight">
                 {profile.partner2.name}
               </span>
-              <span className="text-[10px] text-stone-500 max-w-[90px] truncate">
+              <span className="text-[11px] text-stone-500 max-w-[100px] truncate">
                 {profile.partner2.mood?.status || 'Amoureux'}
               </span>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Days Together Milestone Counter */}
+          {/* Days Together Milestone */}
           <div className="mt-4 sm:mt-5 text-center">
             <h2 className="font-serif text-2xl sm:text-4xl font-bold tracking-tight text-stone-800">
-              <span className="text-rose-600">{daysTogether.toLocaleString('fr-FR')}</span> jours d'amour
+              <span className="text-rose-600">{daysTogether.toLocaleString('fr-FR')}</span> jours d’amour
             </h2>
             <p className="text-xs sm:text-sm text-stone-500 font-medium mt-1">
-              Depuis notre premier jour ensemble le <span className="text-stone-700 font-semibold">{formattedAnniversary}</span>
+              Depuis le <span className="text-stone-700 font-semibold">{formattedAnniversary}</span>
             </p>
           </div>
 
-          {/* Feedback message for pulse */}
+          {/* Toast feedback when sending love pulse */}
           <AnimatePresence>
-            {pulseSentFeedback && (
+            {pulseFeedback && (
               <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                initial={{ opacity: 0, y: 8, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                exit={{ opacity: 0, y: -8, scale: 0.95 }}
                 className="mt-3 px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-semibold shadow-md flex items-center gap-1.5"
               >
                 <Heart className="w-3.5 h-3.5 fill-white animate-bounce" />
-                <span>{pulseSentFeedback} envoyé à {otherPartner.name} !</span>
+                <span>{pulseFeedback} envoyé avec amour à {otherPartner.name} !</span>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Primary Quick Actions Bar (Miss you pulse & Partner Switcher) */}
-          <div className="mt-5 sm:mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5">
-            {/* Quick Pulse Menu Button */}
-            <div className="relative">
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setActivePulseMenu(!activePulseMenu)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition-all cursor-pointer"
-                id="btn-home-send-pulse"
-              >
-                <Heart className="w-4 h-4 fill-white animate-pulse" />
-                <span>Envoyer une onde à {otherPartner.name}</span>
-                <Sparkles className="w-3.5 h-3.5 text-rose-200" />
-              </motion.button>
-
-              {/* Pulse Menu Popover */}
-              <AnimatePresence>
-                {activePulseMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    className="absolute left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 mt-2 w-64 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-stone-200/80 p-2.5 z-40 text-left"
-                  >
-                    <div className="px-2 py-1 text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-                      Onde d'amour instantanée
-                    </div>
-                    <div className="grid grid-cols-1 gap-1 mt-1">
-                      <button
-                        onClick={() =>
-                          handlePulseAction('hug', 'Gros câlin télépathique tout doux 🧸', 'Câlin télépathique')
-                        }
-                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-xs hover:bg-rose-50 transition-colors text-stone-800 text-left cursor-pointer"
-                      >
-                        <span className="text-lg">🧸</span>
-                        <div>
-                          <p className="font-semibold text-stone-800">Câlin télépathique</p>
-                          <p className="text-[10px] text-stone-500">Douce étreinte à distance</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() =>
-                          handlePulseAction('kiss', 'Pluie de doux baisers sur tes joues 💋', 'Doux baisers')
-                        }
-                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-xs hover:bg-rose-50 transition-colors text-stone-800 text-left cursor-pointer"
-                      >
-                        <span className="text-lg">💋</span>
-                        <div>
-                          <p className="font-semibold text-stone-800">Pluie de baisers</p>
-                          <p className="text-[10px] text-stone-500">Pour te faire sourire</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() =>
-                          handlePulseAction('flame', 'Petite flamme passionnée qui crépite pour toi 🔥', 'Flamme complice')
-                        }
-                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-xs hover:bg-rose-50 transition-colors text-stone-800 text-left cursor-pointer"
-                      >
-                        <span className="text-lg">🔥</span>
-                        <div>
-                          <p className="font-semibold text-stone-800">Flamme complice</p>
-                          <p className="text-[10px] text-stone-500">Pensée coquine & passionnée</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() =>
-                          handlePulseAction('thought', 'Une grosse pensée magique pour toi en ce moment ✨', 'Pensée magique')
-                        }
-                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-xs hover:bg-rose-50 transition-colors text-stone-800 text-left cursor-pointer"
-                      >
-                        <span className="text-lg">✨</span>
-                        <div>
-                          <p className="font-semibold text-stone-800">Pensée magique</p>
-                          <p className="text-[10px] text-stone-500">Hâte de te serrer dans mes bras</p>
-                        </div>
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Quick Switch Partner Toggle */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white/85 border border-stone-200/70 text-xs font-semibold text-stone-600 shadow-2xs">
-              <span className="text-[11px] text-stone-500">Connecté en tant que</span>
-              <button
-                onClick={() => onSwitchPartner(activePartnerId === 'p1' ? 'p2' : 'p1')}
-                className="font-bold text-rose-600 hover:text-rose-700 underline decoration-rose-300 underline-offset-2 cursor-pointer transition-colors"
-                title="Basculer vers l'autre partenaire"
-              >
-                {currentPartner.name}
-              </button>
+          {/* Quick "Ondes d'Amour" Instant Buttons */}
+          <div className="mt-5 w-full max-w-lg">
+            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider mb-2">
+              Envoyer une onde instantanée à {otherPartner.name}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {QUICK_PULSES.map((pulse) => (
+                <motion.button
+                  key={pulse.vibe}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleSendPulse(pulse.vibe, pulse.message, pulse.label)}
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-2xl bg-white/85 border border-stone-200/80 shadow-2xs text-xs font-semibold text-stone-700 transition-all cursor-pointer ${pulse.tagColor}`}
+                  title={pulse.message}
+                >
+                  <span className="text-base">{pulse.icon}</span>
+                  <span className="truncate">{pulse.label}</span>
+                </motion.button>
+              ))}
             </div>
           </div>
+
+          {/* Active profile switch indicator */}
+          <div className="mt-4 pt-3 border-t border-stone-200/60 w-full flex items-center justify-center gap-2 text-xs text-stone-500">
+            <span>Connecté(e) :</span>
+            <span className="font-bold text-stone-800">{currentPartner.name}</span>
+            <span className="text-stone-300">•</span>
+            <button
+              onClick={() => onSwitchPartner(activePartnerId === 'p1' ? 'p2' : 'p1')}
+              className="text-rose-600 font-semibold hover:underline cursor-pointer transition-colors"
+            >
+              Basculer vers {otherPartner.name}
+            </button>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* ========================================================
+          2. LES 4 PILIERS DU NID (NAVIGATION SIMPLE & ÉLÉGANTE)
+         ======================================================== */}
+      <section aria-label="Espaces du couple" className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-serif text-lg sm:text-xl font-bold tracking-tight text-stone-800 flex items-center gap-2">
+            <span>Nos Espaces en Tête-à-Tête</span>
+          </h3>
+          <span className="text-xs text-stone-400 font-medium">Tout en un clic</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+          {/* Card 1: Salon de Chat Intime */}
+          <motion.div
+            whileHover={{ y: -3 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={() => onNavigateToTab('chat')}
+            className="group p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-rose-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            id="card-nav-chat"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 group-hover:scale-110 transition-transform">
+                  <MessageCircle className="w-5 h-5" />
+                </div>
+                {unreadCount > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[11px] font-bold shadow-xs animate-pulse">
+                    {unreadCount} message{unreadCount > 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    En direct
+                  </span>
+                )}
+              </div>
+
+              <h4 className="text-base font-bold text-stone-800 group-hover:text-rose-600 transition-colors">
+                Salon Privé & Vocaux
+              </h4>
+              <p className="text-xs text-stone-500 mt-1">
+                Discutez en tête-à-tête, envoyez vos messages vocaux et photos privées.
+              </p>
+
+              {/* Latest message preview */}
+              <div className="mt-3 p-3 rounded-xl bg-stone-50 border border-stone-100/80 text-xs text-stone-600 italic">
+                {latestMessage ? (
+                  <p className="truncate">
+                    <span className="font-semibold text-stone-700 not-italic">
+                      {latestMessage.senderId === activePartnerId ? 'Toi : ' : `${otherPartner.name} : `}
+                    </span>
+                    {latestMessage.type === 'audio'
+                      ? '🎤 Note vocale'
+                      : latestMessage.type === 'image'
+                      ? '📷 Photo'
+                      : `« ${latestMessage.text} »`}
+                  </p>
+                ) : (
+                  <p className="text-stone-400">Votre salon secret vous attend...</p>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-rose-600">
+              <span>Ouvrir la conversation</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Card 2: Salon des Jeux & Flirt */}
+          <motion.div
+            whileHover={{ y: -3 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={() => onNavigateToTab('games')}
+            className="group p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            id="card-nav-games"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 group-hover:scale-110 transition-transform">
+                  <Gamepad2 className="w-5 h-5" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                  5 Jeux Complices
+                </span>
+              </div>
+
+              <h4 className="text-base font-bold text-stone-800 group-hover:text-amber-700 transition-colors">
+                Salon des Jeux & Flirt
+              </h4>
+              <p className="text-xs text-stone-500 mt-1">
+                Roue des gages coquins, cartes confidences, quiz couple, jeux de rôle et bons d’amour.
+              </p>
+
+              <div className="mt-3 flex items-center gap-2">
+                <span className="px-2 py-1 rounded-lg bg-stone-50 text-[11px] text-stone-600 border border-stone-100">
+                  🎡 Roue des gages
+                </span>
+                <span className="px-2 py-1 rounded-lg bg-stone-50 text-[11px] text-stone-600 border border-stone-100">
+                  🃏 Cartes vérité
+                </span>
+                <span className="px-2 py-1 rounded-lg bg-stone-50 text-[11px] text-stone-600 border border-stone-100">
+                  🎟️ Bons
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-amber-700">
+              <span>Jouer ensemble</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Card 3: Défi Anglais du Jour */}
+          {activeWeeklyChallenge && (
+            <motion.div
+              whileHover={{ y: -3 }}
+              className="p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-violet-300 hover:shadow-md transition-all flex flex-col justify-between"
+              id="card-nav-english"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-700">
+                    <Sparkle className="w-5 h-5" />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-bold">
+                    Anglais Romantique
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-bold text-stone-800">
+                    « {activeWeeklyChallenge.targetEnglish} »
+                  </h4>
+                  <button
+                    onClick={() => handlePlayPronunciation(activeWeeklyChallenge.targetEnglish)}
+                    className={`p-1.5 rounded-full bg-violet-50 hover:bg-violet-100 text-violet-700 transition-colors cursor-pointer ${
+                      isPlayingAudio ? 'scale-110 text-violet-900 animate-pulse' : ''
+                    }`}
+                    title="Écouter la prononciation audio"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs font-semibold text-violet-800 mt-1">
+                  {activeWeeklyChallenge.targetFrench}
+                </p>
+                <p className="text-xs text-stone-500 mt-1 line-clamp-2">
+                  {activeWeeklyChallenge.tips || activeWeeklyChallenge.description}
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-stone-100 flex items-center gap-2">
+                <button
+                  onClick={() => handleLaunchChallengeInChat(activeWeeklyChallenge)}
+                  className="flex-1 py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Dire dans le chat</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (onNavigateToGame) onNavigateToGame('weekly_challenges');
+                    else onNavigateToTab('games');
+                  }}
+                  className="py-2 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Lexique
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Card 4: Notre Galerie Partagée */}
+          <motion.div
+            whileHover={{ y: -3 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={() => onNavigateToTab('gallery')}
+            className="group p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-pink-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            id="card-nav-gallery"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600 group-hover:scale-110 transition-transform">
+                  <Images className="w-5 h-5" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200 text-[11px] font-bold">
+                  Nos Souvenirs
+                </span>
+              </div>
+
+              <h4 className="text-base font-bold text-stone-800 group-hover:text-pink-600 transition-colors">
+                Galerie & Album Duo
+              </h4>
+              <p className="text-xs text-stone-500 mt-1">
+                Tous vos précieux clichés, voyages et souvenirs immortalisés ensemble.
+              </p>
+
+              {/* Photo preview avatars */}
+              <div className="mt-3 flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                  <img
+                    src={profile.partner1.avatar || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80'}
+                    alt={profile.partner1.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                  <img
+                    src={profile.partner2.avatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80'}
+                    alt={profile.partner2.name}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="h-10 px-3 rounded-xl bg-pink-50/70 border border-pink-100 flex items-center text-xs font-semibold text-pink-700">
+                  + Album partagé
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-pink-600">
+              <span>Voir l’album photo</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* 2. Bento Grid: Chat Intime & Mot Doux du Jour */}
+      {/* ========================================================
+          3. MOTS DOUX & MÉTÉO DU CŒUR (INTIMITÉ & TENDRESSE)
+         ======================================================== */}
       <section className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
-        {/* Salon Privé (Chat Direct Preview) - 6 cols */}
-        <div className="md:col-span-6 flex flex-col justify-between rounded-3xl bg-white/90 border border-stone-200/70 p-5 sm:p-6 shadow-xs hover:border-rose-200 transition-all">
+        {/* Le Billet Doux (7 cols) */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="md:col-span-7 rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FAF5EE] to-[#F5EFE6] border border-amber-200/70 p-5 sm:p-6 shadow-xs flex flex-col justify-between"
+          id="section-billet-doux"
+        >
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-                  <MessageCircle className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-stone-800">Salon de Chat Intime</h3>
-                  <p className="text-[11px] text-stone-500">Messages, vocaux & photos en direct</p>
-                </div>
-              </div>
-              {unreadMessagesCount > 0 ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[11px] font-bold shadow-2xs animate-pulse">
-                  {unreadMessagesCount} nouveau{unreadMessagesCount > 1 ? 'x' : ''}
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Synchronisé
-                </span>
-              )}
-            </div>
-
-            {/* Last message preview bubble */}
-            <div className="my-3 p-3.5 rounded-2xl bg-stone-50/80 border border-stone-100">
-              {latestMessage ? (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] text-stone-500">
-                    <span className="font-semibold text-stone-700">
-                      {latestMessage.senderId === activePartnerId
-                        ? 'Toi'
-                        : otherPartner.name}
-                    </span>
-                    <span className="text-[10px]">
-                      {new Date(latestMessage.timestamp).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-stone-700 line-clamp-2 italic">
-                    {latestMessage.type === 'audio'
-                      ? '🎤 [Message vocal enregistré]'
-                      : latestMessage.type === 'image'
-                      ? '📷 [Photo partagée]'
-                      : `"${latestMessage.text}"`}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-stone-500 italic text-center py-1">
-                  Votre salon secret vous attend. Envoyez un mot doux pour débuter la journée...
-                </p>
-              )}
-            </div>
-          </div>
-
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onNavigateToTab('chat')}
-            className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-stone-900 hover:bg-black text-white text-xs font-semibold shadow-xs hover:shadow-sm transition-all cursor-pointer group"
-            id="btn-home-open-chat"
-          >
-            <span>Rejoindre la conversation</span>
-            <ArrowRight className="w-3.5 h-3.5 text-stone-400 group-hover:translate-x-0.5 transition-transform" />
-          </motion.button>
-        </div>
-
-        {/* Le Billet Doux en Vedette - 6 cols */}
-        <div className="md:col-span-6 flex flex-col justify-between rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FAF4ED] to-[#F7EFE5] border border-amber-200/60 p-5 sm:p-6 shadow-xs">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-amber-800">
+                <div className="w-8 h-8 rounded-xl bg-amber-100/80 border border-amber-200/80 flex items-center justify-center text-amber-800">
                   <Feather className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-stone-800">Billet Doux & Pensée Secrète</h3>
-                  <p className="text-[11px] text-stone-500">Mots d'amour pour réchauffer le cœur</p>
-                </div>
+                <h4 className="text-sm font-bold text-stone-800">Billet Doux du Jour</h4>
               </div>
-              <span className="text-amber-700 font-serif italic text-xs">Parfum d'amour</span>
+              <span className="text-xs font-serif italic text-amber-800/80">Pensée d’amour</span>
             </div>
 
-            {/* Note display */}
-            <div className="my-3 p-4 rounded-2xl bg-white/70 backdrop-blur-xs border border-amber-200/50 shadow-2xs relative">
+            <div className="my-2 p-4 rounded-2xl bg-white/80 backdrop-blur-xs border border-amber-200/50 shadow-2xs relative">
               <Quote className="w-4 h-4 text-amber-300 absolute top-2 right-2 opacity-50" />
               {latestNote ? (
                 <div>
-                  <p className="font-['Caveat',cursive] text-base sm:text-lg text-stone-800 leading-snug line-clamp-3">
+                  <p className="font-['Caveat',cursive] text-lg sm:text-xl text-stone-800 leading-snug">
                     « {latestNote.content} »
                   </p>
-                  <p className="text-[10px] text-amber-800/80 font-medium text-right mt-2">
+                  <p className="text-[11px] text-amber-800 font-medium text-right mt-2">
                     De {latestNote.senderId === 'p1' ? profile.partner1.name : profile.partner2.name} •{' '}
                     {new Date(latestNote.date).toLocaleDateString('fr-FR', {
                       day: 'numeric',
@@ -481,8 +620,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </p>
                 </div>
               ) : (
-                <p className="font-['Caveat',cursive] text-base sm:text-lg text-stone-600 italic text-center py-1">
-                  « Tu es la plus belle chose qui me soit arrivée. Je t'aime un peu plus chaque seconde. »
+                <p className="font-['Caveat',cursive] text-lg sm:text-xl text-stone-600 italic text-center py-2">
+                  « Tu es la plus belle chose qui me soit arrivée. Je t’aime un peu plus chaque seconde. »
                 </p>
               )}
             </div>
@@ -491,323 +630,35 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={onOpenWriteNoteModal}
-            className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-semibold shadow-xs hover:shadow-sm transition-all cursor-pointer group"
+            className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
             id="btn-home-write-note"
           >
             <Feather className="w-3.5 h-3.5 text-amber-200" />
             <span>Laisser un mot doux à {otherPartner.name}</span>
           </motion.button>
-        </div>
-      </section>
+        </motion.div>
 
-      {/* 3. Défi Anglais en Amoureux (English Learning Highlight) */}
-      {activeWeeklyChallenge && (
-        <section
-          aria-label="Défi anglais en duo"
-          className="rounded-3xl bg-gradient-to-r from-stone-900 via-stone-800 to-rose-950 text-white p-5 sm:p-7 shadow-md relative overflow-hidden"
+        {/* Météo du Cœur (5 cols) */}
+        <motion.div
+          whileHover={{ y: -2 }}
+          className="md:col-span-5 rounded-3xl bg-white border border-stone-200/70 p-5 sm:p-6 shadow-xs flex flex-col justify-between"
+          id="section-meteo-du-coeur"
         >
-          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-rose-500/10 to-transparent pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-400/30 text-rose-300 text-[10px] font-bold uppercase tracking-wider">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>Défi Anglais de la Semaine</span>
-                <span>•</span>
-                <span>Semaine {activeWeeklyChallenge.weekNumber}</span>
-              </div>
-
-              <h3 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                <span>« {activeWeeklyChallenge.targetEnglish} »</span>
-                <button
-                  onClick={() => handlePlayPronunciation(activeWeeklyChallenge.targetEnglish)}
-                  className={`p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-rose-300 cursor-pointer ${
-                    isPlayingAudio ? 'scale-110 text-amber-300 animate-pulse' : ''
-                  }`}
-                  title="Écouter la prononciation anglaise"
-                >
-                  <Volume2 className="w-4 h-4" />
-                </button>
-              </h3>
-
-              <p className="text-xs text-stone-300">
-                <span className="text-amber-300 font-semibold">{activeWeeklyChallenge.targetFrench}</span>
-                {activeWeeklyChallenge.phonetic && (
-                  <>
-                    <span className="mx-2 text-stone-500">•</span>
-                    <span className="italic text-stone-400">/{activeWeeklyChallenge.phonetic}/</span>
-                  </>
-                )}
-              </p>
-
-              <p className="text-xs text-stone-400">
-                {activeWeeklyChallenge.tips || activeWeeklyChallenge.description}
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={() => handleLaunchChallengeInChat(activeWeeklyChallenge)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                id="btn-home-english-challenge-chat"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Lancer dans le chat</span>
-              </motion.button>
-
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={() => handleLaunchGame('weekly_challenges')}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-stone-200 hover:text-white text-xs font-semibold border border-white/10 transition-colors cursor-pointer"
-                id="btn-home-english-all-challenges"
-              >
-                <Gamepad2 className="w-4 h-4 text-rose-300" />
-                <span>Voir tous les défis</span>
-              </motion.button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 4. Le Salon des 5 Jeux & Flirt en Duo */}
-      <section aria-label="Salon des jeux duo" className="space-y-4">
-        <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-stone-800">
-              Salon des Jeux & Flirt
-            </h2>
-            <p className="text-xs text-stone-500">
-              5 expériences exclusives pour pimenter votre complicité à deux
-            </p>
-          </div>
-          <button
-            onClick={() => onNavigateToTab('games')}
-            className="flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
-          >
-            <span>Explorer tout</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          {/* Game 1: Roue des Gages */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            onClick={() => handleLaunchGame('roulette')}
-            className="p-4 rounded-2xl bg-white border border-stone-200/70 shadow-xs hover:shadow-sm hover:border-rose-300 transition-all cursor-pointer flex flex-col justify-between group"
-            id="card-game-roulette"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-2xl">🎡</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
-                  Gages & Bisous
-                </span>
-              </div>
-              <h3 className="text-sm font-bold text-stone-800 group-hover:text-rose-600 transition-colors">
-                La Roue des Gages Amoureux
-              </h3>
-              <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                Tournez la roue interactive et accomplissez des gages romantiques, coquins ou complices à deux.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-rose-600">
-              <span>Tourner la roue</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
-
-          {/* Game 2: Cartes Flirt & Vérité */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            onClick={() => handleLaunchGame('cards')}
-            className="p-4 rounded-2xl bg-white border border-stone-200/70 shadow-xs hover:shadow-sm hover:border-amber-300 transition-all cursor-pointer flex flex-col justify-between group"
-            id="card-game-flirt-cards"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-2xl">🃏</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-                  Confidences
-                </span>
-              </div>
-              <h3 className="text-sm font-bold text-stone-800 group-hover:text-amber-700 transition-colors">
-                Cartes Flirt & Vérités
-              </h3>
-              <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                24 cartes de questions intimes, défis et vérités secrètes pour se redécouvrir sans filtre.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-amber-700">
-              <span>Tirer une carte</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
-
-          {/* Game 3: Love Blind Test */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            onClick={() => handleLaunchGame('trivia')}
-            className="p-4 rounded-2xl bg-white border border-stone-200/70 shadow-xs hover:shadow-sm hover:border-sky-300 transition-all cursor-pointer flex flex-col justify-between group"
-            id="card-game-blind-test"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-2xl">🎵</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-100">
-                  Quiz Couple
-                </span>
-              </div>
-              <h3 className="text-sm font-bold text-stone-800 group-hover:text-sky-700 transition-colors">
-                Love Blind Test & Quiz
-              </h3>
-              <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                Testez vos connaissances mutuelles : qui embrasse le mieux ? qui a dit je t'aime en premier ?
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-sky-700">
-              <span>Lancer le quiz</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
-
-          {/* Game 4: Jeu de Rôle Romantique */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            onClick={() => handleLaunchGame('roleplay')}
-            className="p-4 rounded-2xl bg-white border border-stone-200/70 shadow-xs hover:shadow-sm hover:border-purple-300 transition-all cursor-pointer flex flex-col justify-between group"
-            id="card-game-roleplay"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-2xl">🎭</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
-                  Improvisation
-                </span>
-              </div>
-              <h3 className="text-sm font-bold text-stone-800 group-hover:text-purple-700 transition-colors">
-                Jeu de Rôle Romantique
-              </h3>
-              <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                Incarnez des personnages et inventez des scénarios de drague et de séduction inédits.
-              </p>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-purple-700">
-              <span>Commencer un scénario</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
-
-          {/* Game 5: Bons pour Privilèges */}
-          <motion.div
-            whileHover={{ y: -3 }}
-            onClick={() => handleLaunchGame('vouchers')}
-            className="p-4 rounded-2xl bg-white border border-stone-200/70 shadow-xs hover:shadow-sm hover:border-emerald-300 transition-all cursor-pointer flex flex-col justify-between group sm:col-span-2 lg:col-span-2"
-            id="card-game-vouchers"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">🎟️</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                    {unredeemedVouchers.length} bon{unredeemedVouchers.length > 1 ? 's' : ''} disponible{unredeemedVouchers.length > 1 ? 's' : ''}
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold text-stone-800 group-hover:text-emerald-700 transition-colors">
-                  Bons Cadeaux d'Amour & Privilèges
-                </h3>
-                <p className="text-xs text-stone-500 mt-1 leading-relaxed">
-                  Bons pour un massage relaxant, un petit-déjeuner au lit ou une grasse matinée royale à réclamer quand vous voulez !
-                </p>
-              </div>
-              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-semibold">
-                <span>Voir nos bons</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* 5. Galerie Duo & Météo du Cœur */}
-      <section className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
-        {/* Galerie Duo preview - 7 cols */}
-        <div className="md:col-span-7 rounded-3xl bg-white/90 border border-stone-200/70 p-5 sm:p-6 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-                  <Images className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600">
+                  <Smile className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-stone-800">Notre Galerie Duo</h3>
-                  <p className="text-[11px] text-stone-500">Nos plus beaux instants en tête-à-tête</p>
-                </div>
+                <h4 className="text-sm font-bold text-stone-800">Météo du Cœur</h4>
               </div>
-              <button
-                onClick={() => onNavigateToTab('gallery')}
-                className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Voir la galerie</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              <span className="text-[11px] text-stone-400 font-medium">Humeurs</span>
             </div>
 
-            {/* Visual Polaroid preview */}
-            <div className="grid grid-cols-2 gap-3 my-2">
-              <div className="relative group overflow-hidden rounded-2xl bg-stone-100 aspect-4/3 border border-stone-200/60 shadow-2xs">
-                <img
-                  src={profile.partner1.avatar || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop&q=80'}
-                  alt={profile.partner1.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90 flex items-end p-2.5">
-                  <p className="text-white text-xs font-semibold truncate">{profile.partner1.name}</p>
-                </div>
-              </div>
-              <div className="relative group overflow-hidden rounded-2xl bg-stone-100 aspect-4/3 border border-stone-200/60 shadow-2xs">
-                <img
-                  src={profile.partner2.avatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80'}
-                  alt={profile.partner2.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-90 flex items-end p-2.5">
-                  <p className="text-white text-xs font-semibold truncate">{profile.partner2.name}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onNavigateToTab('gallery')}
-            className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-semibold transition-colors cursor-pointer"
-          >
-            <Camera className="w-3.5 h-3.5 text-stone-600" />
-            <span>Parcourir toutes nos photos partagées</span>
-          </motion.button>
-        </div>
-
-        {/* Météo du Cœur (Humeurs & Besoins en direct) - 5 cols */}
-        <div className="md:col-span-5 rounded-3xl bg-white/90 border border-stone-200/70 p-5 sm:p-6 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600">
-                <Smile className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-stone-800">Météo du Cœur</h3>
-                <p className="text-[11px] text-stone-500">Humeurs et besoins du moment</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {/* Partner 1 status */}
-              <div className="p-3 rounded-2xl bg-stone-50/80 border border-stone-100 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
+            <div className="space-y-2.5 my-2">
+              {/* Partner 1 Mood */}
+              <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <PartnerAvatar
                     name={profile.partner1.name}
                     avatar={profile.partner1.avatar}
@@ -822,13 +673,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </div>
                 </div>
                 <span className="text-[10px] text-stone-500 bg-white px-2 py-0.5 rounded-md border border-stone-200">
-                  {profile.partner1.mood?.need || "Besoin d'un câlin"}
+                  {profile.partner1.mood?.need || 'Envie d’un câlin'}
                 </span>
               </div>
 
-              {/* Partner 2 status */}
-              <div className="p-3 rounded-2xl bg-stone-50/80 border border-stone-100 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
+              {/* Partner 2 Mood */}
+              <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <PartnerAvatar
                     name={profile.partner2.name}
                     avatar={profile.partner2.avatar}
@@ -849,25 +700,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-            <span>Envie de changer d'humeur ?</span>
-            <button
-              onClick={() => onOpenProfileModal && onOpenProfileModal(activePartnerId)}
-              className="text-rose-600 font-semibold hover:underline cursor-pointer"
-            >
-              Modifier mon humeur
-            </button>
-          </div>
-        </div>
+          <button
+            onClick={() => onOpenProfileModal && onOpenProfileModal(activePartnerId)}
+            className="w-full mt-3 py-2 text-center text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/60 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+          >
+            Mettre à jour mon humeur
+          </button>
+        </motion.div>
       </section>
 
-      {/* Romantic Quote Footer */}
-      <div className="text-center py-4">
-        <p className="font-serif italic text-xs sm:text-sm text-stone-500 max-w-lg mx-auto">
-          « Aimer, ce n'est pas se regarder l'un l'autre, c'est regarder ensemble dans la même direction. »
-        </p>
-        <p className="text-[10px] text-stone-400 mt-1 uppercase tracking-widest">
-          {profile.relationshipTitle} • Toujours complices
+      {/* Romantic Footer Note */}
+      <div className="text-center py-2">
+        <p className="font-serif italic text-xs text-stone-400">
+          « Aimer, ce n’est pas se regarder l’un l’autre, c’est regarder ensemble dans la même direction. »
         </p>
       </div>
     </div>

@@ -34,6 +34,8 @@ import {
 import { soundEffects } from '../../lib/audio';
 import { PartnerAvatar } from '../PartnerAvatar';
 import { triggerHeartConfetti } from '../../lib/confetti';
+import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
+import { CameraCaptureModal } from '../modals/CameraCaptureModal';
 
 export type GallerySourceType =
   | 'all'
@@ -66,6 +68,7 @@ interface SharedGalleryViewProps {
   capsules: TimeCapsule[];
   challenges: CoupleChallenge[];
   onLikeMemory?: (memoryId: string) => void;
+  onAddMemory?: (memory: Omit<TimelineMemory, 'id' | 'likes'>) => void;
   onOpenAddMemoryModal: () => void;
   onOpenProfileModal: (pId?: PartnerId) => void;
   onEditMemory?: (memory: TimelineMemory) => void;
@@ -82,6 +85,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   capsules,
   challenges,
   onLikeMemory,
+  onAddMemory,
   onOpenAddMemoryModal,
   onOpenProfileModal,
   onEditMemory,
@@ -95,6 +99,25 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [galleryLayout, setGalleryLayout] = useState<'fit' | 'natural'>('fit');
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+
+  const handlePhotoCapturedFromCamera = (dataUrl: string, caption?: string) => {
+    if (onAddMemory) {
+      onAddMemory({
+        title: caption && caption.trim() ? caption.trim() : 'Photo capturée en direct',
+        photoUrl: dataUrl,
+        date: new Date().toISOString().split('T')[0],
+        category: 'rencard',
+        description: 'Photo prise sur le vif depuis la Galerie partagée',
+        authorId: activePartnerId,
+        tags: ['Galerie', 'En direct', 'Amour'],
+      });
+      soundEffects.playSuccessSparkle();
+      triggerHeartConfetti();
+    } else {
+      onOpenAddMemoryModal();
+    }
+  };
 
   // Compile all photos across the application into unified items
   const allGalleryItems: GalleryItem[] = useMemo(() => {
@@ -262,32 +285,6 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       });
   }, [allGalleryItems, selectedSource, selectedPartnerFilter, searchQuery, sortOrder]);
 
-  // Handle keyboard navigation for Lightbox
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeLightboxIndex === null) return;
-      if (e.key === 'Escape') {
-        setActiveLightboxIndex(null);
-      } else if (e.key === 'ArrowLeft') {
-        setActiveLightboxIndex((prev) =>
-          prev !== null && prev > 0 ? prev - 1 : filteredItems.length - 1
-        );
-      } else if (e.key === 'ArrowRight') {
-        setActiveLightboxIndex((prev) =>
-          prev !== null && prev < filteredItems.length - 1 ? prev + 1 : 0
-        );
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeLightboxIndex, filteredItems.length]);
-
-  const activePhoto =
-    activeLightboxIndex !== null && filteredItems[activeLightboxIndex]
-      ? filteredItems[activeLightboxIndex]
-      : null;
-
   const currentPartner =
     activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
 
@@ -326,6 +323,63 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         };
     }
   };
+
+  // Mobile & Desktop Swipeable Photo Items for Lightbox
+  const photoViewerItems: PhotoViewerItem[] = useMemo(() => {
+    return filteredItems.map((item) => {
+      const badge = getSourceBadgeInfo(item.sourceType);
+      const author =
+        item.authorId === 'p1'
+          ? profile.partner1
+          : item.authorId === 'p2'
+          ? profile.partner2
+          : null;
+
+      const mem =
+        item.sourceType === 'memory' && item.originalEntityId
+          ? memories.find((m) => m.id === item.originalEntityId)
+          : null;
+
+      return {
+        id: item.id,
+        photoUrl: item.photoUrl,
+        title: item.title,
+        description: item.description,
+        date: item.date,
+        locationName: item.locationName,
+        badgeLabel: badge.label,
+        badgeBg: badge.bg,
+        authorId: item.authorId,
+        authorName: author?.name || (item.authorId === 'both' ? 'En duo' : undefined),
+        authorAvatar: author?.avatar,
+        isLiked: item.likes?.includes(activePartnerId),
+        likeCount: item.likes?.length,
+        tags: item.tags,
+        onLike:
+          item.sourceType === 'memory' && item.originalEntityId && onLikeMemory
+            ? () => onLikeMemory(item.originalEntityId!)
+            : undefined,
+        onDelete: onDeleteMediaItem
+          ? () => onDeleteMediaItem(item)
+          : item.sourceType === 'memory' && item.originalEntityId && onDeleteMemory
+          ? () => onDeleteMemory(item.originalEntityId!)
+          : undefined,
+        onEdit: mem && onEditMemory ? () => onEditMemory(mem) : undefined,
+        onRemovePhotoOnly: onRemovePhotoOnly ? () => onRemovePhotoOnly(item) : undefined,
+      };
+    });
+  }, [
+    filteredItems,
+    profile.partner1,
+    profile.partner2,
+    activePartnerId,
+    memories,
+    onLikeMemory,
+    onDeleteMediaItem,
+    onDeleteMemory,
+    onEditMemory,
+    onRemovePhotoOnly,
+  ]);
 
   const p1Name = profile.partner1?.name || 'Safi';
   const p2Name = profile.partner2?.name || 'Med';
@@ -375,7 +429,19 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           </div>
 
           {/* Quick actions */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 w-full sm:w-auto justify-center sm:justify-end">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 w-full sm:w-auto justify-center sm:justify-end">
+            <button
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowCameraModal(true);
+              }}
+              className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-rose-700 hover:bg-rose-800 active:scale-95 text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/20"
+              title="Prendre une photo directement avec la caméra"
+              id="btn-gallery-take-photo"
+            >
+              <Camera className="w-4 h-4 text-white" />
+              <span>Prendre une photo</span>
+            </button>
             <button
               onClick={() => {
                 soundEffects.playNoteClick();
@@ -622,10 +688,20 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
             )}
             <button
               onClick={() => {
+                soundEffects.playSoftTap();
+                setShowCameraModal(true);
+              }}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Prendre une photo</span>
+            </button>
+            <button
+              onClick={() => {
                 soundEffects.playNoteClick();
                 onOpenAddMemoryModal();
               }}
-              className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Ajouter une photo</span>
@@ -918,266 +994,25 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         </div>
       )}
 
-      {/* Fullscreen Lightbox Modal */}
-      <AnimatePresence>
-        {activePhoto && activeLightboxIndex !== null && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md">
-            {/* Close button */}
-            <button
-              onClick={() => setActiveLightboxIndex(null)}
-              className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors"
-              title="Fermer (Échap)"
-            >
-              <X className="w-6 h-6" />
-            </button>
+      {/* Fullscreen Mobile & Desktop Photo Viewer (Swipe & Pinch-to-Zoom like Android / iOS) */}
+      <MobilePhotoViewer
+        items={photoViewerItems}
+        initialIndex={activeLightboxIndex ?? 0}
+        isOpen={activeLightboxIndex !== null}
+        onClose={() => setActiveLightboxIndex(null)}
+        onIndexChange={(newIndex) => setActiveLightboxIndex(newIndex)}
+      />
 
-            {/* Prev / Next buttons */}
-            {filteredItems.length > 1 && (
-              <>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    soundEffects.playNoteClick();
-                    setActiveLightboxIndex((prev) =>
-                      prev !== null && prev > 0 ? prev - 1 : filteredItems.length - 1
-                    );
-                  }}
-                  className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors"
-                  title="Photo précédente (Flèche gauche)"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                </button>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    soundEffects.playNoteClick();
-                    setActiveLightboxIndex((prev) =>
-                      prev !== null && prev < filteredItems.length - 1 ? prev + 1 : 0
-                    );
-                  }}
-                  className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors"
-                  title="Photo suivante (Flèche droite)"
-                >
-                  <ChevronRight className="w-6 h-6" />
-                </button>
-              </>
-            )}
-
-            {/* Lightbox Content Container */}
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative max-w-4xl w-full max-h-[92vh] flex flex-col bg-stone-950 rounded-3xl overflow-hidden border border-white/10 shadow-2xl"
-            >
-              {/* Main Image View */}
-              <div className="relative flex-1 min-h-[300px] max-h-[65vh] flex items-center justify-center bg-black/60 overflow-hidden">
-                <img
-                  src={activePhoto.photoUrl}
-                  alt={activePhoto.title}
-                  className="max-h-[65vh] max-w-full w-auto h-auto object-contain select-none"
-                />
-
-                {/* Counter pill */}
-                <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white/90 text-xs font-semibold border border-white/10">
-                  {activeLightboxIndex + 1} / {filteredItems.length}
-                </div>
-
-                {/* Direct Image Actions */}
-                <div className="absolute top-4 right-4 flex items-center gap-2">
-                  <a
-                    href={activePhoto.photoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white text-xs backdrop-blur-md border border-white/10 transition-colors"
-                    title="Ouvrir dans un nouvel onglet"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-
-              {/* Photo Meta & Story Footer */}
-              <div className="p-4 sm:p-6 bg-stone-900 text-white border-t border-white/10 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                          getSourceBadgeInfo(activePhoto.sourceType).bg
-                        }`}
-                      >
-                        {getSourceBadgeInfo(activePhoto.sourceType).label}
-                      </span>
-                      {activePhoto.locationName && (
-                        <span className="flex items-center gap-1 text-xs text-rose-300 font-medium">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {activePhoto.locationName}
-                        </span>
-                      )}
-                      {activePhoto.date && (
-                        <span className="flex items-center gap-1 text-xs text-stone-400">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {activePhoto.date}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-lg sm:text-xl font-serif font-bold text-white mt-1">
-                      {activePhoto.title}
-                    </h3>
-                  </div>
-
-                  {/* Heart / Like & Action */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    {activePhoto.sourceType === 'memory' &&
-                      activePhoto.originalEntityId &&
-                      onLikeMemory && (
-                        <button
-                          onClick={() => {
-                            if (activePhoto.originalEntityId) {
-                              onLikeMemory(activePhoto.originalEntityId);
-                              triggerHeartConfetti();
-                              soundEffects.playHeartPulse();
-                            }
-                          }}
-                          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                            activePhoto.likes?.includes(activePartnerId)
-                              ? 'bg-rose-500 text-white'
-                              : 'bg-white/10 hover:bg-white/20 text-rose-300'
-                          }`}
-                        >
-                          <Heart
-                            className={`w-4 h-4 ${
-                              activePhoto.likes?.includes(activePartnerId)
-                                ? 'fill-white text-white'
-                                : 'fill-rose-400 text-rose-400'
-                            }`}
-                          />
-                          <span>{activePhoto.likes?.length || 0} J'aime</span>
-                        </button>
-                      )}
-
-                    {/* Media Actions for Lightbox */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {onRemovePhotoOnly && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const target = activePhoto;
-                            setActiveLightboxIndex(null);
-                            onRemovePhotoOnly(target);
-                          }}
-                          className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                          title="Supprimer uniquement cette photo"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Retirer photo</span>
-                        </button>
-                      )}
-
-                      {onDeleteMediaItem ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const target = activePhoto;
-                            setActiveLightboxIndex(null);
-                            onDeleteMediaItem(target);
-                          }}
-                          className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                          title="Supprimer ce média"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Supprimer</span>
-                        </button>
-                      ) : (
-                        activePhoto.sourceType === 'memory' &&
-                        activePhoto.originalEntityId &&
-                        onDeleteMemory && (
-                          <button
-                            onClick={() => {
-                              const memId = activePhoto.originalEntityId!;
-                              setActiveLightboxIndex(null);
-                              onDeleteMemory(memId);
-                            }}
-                            className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                            title="Supprimer ce souvenir"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Supprimer</span>
-                          </button>
-                        )
-                      )}
-
-                      {activePhoto.sourceType === 'memory' &&
-                        activePhoto.originalEntityId &&
-                        onEditMemory && (
-                          <button
-                            onClick={() => {
-                              const mem = memories.find(
-                                (m) => m.id === activePhoto.originalEntityId
-                              );
-                              if (mem) {
-                                setActiveLightboxIndex(null);
-                                onEditMemory(mem);
-                              }
-                            }}
-                            className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                            title="Modifier ce souvenir"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Modifier</span>
-                          </button>
-                        )}
-
-                      {activePhoto.sourceType === 'profile' && (
-                        <button
-                          onClick={() => {
-                            setActiveLightboxIndex(null);
-                            onOpenProfileModal(
-                              activePhoto.authorId === 'p1' || activePhoto.authorId === 'p2'
-                                ? activePhoto.authorId
-                                : undefined
-                            );
-                          }}
-                          className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Camera className="w-3.5 h-3.5" />
-                          <span>Changer photo</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Story / Description */}
-                {activePhoto.description && (
-                  <p className="text-xs sm:text-sm text-stone-300 leading-relaxed max-w-3xl">
-                    {activePhoto.description}
-                  </p>
-                )}
-
-                {/* Tags */}
-                {activePhoto.tags && activePhoto.tags.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                    {activePhoto.tags.map((t, idx) => (
-                      <span
-                        key={`${t}-${idx}`}
-                        className="text-[11px] px-2 py-0.5 rounded-md bg-white/10 text-stone-300 flex items-center gap-1"
-                      >
-                        <Tag className="w-2.5 h-2.5 text-rose-400" />
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Live In-App Camera Viewfinder Modal */}
+      <CameraCaptureModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onPhotoCaptured={handlePhotoCapturedFromCamera}
+        title="Prendre une photo pour la galerie"
+        subtitle="Capturez cet instant à deux et immortalisez-le"
+        submitLabel="Ajouter à notre galerie"
+        allowCaption={true}
+      />
     </div>
   );
 };

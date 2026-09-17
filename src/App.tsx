@@ -1903,6 +1903,7 @@ export default function App() {
               capsules={capsules}
               challenges={challenges}
               onLikeMemory={handleLikeMemory}
+              onAddMemory={handleAddMemory}
               onOpenAddMemoryModal={() => {
                 setEditingMemory(null);
                 setShowAddMemoryModal(true);

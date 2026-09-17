@@ -1,7 +1,7 @@
 // Service Worker for Nid d'Amour PWA
 // Offline caching, background push notifications & home screen badging
 
-const CACHE_NAME = 'nid-damour-cache-v2';
+const CACHE_NAME = 'nid-damour-cache-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -26,7 +26,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate: Clean up old caches
+// Activate: Clean up all old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -51,13 +51,20 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Skip Firestore, Gemini API, and chrome-extension calls
+  // ALWAYS bypass Vite, node_modules, dev tools, and APIs
   if (
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('generativelanguage') ||
     url.pathname.startsWith('/api/') ||
-    url.protocol.startsWith('chrome-extension')
+    url.protocol.startsWith('chrome-extension') ||
+    url.pathname.includes('/@vite/') ||
+    url.pathname.includes('/@fs/') ||
+    url.pathname.includes('/@id/') ||
+    url.pathname.includes('/node_modules/') ||
+    url.pathname.startsWith('/src/') ||
+    url.search.includes('?v=') ||
+    url.search.includes('&v=')
   ) {
     return;
   }

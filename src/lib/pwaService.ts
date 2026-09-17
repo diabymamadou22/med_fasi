@@ -13,7 +13,31 @@ export function onPwaNavigate(callback: NavigateListener): () => void {
 }
 
 export function registerServiceWorker(): void {
-  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  // In development, unregister any existing service worker and purge caches
+  // to prevent stale chunk caching from breaking Vite and React hooks.
+  if (import.meta.env.DEV) {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        for (const key of keys) {
+          caches.delete(key);
+        }
+      });
+    }
+    return;
+  }
+
+  if (!('serviceWorker' in navigator)) {
     return;
   }
 
