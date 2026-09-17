@@ -103,7 +103,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       {/* 2. Mobile Fixed Bottom Tab Bar (Designed for Smartphone Thumb Reach) */}
       <nav
         aria-label="Navigation principale mobile"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-rose-100/90 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] px-1 pt-1.5 pb-[max(0.6rem,env(safe-area-inset-bottom))] flex items-center justify-around"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-rose-100/90 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] px-1 pt-1.5 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-[max(0.5rem,env(safe-area-inset-right,0px))] flex items-center justify-around"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;

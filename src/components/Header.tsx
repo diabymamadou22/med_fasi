@@ -76,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[#FAF7F5]/95 backdrop-blur-md border-b border-rose-100/80 px-3 sm:px-6 py-2 sm:py-3 transition-all">
+    <header className="sticky top-0 z-30 bg-[#FAF7F5]/95 backdrop-blur-md border-b border-rose-100/80 px-3 sm:px-6 pt-[max(0.6rem,env(safe-area-inset-top,0px))] pb-2 sm:pb-3 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] transition-all">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
         {/* Top / Left: Couple Brand & Days counter & Photos */}
         <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-4">

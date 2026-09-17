@@ -1772,8 +1772,8 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen bg-[#FAF7F5] flex flex-col justify-between selection:bg-rose-200 ${
-        activeTab === 'chat' ? 'h-screen h-[100dvh] overflow-hidden no-scrollbar' : ''
+      className={`min-h-screen min-h-[100dvh] bg-[#FAF7F5] flex flex-col justify-between selection:bg-rose-200 ${
+        activeTab === 'chat' ? 'h-screen h-[100dvh] max-h-[100dvh] overflow-hidden no-scrollbar' : ''
       }`}
     >
       {/* Floating real-time message alert if user is in another tab */}
@@ -1823,7 +1823,9 @@ export default function App() {
       {/* Main Body */}
       <main
         className={`flex-1 flex flex-col min-h-0 ${
-          activeTab === 'chat' ? 'pb-0 overflow-hidden' : 'pb-24 sm:pb-12'
+          activeTab === 'chat'
+            ? 'pb-0 overflow-hidden'
+            : 'pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:pb-12'
         }`}
       >
         {/* Tab Navigation - hidden when in Chat like a native messaging phone screen */}

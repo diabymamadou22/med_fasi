@@ -1,6 +1,9 @@
 // Native Web Speech API utility for pronouncing English words and sentences
 // Specially tuned with slow rate (0.85x) for beginner French speakers
 
+// Retain in module scope so iOS Safari doesn't garbage collect the utterance mid-speech
+let activeUtterance: SpeechSynthesisUtterance | null = null;
+
 export const speakEnglish = (
   text: string,
   options?: { rate?: number; pitch?: number; onEnd?: () => void }
@@ -11,6 +14,7 @@ export const speakEnglish = (
 
   try {
     window.speechSynthesis.cancel();
+    activeUtterance = null;
 
     // Clean text of emojis or quotes that might sound weird
     const cleanText = text.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').replace(/[«»"“”…]+/g, ' ').trim();
@@ -37,11 +41,17 @@ export const speakEnglish = (
       utterance.voice = enVoice;
     }
 
-    if (options?.onEnd) {
-      utterance.onend = options.onEnd;
-      utterance.onerror = options.onEnd;
-    }
+    const cleanupAndCallback = () => {
+      activeUtterance = null;
+      if (options?.onEnd) {
+        options.onEnd();
+      }
+    };
 
+    utterance.onend = cleanupAndCallback;
+    utterance.onerror = cleanupAndCallback;
+
+    activeUtterance = utterance;
     window.speechSynthesis.speak(utterance);
   } catch (e) {
     console.warn('Speech synthesis unavailable or blocked:', e);
@@ -51,6 +61,7 @@ export const speakEnglish = (
 export const stopSpeech = () => {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
+      activeUtterance = null;
       window.speechSynthesis.cancel();
     } catch {}
   }

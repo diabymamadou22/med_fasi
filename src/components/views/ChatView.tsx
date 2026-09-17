@@ -252,7 +252,7 @@ export const CHAT_FONT_SIZES: Record<
   normal: {
     label: 'Normal (15px)',
     textClass: 'text-[14.5px] sm:text-[15.5px]',
-    inputClass: 'text-[14.5px] sm:text-[15px]',
+    inputClass: 'text-[16px] sm:text-[15px]',
   },
   large: {
     label: 'Grand (17px)',
@@ -1331,7 +1331,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`px-3 sm:px-4 py-2.5 flex items-center justify-between border-b shadow-md z-20 shrink-0 ${
+            className={`px-3 sm:px-4 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] flex items-center justify-between border-b shadow-md z-20 shrink-0 ${
               chatTheme === 'velvet-night'
                 ? 'bg-slate-900 border-rose-900/60 text-white'
                 : 'bg-gradient-to-r from-rose-600 via-rose-500 to-pink-600 border-rose-600 text-white shadow-rose-200/50'
@@ -1415,7 +1415,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </motion.div>
         ) : (
-          <div className={`${themeStyles.headerBg} px-3 sm:px-4 py-2.5 flex items-center justify-between border-b shadow-2xs z-20 shrink-0 transition-colors duration-300`}>
+          <div className={`${themeStyles.headerBg} px-3 sm:px-4 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] flex items-center justify-between border-b shadow-2xs z-20 shrink-0 transition-colors duration-300`}>
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Back Button (Phone & Fullscreen UI - returns to Journal/other tabs) */}
             {onBack && (
@@ -2103,7 +2103,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           <div
             ref={chatContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto no-scrollbar p-3 sm:p-5 space-y-4 relative z-10"
+            className="flex-1 overflow-y-auto no-scrollbar p-3 sm:p-5 space-y-4 relative z-10 overscroll-contain"
+            style={{ WebkitOverflowScrolling: 'touch' }}
           >
           {/* Notification Activation Banner (shown if push alerts not yet enabled on this device) */}
           <NotificationActivationBanner
@@ -2797,7 +2798,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         {/* ================================================================= */}
         {/* 7. CHAT BOTTOM INPUT BAR */}
         {/* ================================================================= */}
-        <div className={`${themeStyles.headerBg} px-2 sm:px-4 py-2.5 flex items-center gap-1.5 sm:gap-2 border-t z-20 shrink-0 transition-colors`}>
+        <div className={`${themeStyles.headerBg} px-2 sm:px-4 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-[max(0.5rem,env(safe-area-inset-right,0px))] flex items-center gap-1.5 sm:gap-2 border-t z-20 shrink-0 transition-colors`}>
           {/* Emoji Toggle */}
           <button
             type="button"
