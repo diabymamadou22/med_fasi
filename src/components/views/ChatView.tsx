@@ -27,6 +27,7 @@ import {
   CheckSquare,
   Square,
   SmilePlus,
+  Copy,
   ArrowLeft,
   Type,
   Loader2,
@@ -37,11 +38,18 @@ import {
   BellRing,
   Camera,
   Video,
+  AudioWaveform,
+  Square as SquareIcon,
+  Sticker as StickerIcon,
 } from 'lucide-react';
 import { NotificationActivationBanner } from '../NotificationActivationBanner';
 import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
 import { CameraCaptureModal } from '../modals/CameraCaptureModal';
 import { ChatVideoBubble } from '../chat/ChatVideoBubble';
+import { ChatAudioBubble } from '../chat/ChatAudioBubble';
+import { RomanticStickerPicker } from '../chat/RomanticStickerPicker';
+import { RomanticSticker } from '../../lib/romanticStickers';
+import { getSupportedAudioMimeType, formatAudioTime, audioBlobToDataUrl } from '../../lib/audioRecorderUtils';
 import { extractVideoThumbnail, storeMediaBlob, formatVideoDuration } from '../../lib/videoUtils';
 import {
   CoupleProfile,
@@ -507,11 +515,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showQuickPhrases, setShowQuickPhrases] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'audio' | 'loveNote'>('all');
+
+  // Romantic sticker selection handler
+  const handleSelectRomanticSticker = (sticker: RomanticSticker) => {
+    onSendMessage({
+      senderId: activePartnerId,
+      content: `Sticker ${sticker.name}`,
+      mediaType: 'image',
+      mediaUrl: sticker.svgDataUri,
+    });
+    soundEffects.playMessageSent();
+    setShowStickerPicker(false);
+  };
 
   // Mobile & Desktop Swipeable Photo Lightbox
   const [activeChatPhotoIndex, setActiveChatPhotoIndex] = useState<number | null>(null);
@@ -574,9 +595,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [recordingAudioLevels, setRecordingAudioLevels] = useState<number[]>([30, 45, 60, 40, 70, 50, 80]);
   const recordIntervalRef = useRef<any>(null);
+  const audioAnimationIntervalRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Real-time presence & typing status from Firestore
   const [presenceMap, setPresenceMap] = useState<Record<string, PartnerPresenceInfo>>({});
@@ -785,9 +810,90 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
-  // Handle Input Change and broadcast typing status
+  // =========================================================================
+  // Mobile / iPhone Long-Press Action Sheet & Context Menu
+  // =========================================================================
+  const [messageActionSheet, setMessageActionSheet] = useState<ChatMessage | null>(null);
+  const longPressTimerRef = useRef<any>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTriggeredRef = useRef<boolean>(false);
+
+  const openMessageActionSheet = (msg: ChatMessage) => {
+    setMessageActionSheet(msg);
+    soundEffects.playSoftTap();
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(45);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleMessageTouchStart = (msg: ChatMessage, e: React.TouchEvent) => {
+    // If user is in multi-selection mode, simple tap handles selection
+    if (isSelectionMode || selectedMessageIds.length > 0) return;
+
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    longPressTriggeredRef.current = false;
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    // 400ms is the responsive standard threshold for iOS Safari and Android long-press
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      openMessageActionSheet(msg);
+    }, 400);
+  };
+
+  const handleMessageTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+
+    // If user scrolled finger by more than 8 pixels, cancel long press
+    if (dx > 8 || dy > 8) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  };
+
+  const handleMessageTouchEnd = (e: React.TouchEvent) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+    if (longPressTriggeredRef.current) {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleMessageContextMenu = (msg: ChatMessage, e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openMessageActionSheet(msg);
+  };
+
+  // Handle Input Change and broadcast typing status with auto-expanding height
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputText(e.target.value);
+    const val = e.target.value;
+    setInputText(val);
+
+    // Auto-resize textarea height smoothly up to max height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const newHeight = Math.min(130, Math.max(38, textareaRef.current.scrollHeight));
+      textareaRef.current.style.height = `${newHeight}px`;
+    }
 
     // Broadcast typing signal
     setChatTypingStatus(activePartnerId, true);
@@ -819,63 +925,111 @@ export const ChatView: React.FC<ChatViewProps> = ({
     soundEffects.playMessageSent();
     if (customText === undefined) {
       setInputText('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '38px';
+      }
     }
     setReplyingTo(null);
     setShowEmojiPicker(false);
     setChatTypingStatus(activePartnerId, false);
   };
 
-  // Voice recording controls
+  // Voice recording controls optimized for iOS Safari, Android Chrome & Desktop
   const startRecording = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         alert("L'enregistrement vocal n'est pas supporté par ce navigateur.");
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      // iOS Safari and Android require sampleRate & noiseSuppression constraints
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      recordingStreamRef.current = stream;
+
+      // Select optimal audio MIME type (audio/mp4 on iOS Safari, audio/webm on Android Chrome)
+      const { mimeType } = getSupportedAudioMimeType();
+      const recorderOptions: MediaRecorderOptions = {};
+      if (mimeType) {
+        recorderOptions.mimeType = mimeType;
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64Audio = reader.result as string;
-          if (base64Audio) {
-            onSendMessage({
-              senderId: activePartnerId,
-              content: '🎵 Note vocale',
-              mediaType: 'audio',
-              mediaUrl: base64Audio,
-              audioDuration: Math.max(1, recordSeconds),
-            });
-            soundEffects.playMessageSent();
-          }
-        };
-        reader.readAsDataURL(audioBlob);
+      mediaRecorder.onstop = async () => {
+        // Clear animated audio levels
+        if (audioAnimationIntervalRef.current) {
+          clearInterval(audioAnimationIntervalRef.current);
+        }
 
-        // Stop tracks
+        const finalMime = mimeType || 'audio/mp4';
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalMime });
+
+        if (audioBlob.size > 0) {
+          try {
+            const base64Audio = await audioBlobToDataUrl(audioBlob);
+            if (base64Audio) {
+              onSendMessage({
+                senderId: activePartnerId,
+                content: '🎵 Note vocale',
+                mediaType: 'audio',
+                mediaUrl: base64Audio,
+                audioDuration: Math.max(1, recordSeconds),
+              });
+              soundEffects.playMessageSent();
+            }
+          } catch (err) {
+            console.error('Erreur lecture du vocal:', err);
+          }
+        }
+
+        // Stop all tracks on the stream to release the microphone
         stream.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
       };
 
-      mediaRecorder.start();
+      // Request data in chunks every 250ms for maximum reliability on mobile
+      mediaRecorder.start(250);
       setIsRecording(true);
       setRecordSeconds(0);
       soundEffects.playSoftTap();
 
+      // Timer counter
+      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
       recordIntervalRef.current = setInterval(() => {
         setRecordSeconds((sec) => sec + 1);
       }, 1000);
+
+      // Live waveform visualizer animation for recorder UI
+      if (audioAnimationIntervalRef.current) clearInterval(audioAnimationIntervalRef.current);
+      audioAnimationIntervalRef.current = setInterval(() => {
+        setRecordingAudioLevels([
+          Math.floor(Math.random() * 50) + 30,
+          Math.floor(Math.random() * 65) + 35,
+          Math.floor(Math.random() * 80) + 20,
+          Math.floor(Math.random() * 90) + 30,
+          Math.floor(Math.random() * 75) + 25,
+          Math.floor(Math.random() * 85) + 30,
+          Math.floor(Math.random() * 60) + 40,
+        ]);
+      }, 140);
     } catch (err) {
       console.error('Erreur accès micro:', err);
-      alert('Impossible d’accéder au microphone.');
+      alert('Impossible d’accéder au microphone. Veuillez autoriser l\'accès micro dans les réglages.');
     }
   };
 
@@ -884,15 +1038,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+      if (audioAnimationIntervalRef.current) clearInterval(audioAnimationIntervalRef.current);
     }
   };
 
   const cancelRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+      // Discard recorded chunks
+      audioChunksRef.current = [];
+      if (recordingStreamRef.current) {
+        recordingStreamRef.current.getTracks().forEach((t) => t.stop());
+        recordingStreamRef.current = null;
+      }
       mediaRecorderRef.current = null;
       setIsRecording(false);
       if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+      if (audioAnimationIntervalRef.current) clearInterval(audioAnimationIntervalRef.current);
       setRecordSeconds(0);
       soundEffects.playSoftTap();
     }
@@ -2213,9 +2374,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         </button>
                       )}
 
-                      {/* Message Bubble Container with double tap and selection click listener */}
+                      {/* Message Bubble Container with long-press, double tap, and selection listener */}
                       <div
+                        onTouchStart={(e) => handleMessageTouchStart(msg, e)}
+                        onTouchMove={handleMessageTouchMove}
+                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchCancel={handleMessageTouchEnd}
+                        onContextMenu={(e) => handleMessageContextMenu(msg, e)}
                         onClick={(e) => {
+                          if (longPressTriggeredRef.current) {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            longPressTriggeredRef.current = false;
+                            return;
+                          }
                           if (isSelectionMode || selectedMessageIds.length > 0) {
                             e.stopPropagation();
                             toggleSelectMessage(msg.id);
@@ -2223,12 +2395,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
                             handleMessageDoubleTap(e, msg);
                           }
                         }}
+                        style={{
+                          WebkitTouchCallout: 'none',
+                          WebkitUserSelect: 'none',
+                          userSelect: 'none',
+                          touchAction: 'manipulation',
+                        }}
                         className={`relative max-w-[85%] sm:max-w-[76%] px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-sm transition-all select-none cursor-pointer flex flex-col ${bubbleCorners} ${
-                          isMe
-                            ? themeStyles.myBubble
-                            : themeStyles.partnerBubble
+                          msg.content?.startsWith('Sticker ') && msg.mediaType === 'image'
+                            ? (isMe
+                                ? 'bg-rose-500/10 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/50'
+                                : 'bg-white/90 dark:bg-slate-800/90 border border-stone-200/60 dark:border-slate-700/50')
+                            : (isMe
+                                ? themeStyles.myBubble
+                                : themeStyles.partnerBubble)
                         } ${isLoveNote ? 'border-2 border-rose-300/80 bg-rose-50/90' : ''} ${
                           isSelected ? 'ring-2 ring-rose-500 ring-offset-2 scale-[1.01]' : ''
+                        } ${
+                          messageActionSheet?.id === msg.id
+                            ? 'ring-2 ring-rose-400 dark:ring-rose-300 shadow-md scale-[1.015]'
+                            : ''
                         }`}
                       >
                         {/* Sender name on received message - ONLY ON FIRST IN BURST */}
@@ -2257,24 +2443,39 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           </div>
                         )}
 
-                        {/* Photo Content */}
+                        {/* Photo or Romantic Sticker Content */}
                         {msg.mediaType === 'image' && msg.mediaUrl && (
-                          <div className="rounded-xl overflow-hidden mb-2 bg-black/10 cursor-pointer relative group/img border border-white/15">
-                            <img
-                              src={msg.mediaUrl}
-                              alt="Photo partagée"
-                              onClick={() => {
-                                const idx = chatPhotoItems.findIndex(
-                                  (p) => p.id === msg.id || p.photoUrl === msg.mediaUrl
-                                );
-                                setActiveChatPhotoIndex(idx >= 0 ? idx : 0);
-                              }}
-                              className="max-h-72 w-auto object-contain rounded-xl hover:opacity-95 transition-opacity"
-                            />
-                            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none text-xs font-semibold">
-                              🔍 Cliquer pour agrandir
+                          msg.content?.startsWith('Sticker ') ? (
+                            <div className="flex flex-col items-center justify-center p-1 my-1">
+                              <div className="w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center drop-shadow-md hover:scale-105 transition-transform">
+                                <img
+                                  src={msg.mediaUrl}
+                                  alt={msg.content}
+                                  className="w-full h-full object-contain pointer-events-none"
+                                />
+                              </div>
+                              <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400 mt-1 opacity-90">
+                                {msg.content.replace('Sticker ', '')}
+                              </span>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="rounded-xl overflow-hidden mb-2 bg-black/10 cursor-pointer relative group/img border border-white/15">
+                              <img
+                                src={msg.mediaUrl}
+                                alt="Photo partagée"
+                                onClick={() => {
+                                  const idx = chatPhotoItems.findIndex(
+                                    (p) => p.id === msg.id || p.photoUrl === msg.mediaUrl
+                                  );
+                                  setActiveChatPhotoIndex(idx >= 0 ? idx : 0);
+                                }}
+                                className="max-h-72 w-auto object-contain rounded-xl hover:opacity-95 transition-opacity"
+                              />
+                              <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none text-xs font-semibold">
+                                🔍 Cliquer pour agrandir
+                              </div>
+                            </div>
+                          )
                         )}
 
                         {/* Video Content */}
@@ -2295,78 +2496,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           />
                         )}
 
-                        {/* Enhanced Voice Note Player */}
+                        {/* Enhanced Cross-Platform Voice Note Player */}
                         {msg.mediaType === 'audio' && (
-                          <div className="flex items-center gap-3 py-1 px-1 min-w-[210px] sm:min-w-[250px]">
-                            <button
-                              onClick={() => togglePlayAudio(msg)}
-                              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-xs ${
-                                isMe
-                                  ? 'bg-white text-rose-600 hover:bg-rose-50'
-                                  : playingAudioId === msg.id
-                                  ? 'bg-rose-600 text-white scale-105 shadow-md'
-                                  : 'bg-rose-500 hover:bg-rose-600 text-white'
-                              }`}
-                            >
-                              {playingAudioId === msg.id ? (
-                                <Pause className="w-5 h-5 fill-current" />
-                              ) : (
-                                <Play className="w-5 h-5 fill-current ml-0.5" />
-                              )}
-                            </button>
-
-                            {/* Animated Dancing Waveform Graphic */}
-                            <div className="flex-1">
-                              <div className="flex items-center gap-1 h-6">
-                                {[35, 65, 30, 90, 55, 100, 70, 45, 85, 60, 95, 40, 80, 50].map((h, i) => {
-                                  const isCurrentPlaying = playingAudioId === msg.id;
-                                  return (
-                                    <div
-                                      key={i}
-                                      className={`flex-1 rounded-full transition-all duration-150 ${
-                                        isMe
-                                          ? isCurrentPlaying
-                                            ? 'bg-white animate-pulse'
-                                            : 'bg-white/80'
-                                          : isCurrentPlaying
-                                          ? 'bg-rose-500 animate-pulse'
-                                          : chatTheme === 'velvet-night'
-                                          ? 'bg-slate-600'
-                                          : 'bg-rose-200'
-                                      }`}
-                                      style={{
-                                        height: isCurrentPlaying
-                                          ? `${Math.min(100, Math.max(25, (h * (1 + (i % 3) * 0.2))))}%`
-                                          : `${h}%`,
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                              <div className={`flex items-center justify-between text-[11px] mt-1.5 font-medium ${isMe ? 'text-white/95' : 'text-stone-600 dark:text-slate-400'}`}>
-                                <span className="font-mono">
-                                  {playingAudioId === msg.id && audioCurrentTime > 0
-                                    ? `0:${Math.floor(audioCurrentTime).toString().padStart(2, '0')}`
-                                    : msg.audioDuration ? `0:${msg.audioDuration.toString().padStart(2, '0')}` : '0:05'}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const nextSpeed = playbackSpeed === 1 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1;
-                                    setPlaybackSpeed(nextSpeed);
-                                    if (audioRef.current) audioRef.current.playbackRate = nextSpeed;
-                                  }}
-                                  className={`font-bold text-[10.5px] px-2 py-0.5 rounded-md cursor-pointer ${
-                                    isMe
-                                      ? 'text-white bg-white/25 hover:bg-white/35'
-                                      : 'text-rose-700 bg-rose-100 hover:bg-rose-200'
-                                  }`}
-                                >
-                                  {playbackSpeed}x
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                          <ChatAudioBubble
+                            message={msg}
+                            isMe={isMe}
+                            chatTheme={chatTheme}
+                          />
                         )}
 
                         {/* Love Note Card format */}
@@ -2382,7 +2518,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           </div>
                         ) : (
                           /* Standard Text Content with customizable comfortable font size and contrast */
-                          msg.content && msg.content !== '🎵 Note vocale' && msg.content !== '📷 Photo partagée' && (
+                          msg.content && msg.content !== '🎵 Note vocale' && msg.content !== '📷 Photo partagée' && !msg.content.startsWith('Sticker ') && (
                             <p className={`leading-[1.55] whitespace-pre-wrap break-words tracking-[0.01em] ${CHAT_FONT_SIZES[chatFontSize].textClass} ${
                               isMe
                                 ? themeStyles.myBubbleText
@@ -2477,6 +2613,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       <span className="text-[9px] text-stone-400 hidden sm:inline mr-1">
                         (Double-clic pour ❤️)
                       </span>
+
+                      {/* Options / Action sheet trigger */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openMessageActionSheet(msg);
+                        }}
+                        className="p-1 rounded-full cursor-pointer hover:bg-rose-50 dark:hover:bg-slate-800 text-stone-400 hover:text-rose-600 transition-colors"
+                        title="Options du message (modifier, supprimer, copier...)"
+                      >
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </button>
 
                       {/* Select for multi-action */}
                       <button
@@ -2692,31 +2841,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
         )}
 
         {/* ================================================================= */}
-        {/* 5. EMOJI DRAWER TRAY */}
+        {/* 5. UNIFIED STICKERS & EMOJIS DRAWER TRAY */}
         {/* ================================================================= */}
         <AnimatePresence>
-          {showEmojiPicker && (
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 15 }}
-              className={`border-t p-3 grid grid-cols-8 gap-2 z-10 shadow-inner max-h-36 overflow-y-auto no-scrollbar ${
-                chatTheme === 'velvet-night'
-                  ? 'bg-slate-900 border-slate-800'
-                  : 'bg-white border-rose-100'
-              }`}
-            >
-              {romanticEmojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setInputText((prev) => prev + emoji)}
-                  className="text-xl sm:text-2xl p-1 hover:scale-125 transition-transform cursor-pointer"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </motion.div>
+          {showStickerPicker && (
+            <RomanticStickerPicker
+              isOpen={showStickerPicker}
+              onClose={() => setShowStickerPicker(false)}
+              onSelectSticker={handleSelectRomanticSticker}
+              onSelectEmoji={(emoji) => setInputText((prev) => prev + emoji)}
+              chatTheme={chatTheme}
+              initialMode="stickers"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Legacy emoji picker drawer fallback */}
+        <AnimatePresence>
+          {showEmojiPicker && !showStickerPicker && (
+            <RomanticStickerPicker
+              isOpen={showEmojiPicker}
+              onClose={() => setShowEmojiPicker(false)}
+              onSelectSticker={handleSelectRomanticSticker}
+              onSelectEmoji={(emoji) => setInputText((prev) => prev + emoji)}
+              chatTheme={chatTheme}
+              initialMode="emojis"
+            />
           )}
         </AnimatePresence>
 
@@ -2729,7 +2879,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               initial={{ opacity: 0, scale: 0.9, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              className={`absolute bottom-16 left-12 rounded-2xl shadow-xl border p-2 z-30 flex flex-col gap-1 min-w-[220px] ${
+              className={`absolute bottom-16 left-3 sm:left-6 rounded-2xl shadow-xl border p-2 z-30 flex flex-col gap-1 min-w-[220px] ${
                 chatTheme === 'velvet-night'
                   ? 'bg-slate-900 border-slate-700 text-slate-200'
                   : 'bg-white border-rose-100 text-stone-700'
@@ -2791,143 +2941,193 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 </div>
                 <span>Billet doux pour toi</span>
               </button>
+
+              <button
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setShowStickerPicker(true);
+                  setShowAttachmentMenu(false);
+                  setShowEmojiPicker(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-rose-500/10 hover:text-rose-500 transition-colors text-left cursor-pointer"
+              >
+                <div className="p-1.5 rounded-lg bg-rose-100 text-rose-600">
+                  <StickerIcon className="w-4 h-4" />
+                </div>
+                <span>Stickers romantiques</span>
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* ================================================================= */}
-        {/* 7. CHAT BOTTOM INPUT BAR */}
+        {/* 7. CHAT BOTTOM INPUT BAR (WHATSAPP-STYLE UNIFIED PILL CAPSULE) */}
         {/* ================================================================= */}
-        <div className={`${themeStyles.headerBg} px-2 sm:px-4 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-[max(0.5rem,env(safe-area-inset-right,0px))] flex items-center gap-1.5 sm:gap-2 border-t z-20 shrink-0 transition-colors`}>
-          {/* Emoji Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setShowEmojiPicker(!showEmojiPicker);
-              setShowAttachmentMenu(false);
-            }}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              showEmojiPicker
-                ? 'text-rose-600 bg-rose-100'
-                : chatTheme === 'velvet-night'
-                ? 'text-slate-400 hover:text-rose-400'
-                : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-            }`}
-            title="Emojis d'amour"
-          >
-            <Smile className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-
-          {/* Attachment Paperclip Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setShowAttachmentMenu(!showAttachmentMenu);
-              setShowEmojiPicker(false);
-            }}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              showAttachmentMenu
-                ? 'text-rose-600 bg-rose-100'
-                : chatTheme === 'velvet-night'
-                ? 'text-slate-400 hover:text-rose-400'
-                : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-            }`}
-            title="Joindre une photo ou mot doux"
-          >
-            <Paperclip className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-
-          {/* Direct Camera Button */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setShowCameraModal(true);
-              setShowAttachmentMenu(false);
-              setShowEmojiPicker(false);
-            }}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              showCameraModal
-                ? 'text-rose-600 bg-rose-100'
-                : chatTheme === 'velvet-night'
-                ? 'text-slate-400 hover:text-rose-400'
-                : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
-            }`}
-            title="Prendre une photo en direct"
-            id="chat-camera-btn"
-          >
-            <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-
-          {/* Voice recording in-progress display OR text input */}
-          {isRecording ? (
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl px-4 py-2 flex items-center justify-between shadow-2xs border border-rose-400">
-              <div className="flex items-center gap-2 text-rose-600 text-xs font-bold animate-pulse">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
-                <span>Enregistrement vocal ({recordSeconds}s)...</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={cancelRecording}
-                  className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg text-xs cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="button"
-                  onClick={stopAndSendRecording}
-                  className="px-3 py-1 bg-gradient-to-r from-rose-500 to-pink-600 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer shadow-xs hover:scale-105"
-                >
-                  <Send className="w-3 h-3" />
-                  <span>Envoyer</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={`flex-1 rounded-2xl px-3.5 py-1.5 border shadow-2xs flex items-center transition-all ${themeStyles.inputBg}`}>
-              <textarea
-                rows={1}
-                value={inputText}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Tapez un mot doux, un souvenir..."
-                className={`w-full bg-transparent ${CHAT_FONT_SIZES[chatFontSize].inputClass} leading-relaxed resize-none outline-hidden max-h-24 ${
-                  chatTheme === 'velvet-night' ? 'text-white placeholder-slate-400' : 'text-stone-900 placeholder-stone-400'
-                }`}
-              />
-            </div>
-          )}
-
-          {/* Dynamic Send / Mic Button */}
-          {inputText.trim() ? (
+        <div className={`px-2.5 sm:px-4 py-2 pb-[max(0.65rem,env(safe-area-inset-bottom,0px))] pl-[max(0.5rem,env(safe-area-inset-left,0px))] pr-[max(0.5rem,env(safe-area-inset-right,0px))] z-20 shrink-0 border-t transition-colors ${
+          chatTheme === 'velvet-night'
+            ? 'bg-slate-950/85 border-slate-800/80 backdrop-blur-md'
+            : 'bg-stone-100/80 border-rose-100/60 backdrop-blur-md'
+        }`}>
+          {/* Main Capsule Container */}
+          <div className={`w-full max-w-4xl mx-auto rounded-full px-2 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-2 shadow-xs transition-all border ${
+            chatTheme === 'velvet-night'
+              ? 'bg-slate-900 border-slate-700/80 text-slate-100 focus-within:border-rose-500/50 focus-within:shadow-rose-950/30'
+              : 'bg-white border-stone-200/90 text-stone-800 focus-within:border-stone-300 focus-within:shadow-xs'
+          }`}>
+            {/* 1. Attachment Paperclip Button */}
             <button
               type="button"
-              onClick={() => handleSend()}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
-              title="Envoyer le message"
-            >
-              <Send className="w-5 h-5 ml-0.5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={isRecording ? stopAndSendRecording : startRecording}
-              className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${
-                isRecording
-                  ? 'bg-rose-600 text-white animate-pulse shadow-md'
-                  : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowAttachmentMenu(!showAttachmentMenu);
+                setShowEmojiPicker(false);
+                setShowStickerPicker(false);
+              }}
+              className={`p-2 rounded-full transition-colors cursor-pointer shrink-0 ${
+                showAttachmentMenu
+                  ? 'text-rose-600 bg-rose-50 dark:bg-slate-800'
+                  : 'text-stone-700 dark:text-slate-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-slate-800'
               }`}
-              title={isRecording ? 'Arrêter et envoyer' : 'Enregistrer une note vocale'}
+              title="Joindre un fichier ou mot doux"
+              aria-label="Pièce jointe"
+              id="chat-paperclip-btn"
             >
-              {isRecording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              <Paperclip className="w-5 h-5 -rotate-45" />
             </button>
-          )}
+
+            {/* 2. Emoji & Stickers Smile Button */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                if (showStickerPicker || showEmojiPicker) {
+                  setShowStickerPicker(false);
+                  setShowEmojiPicker(false);
+                } else {
+                  setShowStickerPicker(true);
+                }
+                setShowAttachmentMenu(false);
+              }}
+              className={`p-2 rounded-full transition-colors cursor-pointer shrink-0 ${
+                showStickerPicker || showEmojiPicker
+                  ? 'text-rose-600 bg-rose-50 dark:bg-slate-800'
+                  : 'text-stone-700 dark:text-slate-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-slate-800'
+              }`}
+              title="Stickers et Emojis"
+              aria-label="Stickers et Emojis"
+              id="chat-sticker-emoji-btn"
+            >
+              <Smile className="w-5 h-5" />
+            </button>
+
+            {/* 3. Text Input OR Recording in-progress inside the capsule */}
+            {isRecording ? (
+              <div className="flex-1 flex items-center justify-between gap-2 min-w-0 px-2 py-0.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                  <div className="flex items-center gap-0.5 sm:gap-1 h-5 shrink-0">
+                    {recordingAudioLevels.map((lvl, i) => (
+                      <span
+                        key={i}
+                        className="w-1 bg-rose-500 rounded-full transition-all duration-100"
+                        style={{ height: `${Math.max(20, Math.min(100, lvl))}%` }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs sm:text-[13px] font-bold text-rose-500 font-mono tracking-tight shrink-0">
+                    {formatAudioTime(recordSeconds)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={cancelRecording}
+                    className="px-2.5 py-1 text-stone-500 hover:text-rose-600 hover:bg-stone-100 dark:hover:bg-slate-800 rounded-full text-xs font-medium cursor-pointer transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopAndSendRecording}
+                    className="p-2 rounded-full bg-rose-500 hover:bg-rose-600 text-white cursor-pointer shadow-xs transition-transform hover:scale-105 active:scale-95"
+                    title="Envoyer la note vocale"
+                  >
+                    <Send className="w-4 h-4 ml-0.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center min-w-0">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={inputText}
+                  onChange={handleInputChange}
+                  onFocus={() => {
+                    setShowEmojiPicker(false);
+                    setShowStickerPicker(false);
+                    setShowAttachmentMenu(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Entrez un message"
+                  style={{ minHeight: '38px', maxHeight: '120px' }}
+                  className={`w-full bg-transparent ${CHAT_FONT_SIZES[chatFontSize].inputClass} py-2 px-1 leading-normal resize-none outline-none border-none overflow-y-auto no-scrollbar transition-all ${
+                    chatTheme === 'velvet-night'
+                      ? 'text-white placeholder-slate-400'
+                      : 'text-stone-800 placeholder-stone-400'
+                  }`}
+                  id="chat-message-input"
+                />
+                {inputText.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputText('');
+                      if (textareaRef.current) {
+                        textareaRef.current.style.height = '38px';
+                      }
+                    }}
+                    className="p-1.5 text-stone-400 hover:text-stone-600 dark:hover:text-slate-200 cursor-pointer rounded-full hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                    title="Effacer le texte"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* 4. Far Right Action inside capsule: Send or Mic */}
+            {!isRecording && (
+              inputText.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => handleSend()}
+                  className="p-2 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0 shadow-xs"
+                  title="Envoyer le message"
+                  aria-label="Envoyer"
+                  id="chat-send-btn"
+                >
+                  <Send className="w-4 h-4 ml-0.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className="p-2 text-stone-700 dark:text-slate-300 hover:text-stone-900 dark:hover:text-white rounded-full transition-colors cursor-pointer shrink-0 hover:bg-stone-100 dark:hover:bg-slate-800"
+                  title="Enregistrer une note vocale"
+                  aria-label="Enregistrer une note vocale"
+                  id="chat-mic-btn"
+                >
+                  <Mic className="w-5 h-5" />
+                </button>
+              )
+            )}
+          </div>
         </div>
 
         {/* Hidden inputs for image and video uploads */}
@@ -2957,6 +3157,249 @@ export const ChatView: React.FC<ChatViewProps> = ({
         onClose={() => setActiveChatPhotoIndex(null)}
         onIndexChange={(newIdx) => setActiveChatPhotoIndex(newIdx)}
       />
+
+      {/* ================================================================= */}
+      {/* 8.5. LONG-PRESS / OPTIONS ACTION SHEET (MOBILE & IPHONE FIRST) */}
+      {/* ================================================================= */}
+      <AnimatePresence>
+        {messageActionSheet && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4"
+            onClick={() => setMessageActionSheet(null)}
+          >
+            <motion.div
+              initial={{ y: 80, opacity: 0, scale: 0.96 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 80, opacity: 0, scale: 0.96 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-md bg-white dark:bg-slate-900 rounded-t-[28px] sm:rounded-3xl shadow-2xl border border-stone-200/80 dark:border-slate-800 p-4 sm:p-5 flex flex-col gap-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] max-h-[85vh] overflow-y-auto no-scrollbar"
+            >
+              {/* Drag handle pill for mobile */}
+              <div className="w-10 h-1.5 bg-stone-300 dark:bg-slate-700 rounded-full mx-auto sm:hidden shrink-0" />
+
+              {/* Quick Reactions Bar */}
+              <div className="flex items-center justify-between gap-1 p-2 bg-rose-50/70 dark:bg-slate-800/80 rounded-2xl border border-rose-100/80 dark:border-slate-700/60 overflow-x-auto no-scrollbar shrink-0">
+                {['❤️', '🥰', '😘', '😂', '🥺', '🔥', '👍', '🌹'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      handleReaction(messageActionSheet.id, emoji);
+                      soundEffects.playHeartPulse();
+                      setMessageActionSheet(null);
+                    }}
+                    className="text-2xl p-1.5 hover:scale-125 active:scale-95 transition-transform cursor-pointer rounded-xl hover:bg-white/60 dark:hover:bg-slate-700 shrink-0"
+                    title={`Réagir avec ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
+              {/* Message Snippet Card Preview */}
+              <div className="p-3 bg-stone-50 dark:bg-slate-800/50 rounded-2xl border border-stone-100 dark:border-slate-800/80 flex items-start gap-2.5">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
+                  messageActionSheet.senderId === activePartnerId
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'bg-emerald-500 text-white shadow-xs'
+                }`}>
+                  {(messageActionSheet.senderId === activePartnerId ? currentPartner.avatar : otherPartner.avatar) ? (
+                    <img
+                      src={messageActionSheet.senderId === activePartnerId ? currentPartner.avatar : otherPartner.avatar}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span>{messageActionSheet.senderId === activePartnerId ? 'Vous'[0] : otherPartner.name[0]?.toUpperCase() || 'A'}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">
+                      {messageActionSheet.senderId === activePartnerId ? 'Votre message' : otherPartner.name}
+                    </span>
+                    <span className="text-[10px] text-stone-400 dark:text-slate-400 shrink-0">
+                      {formatMessageTime(messageActionSheet.timestamp)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-600 dark:text-slate-300 line-clamp-2 mt-0.5 leading-relaxed break-words">
+                    {messageActionSheet.content || (
+                      messageActionSheet.mediaType === 'image' ? '📷 Photo partagée' :
+                      messageActionSheet.mediaType === 'video' ? '🎬 Vidéo partagée' :
+                      messageActionSheet.mediaType === 'audio' ? '🎙️ Note vocale' : 'Message'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Menu List */}
+              <div className="flex flex-col divide-y divide-stone-100 dark:divide-slate-800 rounded-2xl bg-stone-50/50 dark:bg-slate-800/40 border border-stone-100 dark:border-slate-800 overflow-hidden">
+                {/* 1. Edit (Modifier) - if sender is me and has editable text */}
+                {messageActionSheet.senderId === activePartnerId &&
+                  Boolean(messageActionSheet.content) &&
+                  !messageActionSheet.content.startsWith('Sticker ') &&
+                  messageActionSheet.mediaType !== 'audio' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = messageActionSheet;
+                      setMessageActionSheet(null);
+                      openEditModal(target);
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-rose-50/80 dark:hover:bg-slate-800 transition-colors cursor-pointer group text-stone-700 dark:text-slate-200"
+                    id="action-sheet-edit-btn"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                        <Pencil className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
+                          Modifier le message
+                        </p>
+                        <p className="text-[11px] text-stone-400 dark:text-slate-400">
+                          Corriger une faute ou changer le texte
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* 2. Reply (Répondre) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = messageActionSheet;
+                    setMessageActionSheet(null);
+                    setReplyingTo(target);
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                    }
+                  }}
+                  className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-stone-100/80 dark:hover:bg-slate-800 transition-colors cursor-pointer group text-stone-700 dark:text-slate-200"
+                  id="action-sheet-reply-btn"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                      <CornerUpLeft className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        Répondre
+                      </p>
+                      <p className="text-[11px] text-stone-400 dark:text-slate-400">
+                        Citer ce message dans votre réponse
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 3. Copy (Copier le texte) */}
+                {messageActionSheet.content && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (messageActionSheet.content) {
+                        navigator.clipboard.writeText(messageActionSheet.content);
+                        setChatToastFeedback("Texte copié dans le presse-papiers ! 📋");
+                        setTimeout(() => setChatToastFeedback(null), 2500);
+                        soundEffects.playSoftTap();
+                      }
+                      setMessageActionSheet(null);
+                    }}
+                    className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-stone-100/80 dark:hover:bg-slate-800 transition-colors cursor-pointer group text-stone-700 dark:text-slate-200"
+                    id="action-sheet-copy-btn"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <Copy className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                          Copier le texte
+                        </p>
+                        <p className="text-[11px] text-stone-400 dark:text-slate-400">
+                          Copier dans le presse-papiers
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* 4. Select (Sélectionner pour action groupée) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetId = messageActionSheet.id;
+                    setMessageActionSheet(null);
+                    setIsSelectionMode(true);
+                    if (!selectedMessageIds.includes(targetId)) {
+                      setSelectedMessageIds((prev) => [...prev, targetId]);
+                    }
+                  }}
+                  className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-stone-100/80 dark:hover:bg-slate-800 transition-colors cursor-pointer group text-stone-700 dark:text-slate-200"
+                  id="action-sheet-select-btn"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                      <CheckSquare className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        Sélectionner
+                      </p>
+                      <p className="text-[11px] text-stone-400 dark:text-slate-400">
+                        Sélectionner pour action groupée
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 5. Delete (Supprimer) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetId = messageActionSheet.id;
+                    setMessageActionSheet(null);
+                    setMessageIdsToDelete([targetId]);
+                    setShowDeleteConfirmModal(true);
+                  }}
+                  className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer group text-rose-600 dark:text-rose-400"
+                  id="action-sheet-delete-btn"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                      <Trash2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                        Supprimer ce message
+                      </p>
+                      <p className="text-[11px] text-rose-500/80 dark:text-rose-400/70">
+                        Effacer de la conversation
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Dismiss button */}
+              <button
+                type="button"
+                onClick={() => setMessageActionSheet(null)}
+                className="w-full py-2.5 rounded-2xl bg-stone-100 hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-300 text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ================================================================= */}
       {/* 9. EDIT MESSAGE MODAL */}
