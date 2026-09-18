@@ -143,8 +143,17 @@ export default function App() {
     return (saved as PartnerId) || 'p1';
   });
 
-  // Main active tab
-  const [activeTab, setActiveTab] = useState<MainTab>('home');
+  // Main active tab (initialized from URL if present, e.g. /?tab=chat)
+  const [activeTab, setActiveTab] = useState<MainTab>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['home', 'chat', 'games', 'gallery'].includes(tabParam)) {
+        return tabParam as MainTab;
+      }
+    }
+    return 'home';
+  });
   const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
   const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab>('roulette');
 
@@ -324,8 +333,17 @@ export default function App() {
     }
   });
 
-  // Texte pré-rempli pour le chat (insertion depuis le lexique ou les défis)
-  const [chatDraftText, setChatDraftText] = useState<string>('');
+  // Texte pré-rempli pour le chat (insertion depuis le lexique, les défis ou réponse rapide push URL)
+  const [chatDraftText, setChatDraftText] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const draft = params.get('replyDraft') || params.get('draft');
+      if (draft) {
+        return draft;
+      }
+    }
+    return '';
+  });
 
   // Couple Settings (PIN, Romantic Music, Ambiance, Database cleaning)
   const [settings, setSettings] = useState<CoupleSettings>(() => {
@@ -393,9 +411,12 @@ export default function App() {
 
   // Listen for PWA notification navigation events (e.g. user taps a notification)
   useEffect(() => {
-    const unsubPwaNav = onPwaNavigate((tab) => {
+    const unsubPwaNav = onPwaNavigate((tab, draftText) => {
       if (tab) {
         setActiveTab(tab as MainTab);
+      }
+      if (draftText) {
+        setChatDraftText(draftText);
       }
     });
     return unsubPwaNav;

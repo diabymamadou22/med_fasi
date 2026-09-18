@@ -346,17 +346,17 @@ export const NotificationAlertModal: React.FC<NotificationAlertModalProps> = ({
             <div className="space-y-2 text-xs text-stone-600 leading-relaxed bg-rose-50/50 p-3.5 rounded-2xl border border-rose-100/60">
               <p className="font-semibold text-rose-900 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-                Comment fonctionne l'alerte même quand l'application est fermée ?
+                Répondre aux messages étant hors de l'application :
               </p>
               <ul className="space-y-1.5 list-disc list-inside text-stone-700">
                 <li>
-                  <strong className="text-stone-900">En arrière-plan :</strong> Dès que {otherPartner.name} envoie un message, le serveur réveille le téléphone ou l'ordinateur via internet.
+                  <strong className="text-stone-900">Bouton « 💌 Répondre » :</strong> Sur les appareils compatibles (Android, ordinateurs), vous pouvez taper directement votre réponse dans le champ de la notification sans ouvrir l'application.
                 </li>
                 <li>
-                  <strong className="text-stone-900">Son & Vibration :</strong> Une notification native s'affiche avec le nom, le texte ou la photo, accompagnée d'un doux carillon romantique.
+                  <strong className="text-stone-900">Accès immédiat sur iPhone & tout écran :</strong> En touchant simplement la notification ou le bouton « Ouvrir la discussion », vous êtes téléporté en une seconde directement dans le chat, clavier prêt pour taper.
                 </li>
                 <li>
-                  <strong className="text-stone-900">Accès direct :</strong> En touchant l'alerte sur votre écran, vous arrivez directement dans la discussion pour lui répondre.
+                  <strong className="text-stone-900">Raccourci écran d'accueil :</strong> Restez appuyé sur l'icône de l'application NID sur votre écran d'accueil pour sélectionner le raccourci instantané « Chat Intime » ou « Billet Doux ».
                 </li>
               </ul>
             </div>

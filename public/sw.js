@@ -1,7 +1,7 @@
 // Service Worker for NID PWA
 // Offline caching, background push notifications & home screen badging
 
-const CACHE_NAME = 'nid-cache-v5';
+const CACHE_NAME = 'nid-cache-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -149,6 +149,26 @@ self.addEventListener('push', (event) => {
 
   const targetTab = data.data?.tab || data.tab || 'chat';
   const targetUrl = data.data?.url || data.url || '/?tab=' + targetTab;
+  const senderId = data.data?.senderId || data.senderId;
+
+  // Actions allowed on Notification
+  // Note: 'reply' with type 'text' is supported on modern Android Chrome / Edge / macOS
+  const actions = [
+    {
+      action: 'quick_reply',
+      type: 'text',
+      title: '💌 Répondre',
+      placeholder: 'Écrire un mot doux...',
+    },
+    {
+      action: 'open_chat',
+      title: '💬 Ouvrir la discussion',
+    },
+    {
+      action: 'dismiss',
+      title: 'Fermer',
+    },
+  ];
 
   const options = {
     body: data.body,
@@ -161,12 +181,9 @@ self.addEventListener('push', (event) => {
     data: {
       url: targetUrl,
       tab: targetTab,
-      senderId: data.data?.senderId || data.senderId,
+      senderId: senderId,
     },
-    actions: [
-      { action: 'open_chat', title: '💬 Ouvrir la discussion' },
-      { action: 'dismiss', title: 'Fermer' },
-    ],
+    actions: actions,
   };
 
   // Update App Badge on device icon if supported
@@ -177,7 +194,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-// Handle notification clicks: Focus or open window and route to Chat
+// Handle notification clicks: Focus or open window and route to Chat, or post quick reply
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -185,12 +202,58 @@ self.addEventListener('notificationclick', (event) => {
 
   const targetTab = event.notification.data?.tab || 'chat';
   const targetUrl = event.notification.data?.url || `/?tab=${targetTab}`;
+  const senderId = event.notification.data?.senderId;
 
+  // Si l'utilisateur a tapé une réponse directe dans la notification (inline quick reply)
+  if (event.action === 'quick_reply' && event.reply) {
+    const replyText = (event.reply || '').trim();
+    if (replyText) {
+      // Le destinataire de la réponse est l'expéditeur du message précédent
+      const myPartnerId = senderId === 'p1' ? 'p2' : 'p1';
+
+      event.waitUntil(
+        fetch('/api/chat/quick-reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderId: myPartnerId,
+            content: replyText,
+          }),
+        })
+          .then((res) => res.json())
+          .then(() => {
+            // Optionnel : avertir les clients ouverts si présents
+            return self.clients
+              .matchAll({ type: 'window', includeUncontrolled: true })
+              .then((clientList) => {
+                for (const client of clientList) {
+                  client.postMessage({
+                    type: 'QUICK_REPLY_SENT',
+                    content: replyText,
+                  });
+                }
+              });
+          })
+          .catch((err) => {
+            console.error('Erreur envoi quick reply depuis SW:', err);
+            // Si la requête en arrière-plan a échoué, ouvrir l'application sur le chat avec le texte
+            if (self.clients.openWindow) {
+              return self.clients.openWindow(
+                `/?tab=chat&replyDraft=${encodeURIComponent(replyText)}`
+              );
+            }
+          })
+      );
+      return;
+    }
+  }
+
+  // Clic standard ou clic sur "Ouvrir la discussion" / "Répondre" sans texte saisi
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // If an open window exists, focus it and notify app to switch tab
+        // If an open window exists, focus it and notify app to switch tab to chat
         for (const client of clientList) {
           if ('focus' in client) {
             client.postMessage({

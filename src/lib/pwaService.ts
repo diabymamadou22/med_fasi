@@ -2,7 +2,7 @@
  * PWA Service Worker Registration & Lifecycle Management
  */
 
-type NavigateListener = (tab: string) => void;
+type NavigateListener = (tab: string, draftText?: string) => void;
 const navigateListeners: Set<NavigateListener> = new Set();
 
 export function onPwaNavigate(callback: NavigateListener): () => void {
@@ -66,7 +66,7 @@ export function registerServiceWorker(): void {
       if (event.data && event.data.type === 'NAVIGATE_TAB' && event.data.tab) {
         navigateListeners.forEach((listener) => {
           try {
-            listener(event.data.tab);
+            listener(event.data.tab, event.data.replyDraft);
           } catch (err) {
             console.error(err);
           }

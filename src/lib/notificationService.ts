@@ -388,10 +388,26 @@ export async function sendSystemNotification(payload: NotificationPayload): Prom
           renotify: true,
           requireInteraction: true,
           data: {
-            url: '/',
+            url: '/?tab=' + (payload.tab || 'chat'),
             tab: payload.tab || 'chat',
           },
           vibrate: [250, 100, 250, 100, 250],
+          actions: [
+            {
+              action: 'quick_reply',
+              type: 'text',
+              title: '💌 Répondre',
+              placeholder: 'Écrire un mot doux...',
+            },
+            {
+              action: 'open_chat',
+              title: '💬 Ouvrir la discussion',
+            },
+            {
+              action: 'dismiss',
+              title: 'Fermer',
+            },
+          ],
         } as NotificationOptions);
         return true;
       }
