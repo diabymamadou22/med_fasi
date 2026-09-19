@@ -36,6 +36,11 @@ import { FlirtCardsGame } from './games/FlirtCardsGame';
 import { LoveRoleplayGame } from './games/LoveRoleplayGame';
 import { LoveBlindTestGame } from './games/LoveBlindTestGame';
 import { LoveVouchersSection } from './games/LoveVouchersSection';
+import { LoveWordleGame } from './games/LoveWordleGame';
+import { LoveSpeedMatchGame } from './games/LoveSpeedMatchGame';
+import { LoveVoiceChallengeGame } from './games/LoveVoiceChallengeGame';
+import { RomanticMadLibsGame } from './games/RomanticMadLibsGame';
+import { SecretDateMissionsGame } from './games/SecretDateMissionsGame';
 import { INITIAL_LEXICON_WORDS } from '../../data/initialLexiconData';
 import { INITIAL_WEEKLY_LEARNING_CHALLENGES } from '../../data/initialWeeklyChallenges';
 import { ENGLISH_MODULES } from '../../data/englishCourseData';
@@ -69,6 +74,11 @@ interface GamesViewProps {
 }
 
 export type EnglishGameTab =
+  | 'wordle'
+  | 'speed_match'
+  | 'voice_coach'
+  | 'mad_libs'
+  | 'date_missions'
   | 'roulette'
   | 'cards'
   | 'roleplay'
@@ -107,10 +117,33 @@ export const GamesView: React.FC<GamesViewProps> = ({
   onOpenChatWithDraft,
   initialTab,
 }) => {
-  // Main Tab State - default is the exciting couple game roulette or requested initialTab
-  const [activeTab, setActiveTab] = useState<EnglishGameTab>(initialTab || 'roulette');
+  // Main Tab State - default is Love Wordle or requested initialTab
+  const [activeTab, setActiveTab] = useState<EnglishGameTab>(initialTab || 'wordle');
   const [speechRate, setSpeechRate] = useState<number>(0.85); // 0.85x gentle slow speed
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Grouping for navigation: 'english_games' (the 5 new games) vs 'couple_flirt'
+  const isEnglishGame = [
+    'wordle',
+    'speed_match',
+    'voice_coach',
+    'mad_libs',
+    'date_missions',
+  ].includes(activeTab);
+
+  const [activeNavGroup, setActiveNavGroup] = useState<'english_games' | 'couple_flirt'>(
+    isEnglishGame ? 'english_games' : 'couple_flirt'
+  );
+
+  useEffect(() => {
+    if (
+      ['wordle', 'speed_match', 'voice_coach', 'mad_libs', 'date_missions'].includes(activeTab)
+    ) {
+      setActiveNavGroup('english_games');
+    } else {
+      setActiveNavGroup('couple_flirt');
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (initialTab) {
@@ -393,26 +426,187 @@ export const GamesView: React.FC<GamesViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Playful Game Navigation Tabs - Optimized with touch fluidity and ZERO bottom scrollbars */}
-      <div className="bg-white p-1.5 rounded-2xl border border-stone-200 shadow-2xs space-y-1.5 sm:space-y-0">
-        {/* Mobile-First 2-Row Grid for Phones (No horizontal scrolling or cut-off tabs) */}
-        <div className="sm:hidden space-y-1.5">
-          {/* Row 1: 4 Mini-Jeux Rapides */}
-          <div className="grid grid-cols-4 gap-1">
+      {/* 2. Playful Game Navigation Tabs */}
+      <div className="bg-white p-2 rounded-2xl border border-stone-200 shadow-2xs space-y-2">
+        {/* Main Category Filter (English Games vs Couple Flirt) */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-100/80 rounded-xl">
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setActiveNavGroup('english_games');
+              if (
+                !['wordle', 'speed_match', 'voice_coach', 'mad_libs', 'date_missions'].includes(
+                  resolvedTab
+                )
+              ) {
+                setActiveTab('wordle');
+              }
+            }}
+            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              activeNavGroup === 'english_games'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-rose-500" />
+            <span>Jeux d'Anglais (5)</span>
+            <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded-full uppercase tracking-wider font-extrabold hidden sm:inline">
+              Nouveau
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setActiveNavGroup('couple_flirt');
+              if (
+                ['wordle', 'speed_match', 'voice_coach', 'mad_libs', 'date_missions'].includes(
+                  resolvedTab
+                )
+              ) {
+                setActiveTab('roulette');
+              }
+            }}
+            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              activeNavGroup === 'couple_flirt'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+            <span>Flirt & Activités (7)</span>
+          </button>
+        </div>
+
+        {/* Sub-Tabs: Group 1 (English Games) */}
+        {activeNavGroup === 'english_games' && (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setActiveTab('wordle');
+              }}
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] ${
+                resolvedTab === 'wordle'
+                  ? 'bg-rose-500 text-white shadow-2xs'
+                  : 'bg-rose-50/50 hover:bg-rose-100/70 text-stone-700 border border-rose-100'
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5 shrink-0" />
+              <div className="text-left">
+                <p className="leading-tight">Love Wordle</p>
+                <p className={`text-[9px] ${resolvedTab === 'wordle' ? 'text-rose-100' : 'text-stone-400'}`}>
+                  Mot secret & gages
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setActiveTab('speed_match');
+              }}
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] ${
+                resolvedTab === 'speed_match'
+                  ? 'bg-rose-500 text-white shadow-2xs'
+                  : 'bg-rose-50/50 hover:bg-rose-100/70 text-stone-700 border border-rose-100'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 shrink-0" />
+              <div className="text-left">
+                <p className="leading-tight">Speed Match</p>
+                <p className={`text-[9px] ${resolvedTab === 'speed_match' ? 'text-rose-100' : 'text-stone-400'}`}>
+                  Duel chrono 60s
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setActiveTab('voice_coach');
+              }}
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] ${
+                resolvedTab === 'voice_coach'
+                  ? 'bg-rose-500 text-white shadow-2xs'
+                  : 'bg-rose-50/50 hover:bg-rose-100/70 text-stone-700 border border-rose-100'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5 shrink-0" />
+              <div className="text-left">
+                <p className="leading-tight">Coach Vocal</p>
+                <p className={`text-[9px] ${resolvedTab === 'voice_coach' ? 'text-rose-100' : 'text-stone-400'}`}>
+                  Accent & audio
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setActiveTab('mad_libs');
+              }}
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] ${
+                resolvedTab === 'mad_libs'
+                  ? 'bg-rose-500 text-white shadow-2xs'
+                  : 'bg-rose-50/50 hover:bg-rose-100/70 text-stone-700 border border-rose-100'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+              <div className="text-left">
+                <p className="leading-tight">Mad Libs</p>
+                <p className={`text-[9px] ${resolvedTab === 'mad_libs' ? 'text-rose-100' : 'text-stone-400'}`}>
+                  Histoire à trous
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setActiveTab('date_missions');
+              }}
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center min-h-[44px] col-span-2 sm:col-span-1 ${
+                resolvedTab === 'date_missions'
+                  ? 'bg-rose-500 text-white shadow-2xs'
+                  : 'bg-rose-50/50 hover:bg-rose-100/70 text-stone-700 border border-rose-100'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 shrink-0" />
+              <div className="text-left">
+                <p className="leading-tight">Missions Date</p>
+                <p className={`text-[9px] ${resolvedTab === 'date_missions' ? 'text-rose-100' : 'text-stone-400'}`}>
+                  Dans la vraie vie
+                </p>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Sub-Tabs: Group 2 (Couple Flirt & Activities) */}
+        {activeNavGroup === 'couple_flirt' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1.5">
             <button
               type="button"
               onClick={() => {
                 soundEffects.playSoftTap();
                 setActiveTab('roulette');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[46px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] ${
                 resolvedTab === 'roulette'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
               <Shuffle className="w-3.5 h-3.5 shrink-0" />
-              <span className="leading-tight truncate w-full">Roue</span>
+              <span className="truncate">Roue</span>
             </button>
 
             <button
@@ -421,14 +615,14 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 soundEffects.playSoftTap();
                 setActiveTab('cards');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[46px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] ${
                 resolvedTab === 'cards'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span className="leading-tight truncate w-full">Cartes</span>
+              <span className="truncate">Cartes</span>
             </button>
 
             <button
@@ -437,14 +631,14 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 soundEffects.playSoftTap();
                 setActiveTab('roleplay');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[46px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] ${
                 resolvedTab === 'roleplay'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
               <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-              <span className="leading-tight truncate w-full">Rôles</span>
+              <span className="truncate">Rôles</span>
             </button>
 
             <button
@@ -453,33 +647,30 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 soundEffects.playSoftTap();
                 setActiveTab('trivia');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[46px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] ${
                 resolvedTab === 'trivia'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
               <Zap className="w-3.5 h-3.5 shrink-0" />
-              <span className="leading-tight truncate w-full">Blind Test</span>
+              <span className="truncate">Blind Test</span>
             </button>
-          </div>
 
-          {/* Row 2: Missions, Bons & Vocabulaire complice */}
-          <div className="grid grid-cols-3 gap-1">
             <button
               type="button"
               onClick={() => {
                 soundEffects.playSoftTap();
                 setActiveTab('weekly_challenges');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-h-[40px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] ${
                 resolvedTab === 'weekly_challenges'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
-              <Target className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-              <span className="truncate">💌 Missions</span>
+              <Target className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="truncate">Missions Chat</span>
             </button>
 
             <button
@@ -488,14 +679,14 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 soundEffects.playSoftTap();
                 setActiveTab('vouchers');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-h-[40px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] ${
                 resolvedTab === 'vouchers'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
-              <Gift className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-              <span className="truncate">🎁 Bons</span>
+              <Gift className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Bons</span>
             </button>
 
             <button
@@ -504,144 +695,89 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 soundEffects.playSoftTap();
                 setActiveTab('vault');
               }}
-              className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-h-[40px] touch-manipulation text-center ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer text-center min-h-[40px] col-span-2 sm:col-span-1 ${
                 resolvedTab === 'vault'
                   ? 'bg-rose-500 text-white shadow-2xs'
-                  : 'text-stone-700 bg-stone-50 hover:bg-stone-100'
+                  : 'bg-stone-50 hover:bg-stone-100 text-stone-700'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 shrink-0 text-rose-500" />
-              <span className="truncate">📖 Mots ({effectiveLexicon.length})</span>
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Mots ({effectiveLexicon.length})</span>
             </button>
           </div>
-        </div>
-
-        {/* Tablet & Desktop Horizontal Flex Row */}
-        <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none touch-pan-x">
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('roulette');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'roulette'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-roulette"
-          >
-            <Shuffle className="w-3.5 h-3.5 shrink-0" />
-            <span>🎡 Roue des Gages</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('cards');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'cards'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-cards"
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span>🃏 Cartes Flirt</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('roleplay');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'roleplay'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-roleplay"
-          >
-            <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>🎭 Rôles Complices</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('trivia');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'trivia'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-trivia"
-          >
-            <Zap className="w-3.5 h-3.5 shrink-0" />
-            <span>⚡ Blind Test</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('weekly_challenges');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'weekly_challenges'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-weekly"
-          >
-            <Target className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span>💌 Missions Chat</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('vouchers');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'vouchers'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-vouchers"
-          >
-            <Gift className="w-3.5 h-3.5 shrink-0" />
-            <span>🎁 Bons d'Amour</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setActiveTab('vault');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer min-h-[38px] ${
-              resolvedTab === 'vault'
-                ? 'bg-rose-500 text-white shadow-2xs'
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-            id="tab-game-vault"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-            <span>📖 Mots Doux <span className="text-[11px] opacity-80 font-mono">({effectiveLexicon.length})</span></span>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
       {/* 3. ACTIVE GAME TAB VIEWS */}
       {/* ========================================================================= */}
+
+      {/* English Game 1: Love Wordle */}
+      {resolvedTab === 'wordle' && (
+        <LoveWordleGame
+          profile={profile}
+          activePartnerId={activePartnerId}
+          speechRate={speechRate}
+          onSendChatMessage={onSendChatMessage}
+          onAddXp={handleAddXp}
+          onSaveToLexicon={(item) =>
+            handleSaveWord({
+              id: `lex-${Date.now()}`,
+              english: item.english,
+              french: item.french,
+              phonetic: item.phonetic,
+              category: 'romantique',
+              addedBy: activePartnerId,
+              isFavorite: true,
+              isMastered: false,
+              createdAt: new Date().toISOString(),
+            })
+          }
+        />
+      )}
+
+      {/* English Game 2: Speed Match 60s */}
+      {resolvedTab === 'speed_match' && (
+        <LoveSpeedMatchGame
+          profile={profile}
+          activePartnerId={activePartnerId}
+          speechRate={speechRate}
+          onSendChatMessage={onSendChatMessage}
+          onAddXp={handleAddXp}
+        />
+      )}
+
+      {/* English Game 3: Voice Coach & Pronunciation */}
+      {resolvedTab === 'voice_coach' && (
+        <LoveVoiceChallengeGame
+          profile={profile}
+          activePartnerId={activePartnerId}
+          speechRate={speechRate}
+          onSendChatMessage={onSendChatMessage}
+          onAddXp={handleAddXp}
+        />
+      )}
+
+      {/* English Game 4: Romantic Mad Libs */}
+      {resolvedTab === 'mad_libs' && (
+        <RomanticMadLibsGame
+          profile={profile}
+          activePartnerId={activePartnerId}
+          speechRate={speechRate}
+          onSendChatMessage={onSendChatMessage}
+          onAddXp={handleAddXp}
+        />
+      )}
+
+      {/* English Game 5: Secret Date Missions in Real Life */}
+      {resolvedTab === 'date_missions' && (
+        <SecretDateMissionsGame
+          profile={profile}
+          activePartnerId={activePartnerId}
+          onSendChatMessage={onSendChatMessage}
+          onAddXp={handleAddXp}
+        />
+      )}
 
       {/* Tab 1: Interactive Love Roulette Game */}
       {resolvedTab === 'roulette' && (

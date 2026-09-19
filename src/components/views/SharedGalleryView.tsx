@@ -22,6 +22,9 @@ import {
   ArrowUpDown,
   Pencil,
   Trash2,
+  Video,
+  Film,
+  Play,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -39,11 +42,14 @@ import { CameraCaptureModal } from '../modals/CameraCaptureModal';
 
 export type GallerySourceType =
   | 'all'
+  | 'video'
   | 'memory'
   | 'profile'
   | 'location'
   | 'capsule'
   | 'challenge';
+
+export type GalleryMediaMode = 'all' | 'photos' | 'videos';
 
 export interface GalleryItem {
   id: string;
@@ -51,6 +57,9 @@ export interface GalleryItem {
   sourceLabel: string;
   title: string;
   photoUrl: string;
+  mediaType?: 'image' | 'video';
+  videoUrl?: string;
+  videoDuration?: string;
   date?: string;
   locationName?: string;
   description?: string;
@@ -69,7 +78,7 @@ interface SharedGalleryViewProps {
   challenges: CoupleChallenge[];
   onLikeMemory?: (memoryId: string) => void;
   onAddMemory?: (memory: Omit<TimelineMemory, 'id' | 'likes'>) => void;
-  onOpenAddMemoryModal: () => void;
+  onOpenAddMemoryModal: (defaultType?: 'image' | 'video') => void;
   onOpenProfileModal: (pId?: PartnerId) => void;
   onEditMemory?: (memory: TimelineMemory) => void;
   onDeleteMemory?: (memoryId: string) => void;
@@ -93,6 +102,8 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   onDeleteMediaItem,
   onRemovePhotoOnly,
 }) => {
+  // Strict separation: 'photos' | 'videos' | 'all' (defaults to 'photos' so photos and videos are never mixed)
+  const [mediaMode, setMediaMode] = useState<GalleryMediaMode>('photos');
   const [selectedSource, setSelectedSource] = useState<GallerySourceType>('all');
   const [selectedPartnerFilter, setSelectedPartnerFilter] = useState<'all' | 'p1' | 'p2'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -156,13 +167,21 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
 
     // 2. Timeline Memories
     memories.forEach((mem) => {
-      if (mem.photoUrl && mem.photoUrl.trim().length > 0) {
+      const isVideo = Boolean(
+        mem.mediaType === 'video' ||
+        mem.videoUrl ||
+        mem.photoUrl?.startsWith('data:video/')
+      );
+      if ((mem.photoUrl && mem.photoUrl.trim().length > 0) || isVideo) {
         items.push({
           id: `mem-${mem.id}`,
           sourceType: 'memory',
-          sourceLabel: 'Souvenir Timeline',
+          sourceLabel: isVideo ? 'Vidéo souvenir' : 'Souvenir Timeline',
           title: mem.title,
-          photoUrl: mem.photoUrl,
+          photoUrl: mem.photoUrl || '',
+          mediaType: isVideo ? 'video' : 'image',
+          videoUrl: mem.videoUrl,
+          videoDuration: mem.videoDuration,
           date: mem.date,
           locationName: mem.locationName,
           description: mem.description,
@@ -244,23 +263,47 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     return uniqueItems;
   }, [profile, memories, locations, capsules, challenges]);
 
+  const photoCount = useMemo(
+    () => allGalleryItems.filter((i) => i.mediaType !== 'video').length,
+    [allGalleryItems]
+  );
+  const videoCount = useMemo(
+    () => allGalleryItems.filter((i) => i.mediaType === 'video').length,
+    [allGalleryItems]
+  );
+
   // Filtered & Sorted items
   const filteredItems = useMemo(() => {
     return allGalleryItems
       .filter((item) => {
-        // Source filter
-        if (selectedSource !== 'all' && item.sourceType !== selectedSource) {
+        // 1. Strict Media Type separation (Photos vs Videos)
+        if (mediaMode === 'photos') {
+          if (item.mediaType === 'video') {
+            return false;
+          }
+        } else if (mediaMode === 'videos') {
+          if (item.mediaType !== 'video') {
+            return false;
+          }
+        }
+
+        // 2. Source filter
+        if (selectedSource === 'video') {
+          if (item.mediaType !== 'video') {
+            return false;
+          }
+        } else if (selectedSource !== 'all' && item.sourceType !== selectedSource) {
           return false;
         }
 
-        // Partner filter
+        // 3. Partner filter
         if (selectedPartnerFilter !== 'all') {
           if (item.authorId !== selectedPartnerFilter && item.authorId !== 'both') {
             return false;
           }
         }
 
-        // Search query
+        // 4. Search query
         if (searchQuery.trim().length > 0) {
           const q = searchQuery.toLowerCase();
           const matchTitle = item.title.toLowerCase().includes(q);
@@ -283,13 +326,19 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           return dateA - dateB;
         }
       });
-  }, [allGalleryItems, selectedSource, selectedPartnerFilter, searchQuery, sortOrder]);
+  }, [allGalleryItems, mediaMode, selectedSource, selectedPartnerFilter, searchQuery, sortOrder]);
 
   const currentPartner =
     activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
 
   // Source badges styling
-  const getSourceBadgeInfo = (source: GalleryItem['sourceType']) => {
+  const getSourceBadgeInfo = (source: GalleryItem['sourceType'], mediaType?: 'image' | 'video') => {
+    if (mediaType === 'video') {
+      return {
+        label: 'Vidéo',
+        bg: 'bg-purple-100 text-purple-800 border-purple-300',
+      };
+    }
     switch (source) {
       case 'memory':
         return {
@@ -327,7 +376,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   // Mobile & Desktop Swipeable Photo Items for Lightbox
   const photoViewerItems: PhotoViewerItem[] = useMemo(() => {
     return filteredItems.map((item) => {
-      const badge = getSourceBadgeInfo(item.sourceType);
+      const badge = getSourceBadgeInfo(item.sourceType, item.mediaType);
       const author =
         item.authorId === 'p1'
           ? profile.partner1
@@ -343,6 +392,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       return {
         id: item.id,
         photoUrl: item.photoUrl,
+        mediaType: item.mediaType,
+        videoUrl: item.videoUrl,
+        videoDuration: item.videoDuration,
         title: item.title,
         description: item.description,
         date: item.date,
@@ -413,17 +465,23 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center justify-center sm:justify-start gap-2">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                 <h1 className="text-xl sm:text-3xl font-serif font-bold text-white tracking-tight">
                   Galerie Partagée
                 </h1>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/20 text-white backdrop-blur-xs">
                   <Images className="w-3.5 h-3.5" />
-                  {allGalleryItems.length} photos
+                  {photoCount} photos
                 </span>
+                {videoCount > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/40 text-white border border-purple-300/40 backdrop-blur-xs">
+                    <Video className="w-3.5 h-3.5" />
+                    {videoCount} vidéos
+                  </span>
+                )}
               </div>
               <p className="text-rose-100 text-xs sm:text-sm mt-1 max-w-xl">
-                Toutes vos photos de profils, souvenirs de couple, escapades et défis réunis en une vue unique.
+                Vos photos et vidéos de couple soigneusement organisées et séparées.
               </p>
             </div>
           </div>
@@ -445,13 +503,25 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
             <button
               onClick={() => {
                 soundEffects.playNoteClick();
-                onOpenAddMemoryModal();
+                onOpenAddMemoryModal('image');
               }}
               className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-white text-rose-600 hover:bg-rose-50 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               id="btn-gallery-add-memory"
             >
               <Plus className="w-4 h-4 text-rose-600" />
               <span>Ajouter une photo</span>
+            </button>
+            <button
+              onClick={() => {
+                soundEffects.playNoteClick();
+                onOpenAddMemoryModal('video');
+              }}
+              className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-700 hover:to-rose-700 active:scale-95 text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/20"
+              title="Importer une vidéo souvenir"
+              id="btn-gallery-add-video"
+            >
+              <Video className="w-4 h-4 text-white" />
+              <span>Importer une vidéo</span>
             </button>
             <button
               onClick={() => {
@@ -465,6 +535,93 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
               <Camera className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Main Mode Navigation: Strict Separation Photos vs Vidéos */}
+      <div className="bg-white rounded-2xl border border-stone-200 p-2 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 p-1 bg-stone-100 rounded-xl">
+          <button
+            type="button"
+            id="tab-gallery-photos"
+            onClick={() => {
+              soundEffects.playNoteClick();
+              setMediaMode('photos');
+              if (selectedSource === 'video') setSelectedSource('all');
+            }}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              mediaMode === 'photos'
+                ? 'bg-white text-rose-600 shadow-xs ring-1 ring-rose-200/50'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
+            }`}
+          >
+            <Images className="w-4 h-4" />
+            <span>Photos uniquement</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                mediaMode === 'photos' ? 'bg-rose-100 text-rose-700' : 'bg-stone-200 text-stone-600'
+              }`}
+            >
+              {photoCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-gallery-videos"
+            onClick={() => {
+              soundEffects.playNoteClick();
+              setMediaMode('videos');
+              if (selectedSource === 'video') setSelectedSource('all');
+            }}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              mediaMode === 'videos'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            <span>Vidéos uniquement</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                mediaMode === 'videos' ? 'bg-white/25 text-white' : 'bg-stone-200 text-stone-600'
+              }`}
+            >
+              {videoCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-gallery-all"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setMediaMode('all');
+            }}
+            className={`hidden md:flex px-3 py-2 rounded-lg text-xs font-medium transition-all items-center justify-center gap-1.5 cursor-pointer ${
+              mediaMode === 'all'
+                ? 'bg-white text-stone-900 shadow-xs ring-1 ring-stone-200'
+                : 'text-stone-500 hover:text-stone-800'
+            }`}
+            title="Vue combinée"
+          >
+            <span>Tout ({allGalleryItems.length})</span>
+          </button>
+        </div>
+
+        {/* Informative helper pill */}
+        <div className="text-[11px] text-stone-500 text-center sm:text-right px-2">
+          {mediaMode === 'photos' ? (
+            <span className="inline-flex items-center gap-1 font-medium text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100">
+              <Images className="w-3 h-3" /> Affichage exclusif de vos photos ({photoCount})
+            </span>
+          ) : mediaMode === 'videos' ? (
+            <span className="inline-flex items-center gap-1 font-medium text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100">
+              <Video className="w-3 h-3" /> Affichage exclusif de vos vidéos ({videoCount})
+            </span>
+          ) : (
+            <span className="text-stone-400">Tous les médias</span>
+          )}
         </div>
       </div>
 
@@ -601,34 +758,83 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
 
         {/* Source Categories Badges */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5 no-scrollbar">
-          {[
-            { id: 'all' as GallerySourceType, label: 'Toutes les photos', count: allGalleryItems.length },
-            {
-              id: 'memory' as GallerySourceType,
-              label: 'Souvenirs Timeline',
-              count: allGalleryItems.filter((i) => i.sourceType === 'memory').length,
-            },
-            {
-              id: 'profile' as GallerySourceType,
-              label: 'Portraits Profil',
-              count: allGalleryItems.filter((i) => i.sourceType === 'profile').length,
-            },
-            {
-              id: 'location' as GallerySourceType,
-              label: 'Lieux & Escapades',
-              count: allGalleryItems.filter((i) => i.sourceType === 'location').length,
-            },
-            {
-              id: 'challenge' as GallerySourceType,
-              label: 'Défis complétés',
-              count: allGalleryItems.filter((i) => i.sourceType === 'challenge').length,
-            },
-            {
-              id: 'capsule' as GallerySourceType,
-              label: 'Capsules',
-              count: allGalleryItems.filter((i) => i.sourceType === 'capsule').length,
-            },
-          ].map((cat) => {
+          {(mediaMode === 'videos'
+            ? [
+                { id: 'all' as GallerySourceType, label: 'Toutes les vidéos', count: videoCount },
+                {
+                  id: 'memory' as GallerySourceType,
+                  label: 'Souvenirs Vidéos',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'memory' && i.mediaType === 'video').length,
+                },
+                {
+                  id: 'location' as GallerySourceType,
+                  label: 'Lieux & Escapades',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'location' && i.mediaType === 'video').length,
+                },
+              ]
+            : mediaMode === 'photos'
+            ? [
+                { id: 'all' as GallerySourceType, label: 'Toutes les photos', count: photoCount },
+                {
+                  id: 'memory' as GallerySourceType,
+                  label: 'Souvenirs Photos',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'memory' && i.mediaType !== 'video').length,
+                },
+                {
+                  id: 'profile' as GallerySourceType,
+                  label: 'Portraits Profil',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'profile').length,
+                },
+                {
+                  id: 'location' as GallerySourceType,
+                  label: 'Lieux & Escapades',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'location' && i.mediaType !== 'video').length,
+                },
+                {
+                  id: 'challenge' as GallerySourceType,
+                  label: 'Défis complétés',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'challenge').length,
+                },
+                {
+                  id: 'capsule' as GallerySourceType,
+                  label: 'Capsules',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'capsule').length,
+                },
+              ]
+            : [
+                { id: 'all' as GallerySourceType, label: 'Tous les médias', count: allGalleryItems.length },
+                {
+                  id: 'video' as GallerySourceType,
+                  label: 'Vidéos',
+                  count: allGalleryItems.filter((i) => i.mediaType === 'video').length,
+                },
+                {
+                  id: 'memory' as GallerySourceType,
+                  label: 'Souvenirs Photos',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'memory' && i.mediaType !== 'video').length,
+                },
+                {
+                  id: 'profile' as GallerySourceType,
+                  label: 'Portraits Profil',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'profile').length,
+                },
+                {
+                  id: 'location' as GallerySourceType,
+                  label: 'Lieux & Escapades',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'location').length,
+                },
+                {
+                  id: 'challenge' as GallerySourceType,
+                  label: 'Défis complétés',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'challenge').length,
+                },
+                {
+                  id: 'capsule' as GallerySourceType,
+                  label: 'Capsules',
+                  count: allGalleryItems.filter((i) => i.sourceType === 'capsule').length,
+                },
+              ]
+          ).map((cat) => {
             const isActive = selectedSource === cat.id;
             return (
               <button
@@ -639,7 +845,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                   isActive
-                    ? 'bg-rose-500 text-white shadow-xs'
+                    ? mediaMode === 'videos'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-rose-500 text-white shadow-xs'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
                 }`}
               >
@@ -660,20 +868,28 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       {/* Gallery Grid */}
       {filteredItems.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-stone-300 p-12 text-center max-w-lg mx-auto space-y-4">
-          <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto shadow-xs">
-            <Images className="w-8 h-8" />
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xs ${
+              mediaMode === 'videos' ? 'bg-purple-50 text-purple-600' : 'bg-rose-50 text-rose-500'
+            }`}
+          >
+            {mediaMode === 'videos' ? <Video className="w-8 h-8" /> : <Images className="w-8 h-8" />}
           </div>
           <div>
             <h3 className="text-lg font-serif font-bold text-stone-800">
-              Aucune photo trouvée
+              {mediaMode === 'videos' ? 'Aucune vidéo trouvée' : 'Aucune photo trouvée'}
             </h3>
             <p className="text-stone-500 text-sm mt-1">
               {searchQuery || selectedSource !== 'all' || selectedPartnerFilter !== 'all'
-                ? 'Essayez de réinitialiser vos filtres ou termes de recherche pour afficher toutes vos photos.'
+                ? `Essayez de réinitialiser vos filtres ou termes de recherche pour afficher toutes vos ${
+                    mediaMode === 'videos' ? 'vidéos' : 'photos'
+                  }.`
+                : mediaMode === 'videos'
+                ? 'Importez vos premières vidéos de couple pour les visionner ici séparément !'
                 : 'Commencez à immortaliser vos moments en ajoutant des photos à vos souvenirs !'}
             </p>
           </div>
-          <div className="pt-2 flex justify-center gap-3">
+          <div className="pt-2 flex flex-wrap justify-center gap-3">
             {(searchQuery || selectedSource !== 'all' || selectedPartnerFilter !== 'all') && (
               <button
                 onClick={() => {
@@ -686,26 +902,41 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                 Réinitialiser les filtres
               </button>
             )}
-            <button
-              onClick={() => {
-                soundEffects.playSoftTap();
-                setShowCameraModal(true);
-              }}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Prendre une photo</span>
-            </button>
-            <button
-              onClick={() => {
-                soundEffects.playNoteClick();
-                onOpenAddMemoryModal();
-              }}
-              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Ajouter une photo</span>
-            </button>
+            {mediaMode === 'videos' ? (
+              <button
+                onClick={() => {
+                  soundEffects.playNoteClick();
+                  onOpenAddMemoryModal('video');
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Importer une vidéo</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setShowCameraModal(true);
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Prendre une photo</span>
+                </button>
+                <button
+                  onClick={() => {
+                    soundEffects.playNoteClick();
+                    onOpenAddMemoryModal('image');
+                  }}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Ajouter une photo</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       ) : galleryLayout === 'fit' ? (
@@ -750,6 +981,23 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     loading="lazy"
                     className="relative max-w-full max-h-full w-auto h-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-[1.02] select-none"
                   />
+
+                  {/* Video Play Overlay */}
+                  {item.mediaType === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/60 text-white backdrop-blur-xs flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 group-hover:bg-rose-600/90 transition-all duration-300">
+                        <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-white text-white ml-0.5" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Video duration pill */}
+                  {item.mediaType === 'video' && item.videoDuration && (
+                    <div className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-white text-[10px] font-semibold flex items-center gap-1 border border-white/20">
+                      <Film className="w-3 h-3 text-rose-400" />
+                      <span>{item.videoDuration}</span>
+                    </div>
+                  )}
 
                   {/* Top Badges */}
                   <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
@@ -887,6 +1135,23 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     loading="lazy"
                     className="w-full h-auto object-contain block transition-transform duration-300 group-hover:scale-[1.01]"
                   />
+
+                  {/* Video Play Overlay */}
+                  {item.mediaType === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                      <div className="w-12 h-12 rounded-full bg-black/60 text-white backdrop-blur-xs flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 group-hover:bg-rose-600/90 transition-all duration-300">
+                        <Play className="w-6 h-6 fill-white text-white ml-0.5" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Video duration pill */}
+                  {item.mediaType === 'video' && item.videoDuration && (
+                    <div className="absolute bottom-2.5 left-2.5 z-10 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-white text-[10px] font-semibold flex items-center gap-1 border border-white/20">
+                      <Film className="w-3 h-3 text-rose-400" />
+                      <span>{item.videoDuration}</span>
+                    </div>
+                  )}
 
                   {/* Top Badges */}
                   <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
