@@ -2275,13 +2275,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
           />
 
           {/* Private Intimate Space Indicator */}
-          <div className="flex justify-center my-1">
-            <div className={`backdrop-blur-xs border text-[11px] px-3.5 py-1.5 rounded-full text-center max-w-sm shadow-2xs ${
+          <div className="flex justify-center my-0.5">
+            <div className={`backdrop-blur-xs border text-[11px] px-3 py-1 rounded-full text-center shadow-2xs flex items-center gap-1.5 ${
               chatTheme === 'velvet-night'
                 ? 'bg-slate-900/80 border-slate-800 text-slate-300'
                 : 'bg-white/90 border-rose-100 text-stone-600'
             }`}>
-              🔒 <span className="font-semibold text-rose-500">Espace intime :</span> Messages, vocaux et photos synchronisés en tête-à-tête.
+              <span>🔒</span>
+              <span className="font-semibold text-rose-500">Espace intime</span>
+              <span className="text-stone-400">•</span>
+              <span>Synchronisé à deux</span>
             </div>
           </div>
 

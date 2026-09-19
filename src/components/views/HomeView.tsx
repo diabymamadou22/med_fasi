@@ -184,42 +184,42 @@ export const HomeView: React.FC<HomeViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
+    <div className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5 sm:space-y-6">
       {/* ========================================================
-          1. HERO COMPLICE : ACCUEIL CHIC, PUR & ÉLÉGANT
+          1. HERO COMPLICE : ACCUEIL CHIC, CHALEUREUX & ÉLÉGANT
          ======================================================== */}
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#FCF9F7] to-[#F8F2EE] border border-stone-200/70 p-5 sm:p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)]"
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white via-[#FFF9F6] to-[#FFF4EE] border border-rose-100/90 p-5 sm:p-7 shadow-[0_4px_24px_rgba(244,63,94,0.05)]"
         aria-label="Espace d'accueil du couple"
       >
         {/* Soft background ambient glows */}
-        <div className="absolute -top-16 -right-16 w-56 h-56 bg-rose-200/30 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-amber-200/25 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-rose-200/40 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-amber-200/30 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* Top refined pill with greeting */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 border border-stone-200/80 shadow-2xs text-xs text-stone-600 mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin-slow" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-rose-100 shadow-2xs text-xs text-stone-600 mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span className="font-serif italic text-stone-700">{getGreeting()}</span>
             <span className="text-stone-300">•</span>
             <span className="text-rose-600 font-semibold">{profile.relationshipTitle}</span>
           </div>
 
           {/* Couple Avatars with Living Heartbeat Link */}
-          <div className="flex items-center justify-center gap-5 sm:gap-8 my-2">
+          <div className="flex items-center justify-center gap-4 sm:gap-7 my-1">
             {/* Partner 1 */}
             <motion.div
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onOpenProfileModal && onOpenProfileModal('p1')}
               className="flex flex-col items-center cursor-pointer group"
               title={`Profil de ${profile.partner1.name}`}
               id="hero-avatar-p1"
             >
-              <div className="relative p-1 rounded-full bg-gradient-to-tr from-rose-300 via-rose-200 to-amber-200 shadow-xs">
+              <div className="relative p-1 rounded-full bg-gradient-to-tr from-rose-400 via-rose-300 to-amber-300 shadow-xs ring-2 ring-white">
                 <PartnerAvatar
                   name={profile.partner1.name}
                   avatar={profile.partner1.avatar}
@@ -228,46 +228,43 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   className="border-2 border-white"
                 />
                 {activePartnerId === 'p1' && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-xs">
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-bold shadow-xs">
                     Moi
                   </span>
                 )}
               </div>
-              <span className="mt-2 text-sm font-semibold text-stone-800 tracking-tight">
+              <span className="mt-1.5 text-sm font-semibold text-stone-800 tracking-tight">
                 {profile.partner1.name}
               </span>
-              <span className="text-[11px] text-stone-500 max-w-[100px] truncate">
+              <span className="text-[11px] text-rose-500/90 font-medium">
                 {profile.partner1.mood?.status || 'Rayonnante'}
               </span>
             </motion.div>
 
             {/* Central Living Pulsing Heart */}
-            <div className="flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center justify-center px-1">
               <div className="relative flex items-center justify-center">
                 <motion.div
-                  animate={{ scale: [1, 1.18, 1] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-rose-500/10 border border-rose-200/60 flex items-center justify-center shadow-xs"
+                  animate={{ scale: [1, 1.15, 1] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-rose-500/10 border border-rose-200/80 flex items-center justify-center shadow-xs"
                 >
-                  <Heart className="w-6 h-6 sm:w-7 sm:h-7 text-rose-500 fill-rose-500 drop-shadow-xs" />
+                  <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-rose-500 fill-rose-500 drop-shadow-xs" />
                 </motion.div>
-                <div className="absolute -inset-1.5 border border-rose-300/40 rounded-full animate-ping opacity-35 pointer-events-none" />
+                <div className="absolute -inset-1 border border-rose-300/40 rounded-full animate-ping opacity-30 pointer-events-none" />
               </div>
-              <span className="text-[10px] font-bold font-mono text-rose-500/80 mt-1 tracking-wider uppercase">
-                Complices
-              </span>
             </div>
 
             {/* Partner 2 */}
             <motion.div
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onOpenProfileModal && onOpenProfileModal('p2')}
               className="flex flex-col items-center cursor-pointer group"
               title={`Profil de ${profile.partner2.name}`}
               id="hero-avatar-p2"
             >
-              <div className="relative p-1 rounded-full bg-gradient-to-tr from-sky-300 via-sky-200 to-indigo-200 shadow-xs">
+              <div className="relative p-1 rounded-full bg-gradient-to-tr from-sky-400 via-sky-300 to-indigo-300 shadow-xs ring-2 ring-white">
                 <PartnerAvatar
                   name={profile.partner2.name}
                   avatar={profile.partner2.avatar}
@@ -276,27 +273,30 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   className="border-2 border-white"
                 />
                 {activePartnerId === 'p2' && (
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-sky-600 text-white text-[9px] font-bold shadow-xs">
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.2 rounded-full bg-sky-600 text-white text-[9px] font-bold shadow-xs">
                     Moi
                   </span>
                 )}
               </div>
-              <span className="mt-2 text-sm font-semibold text-stone-800 tracking-tight">
+              <span className="mt-1.5 text-sm font-semibold text-stone-800 tracking-tight">
                 {profile.partner2.name}
               </span>
-              <span className="text-[11px] text-stone-500 max-w-[100px] truncate">
+              <span className="text-[11px] text-sky-600 font-medium">
                 {profile.partner2.mood?.status || 'Amoureux'}
               </span>
             </motion.div>
           </div>
 
           {/* Days Together Milestone */}
-          <div className="mt-4 sm:mt-5 text-center">
-            <h2 className="font-serif text-2xl sm:text-4xl font-bold tracking-tight text-stone-800">
-              <span className="text-rose-600">{daysTogether.toLocaleString('fr-FR')}</span> jours d’amour
+          <div className="mt-3 text-center">
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold tracking-tight text-stone-800">
+              <span className="bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
+                {daysTogether.toLocaleString('fr-FR')}
+              </span>{' '}
+              jours d’amour
             </h2>
-            <p className="text-xs sm:text-sm text-stone-500 font-medium mt-1">
-              Depuis le <span className="text-stone-700 font-semibold">{formattedAnniversary}</span>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Depuis le <span className="text-stone-700 font-medium">{formattedAnniversary}</span>
             </p>
           </div>
 
@@ -307,19 +307,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 initial={{ opacity: 0, y: 8, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                className="mt-3 px-4 py-1.5 rounded-full bg-rose-600 text-white text-xs font-semibold shadow-md flex items-center gap-1.5"
+                className="mt-2.5 px-3.5 py-1.5 rounded-full bg-rose-600 text-white text-xs font-semibold shadow-md flex items-center gap-1.5"
               >
                 <Heart className="w-3.5 h-3.5 fill-white animate-bounce" />
-                <span>{pulseFeedback} envoyé avec amour à {otherPartner.name} !</span>
+                <span>{pulseFeedback} envoyé à {otherPartner.name} !</span>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Quick "Ondes d'Amour" Instant Buttons */}
-          <div className="mt-5 w-full max-w-lg">
-            <p className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider mb-2">
-              Envoyer une onde instantanée à {otherPartner.name}
-            </p>
+          <div className="mt-4 w-full max-w-md">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {QUICK_PULSES.map((pulse) => (
                 <motion.button
@@ -327,10 +324,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => handleSendPulse(pulse.vibe, pulse.message, pulse.label)}
-                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-2xl bg-white/85 border border-stone-200/80 shadow-2xs text-xs font-semibold text-stone-700 transition-all cursor-pointer ${pulse.tagColor}`}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-white/90 border border-stone-200/80 shadow-2xs text-xs font-semibold text-stone-700 transition-all cursor-pointer ${pulse.tagColor}`}
                   title={pulse.message}
                 >
-                  <span className="text-base">{pulse.icon}</span>
+                  <span className="text-sm">{pulse.icon}</span>
                   <span className="truncate">{pulse.label}</span>
                 </motion.button>
               ))}
@@ -338,15 +335,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
 
           {/* Active profile switch indicator */}
-          <div className="mt-4 pt-3 border-t border-stone-200/60 w-full flex items-center justify-center gap-2 text-xs text-stone-500">
-            <span>Connecté(e) :</span>
-            <span className="font-bold text-stone-800">{currentPartner.name}</span>
+          <div className="mt-3 pt-2.5 border-t border-stone-200/60 w-full flex items-center justify-center gap-2 text-xs text-stone-500">
+            <span>Connecté(e) en tant que <strong className="text-stone-800">{currentPartner.name}</strong></span>
             <span className="text-stone-300">•</span>
             <button
               onClick={() => onSwitchPartner(activePartnerId === 'p1' ? 'p2' : 'p1')}
               className="text-rose-600 font-semibold hover:underline cursor-pointer transition-colors"
             >
-              Basculer vers {otherPartner.name}
+              Passer à {otherPartner.name}
             </button>
           </div>
         </div>
@@ -356,67 +352,60 @@ export const HomeView: React.FC<HomeViewProps> = ({
           2. LES 4 PILIERS DU NID (NAVIGATION SIMPLE & ÉLÉGANTE)
          ======================================================== */}
       <section aria-label="Espaces du couple" className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="font-serif text-lg sm:text-xl font-bold tracking-tight text-stone-800 flex items-center gap-2">
-            <span>Nos Espaces en Tête-à-Tête</span>
-          </h3>
-          <span className="text-xs text-stone-400 font-medium">Tout en un clic</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Card 1: Salon de Chat Intime */}
           <motion.div
             whileHover={{ y: -3 }}
             whileTap={{ scale: 0.99 }}
             onClick={() => onNavigateToTab('chat')}
-            className="group p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-rose-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="group p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-white to-rose-50/30 border border-stone-200/80 shadow-xs hover:border-rose-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             id="card-nav-chat"
           >
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 group-hover:scale-110 transition-transform">
-                  <MessageCircle className="w-5 h-5" />
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 group-hover:scale-105 transition-transform">
+                  <MessageCircle className="w-4.5 h-4.5" />
                 </div>
                 {unreadCount > 0 ? (
-                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500 text-white text-[11px] font-bold shadow-xs animate-pulse">
-                    {unreadCount} message{unreadCount > 1 ? 's' : ''}
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-xs animate-pulse">
+                    {unreadCount} nouveau{unreadCount > 1 ? 'x' : ''}
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     En direct
                   </span>
                 )}
               </div>
 
-              <h4 className="text-base font-bold text-stone-800 group-hover:text-rose-600 transition-colors">
-                Salon Privé & Vocaux
+              <h4 className="text-sm sm:text-base font-bold text-stone-800 group-hover:text-rose-600 transition-colors">
+                Chat Privé & Vocaux
               </h4>
-              <p className="text-xs text-stone-500 mt-1">
-                Discutez en tête-à-tête, envoyez vos messages vocaux et photos privées.
+              <p className="text-xs text-stone-500 mt-0.5">
+                Messages instantanés, vocaux et photos en duo.
               </p>
 
               {/* Latest message preview */}
-              <div className="mt-3 p-3 rounded-xl bg-stone-50 border border-stone-100/80 text-xs text-stone-600 italic">
+              <div className="mt-2.5 p-2.5 rounded-xl bg-stone-50/80 border border-stone-100 text-xs text-stone-600">
                 {latestMessage ? (
                   <p className="truncate">
-                    <span className="font-semibold text-stone-700 not-italic">
+                    <span className="font-semibold text-stone-700">
                       {latestMessage.senderId === activePartnerId ? 'Toi : ' : `${otherPartner.name} : `}
                     </span>
                     {latestMessage.type === 'audio'
                       ? '🎤 Note vocale'
                       : latestMessage.type === 'image'
                       ? '📷 Photo'
-                      : `« ${latestMessage.text} »`}
+                      : latestMessage.text}
                   </p>
                 ) : (
-                  <p className="text-stone-400">Votre salon secret vous attend...</p>
+                  <p className="text-stone-400 italic">Votre salon secret vous attend...</p>
                 )}
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-rose-600">
-              <span>Ouvrir la conversation</span>
+            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-rose-600">
+              <span>Ouvrir le chat</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
@@ -426,40 +415,40 @@ export const HomeView: React.FC<HomeViewProps> = ({
             whileHover={{ y: -3 }}
             whileTap={{ scale: 0.99 }}
             onClick={() => onNavigateToTab('games')}
-            className="group p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="group p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-white to-amber-50/30 border border-stone-200/80 shadow-xs hover:border-amber-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             id="card-nav-games"
           >
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 group-hover:scale-110 transition-transform">
-                  <Gamepad2 className="w-5 h-5" />
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-700 group-hover:scale-105 transition-transform">
+                  <Gamepad2 className="w-4.5 h-4.5" />
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
-                  5 Jeux Complices
+                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                  Jeux & Flirt
                 </span>
               </div>
 
-              <h4 className="text-base font-bold text-stone-800 group-hover:text-amber-700 transition-colors">
-                Salon des Jeux & Flirt
+              <h4 className="text-sm sm:text-base font-bold text-stone-800 group-hover:text-amber-700 transition-colors">
+                Jeux & Défis Complices
               </h4>
-              <p className="text-xs text-stone-500 mt-1">
-                Roue des gages coquins, cartes confidences, quiz couple, jeux de rôle et bons d’amour.
+              <p className="text-xs text-stone-500 mt-0.5">
+                Roue des gages, cartes vérité, blind tests & quiz couple.
               </p>
 
-              <div className="mt-3 flex items-center gap-2">
-                <span className="px-2 py-1 rounded-lg bg-stone-50 text-[11px] text-stone-600 border border-stone-100">
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-lg bg-amber-50/70 text-[10px] font-medium text-amber-800 border border-amber-100">
                   🎡 Roue des gages
                 </span>
-                <span className="px-2 py-1 rounded-lg bg-stone-50 text-[11px] text-stone-600 border border-stone-100">
-                  🃏 Cartes vérité
+                <span className="px-2 py-0.5 rounded-lg bg-rose-50/70 text-[10px] font-medium text-rose-700 border border-rose-100">
+                  🃏 Cartes intimes
                 </span>
-                <span className="px-2 py-1 rounded-lg bg-stone-50 text-[11px] text-stone-600 border border-stone-100">
-                  🎟️ Bons
+                <span className="px-2 py-0.5 rounded-lg bg-indigo-50/70 text-[10px] font-medium text-indigo-700 border border-indigo-100">
+                  🎵 Blind Test
                 </span>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-amber-700">
+            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-amber-700">
               <span>Jouer ensemble</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -469,21 +458,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {activeWeeklyChallenge && (
             <motion.div
               whileHover={{ y: -3 }}
-              className="p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-violet-300 hover:shadow-md transition-all flex flex-col justify-between"
+              className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-white to-violet-50/30 border border-stone-200/80 shadow-xs hover:border-violet-300 hover:shadow-md transition-all flex flex-col justify-between"
               id="card-nav-english"
             >
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-700">
-                    <Sparkle className="w-5 h-5" />
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-700">
+                    <Sparkle className="w-4.5 h-4.5" />
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold">
                     Anglais Romantique
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <h4 className="text-base font-bold text-stone-800">
+                  <h4 className="text-sm sm:text-base font-bold text-stone-800">
                     « {activeWeeklyChallenge.targetEnglish} »
                   </h4>
                   <button
@@ -497,18 +486,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </button>
                 </div>
 
-                <p className="text-xs font-semibold text-violet-800 mt-1">
+                <p className="text-xs font-semibold text-violet-700 mt-1">
                   {activeWeeklyChallenge.targetFrench}
-                </p>
-                <p className="text-xs text-stone-500 mt-1 line-clamp-2">
-                  {activeWeeklyChallenge.tips || activeWeeklyChallenge.description}
                 </p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-stone-100 flex items-center gap-2">
+              <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center gap-2">
                 <button
                   onClick={() => handleLaunchChallengeInChat(activeWeeklyChallenge)}
-                  className="flex-1 py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="flex-1 py-1.5 px-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Dire dans le chat</span>
@@ -518,7 +504,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     if (onNavigateToGame) onNavigateToGame('weekly_challenges');
                     else onNavigateToTab('games');
                   }}
-                  className="py-2 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
+                  className="py-1.5 px-3 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Lexique
                 </button>
@@ -531,29 +517,29 @@ export const HomeView: React.FC<HomeViewProps> = ({
             whileHover={{ y: -3 }}
             whileTap={{ scale: 0.99 }}
             onClick={() => onNavigateToTab('gallery')}
-            className="group p-5 rounded-3xl bg-white border border-stone-200/70 shadow-xs hover:border-pink-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="group p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-white to-pink-50/30 border border-stone-200/80 shadow-xs hover:border-pink-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             id="card-nav-gallery"
           >
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600 group-hover:scale-110 transition-transform">
-                  <Images className="w-5 h-5" />
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600 group-hover:scale-105 transition-transform">
+                  <Images className="w-4.5 h-4.5" />
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200 text-[11px] font-bold">
-                  Nos Souvenirs
+                <span className="px-2 py-0.5 rounded-full bg-pink-50 text-pink-700 border border-pink-200 text-[10px] font-bold">
+                  Photos & Vidéos
                 </span>
               </div>
 
-              <h4 className="text-base font-bold text-stone-800 group-hover:text-pink-600 transition-colors">
+              <h4 className="text-sm sm:text-base font-bold text-stone-800 group-hover:text-pink-600 transition-colors">
                 Galerie & Album Duo
               </h4>
-              <p className="text-xs text-stone-500 mt-1">
-                Tous vos précieux clichés, voyages et souvenirs immortalisés ensemble.
+              <p className="text-xs text-stone-500 mt-0.5">
+                Tous vos souvenirs immortalisés en duo.
               </p>
 
               {/* Photo preview avatars */}
-              <div className="mt-3 flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+              <div className="mt-2.5 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 shadow-2xs">
                   <img
                     src={profile.partner1.avatar || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80'}
                     alt={profile.partner1.name}
@@ -561,7 +547,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     referrerPolicy="no-referrer"
                   />
                 </div>
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-stone-100 border border-stone-200">
+                <div className="w-8 h-8 rounded-lg overflow-hidden bg-stone-100 border border-stone-200 shadow-2xs">
                   <img
                     src={profile.partner2.avatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80'}
                     alt={profile.partner2.name}
@@ -569,14 +555,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     referrerPolicy="no-referrer"
                   />
                 </div>
-                <div className="h-10 px-3 rounded-xl bg-pink-50/70 border border-pink-100 flex items-center text-xs font-semibold text-pink-700">
-                  + Album partagé
-                </div>
+                <span className="text-[11px] text-pink-600 font-semibold bg-pink-50 px-2 py-1 rounded-lg border border-pink-100">
+                  Album partagé
+                </span>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-pink-600">
-              <span>Voir l’album photo</span>
+            <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs font-semibold text-pink-600">
+              <span>Voir l’album</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
@@ -586,32 +572,32 @@ export const HomeView: React.FC<HomeViewProps> = ({
       {/* ========================================================
           3. MOTS DOUX & MÉTÉO DU CŒUR (INTIMITÉ & TENDRESSE)
          ======================================================== */}
-      <section className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-12 gap-3.5 sm:gap-4">
         {/* Le Billet Doux (7 cols) */}
         <motion.div
           whileHover={{ y: -2 }}
-          className="md:col-span-7 rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FAF5EE] to-[#F5EFE6] border border-amber-200/70 p-5 sm:p-6 shadow-xs flex flex-col justify-between"
+          className="md:col-span-7 rounded-3xl bg-gradient-to-br from-[#FFFDF9] via-[#FAF5EE] to-[#F5EFE6] border border-amber-200/80 p-4 sm:p-5 shadow-xs flex flex-col justify-between"
           id="section-billet-doux"
         >
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-100/80 border border-amber-200/80 flex items-center justify-center text-amber-800">
-                  <Feather className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg bg-amber-100/80 border border-amber-200/80 flex items-center justify-center text-amber-800">
+                  <Feather className="w-3.5 h-3.5" />
                 </div>
-                <h4 className="text-sm font-bold text-stone-800">Billet Doux du Jour</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-stone-800">Billet Doux du Jour</h4>
               </div>
-              <span className="text-xs font-serif italic text-amber-800/80">Pensée d’amour</span>
+              <span className="text-[11px] font-serif italic text-amber-800/80">Pensée d’amour</span>
             </div>
 
-            <div className="my-2 p-4 rounded-2xl bg-white/80 backdrop-blur-xs border border-amber-200/50 shadow-2xs relative">
+            <div className="my-2 p-3.5 rounded-2xl bg-white/85 backdrop-blur-xs border border-amber-200/50 shadow-2xs relative">
               <Quote className="w-4 h-4 text-amber-300 absolute top-2 right-2 opacity-50" />
               {latestNote ? (
                 <div>
                   <p className="font-['Caveat',cursive] text-lg sm:text-xl text-stone-800 leading-snug">
                     « {latestNote.content} »
                   </p>
-                  <p className="text-[11px] text-amber-800 font-medium text-right mt-2">
+                  <p className="text-[11px] text-amber-800 font-medium text-right mt-1.5">
                     De {latestNote.senderId === 'p1' ? profile.partner1.name : profile.partner2.name} •{' '}
                     {new Date(latestNote.date).toLocaleDateString('fr-FR', {
                       day: 'numeric',
@@ -620,7 +606,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   </p>
                 </div>
               ) : (
-                <p className="font-['Caveat',cursive] text-lg sm:text-xl text-stone-600 italic text-center py-2">
+                <p className="font-['Caveat',cursive] text-lg sm:text-xl text-stone-600 italic text-center py-1">
                   « Tu es la plus belle chose qui me soit arrivée. Je t’aime un peu plus chaque seconde. »
                 </p>
               )}
@@ -630,34 +616,34 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={onOpenWriteNoteModal}
-            className="w-full mt-3 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+            className="w-full mt-2 flex items-center justify-center gap-2 py-2 rounded-xl bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
             id="btn-home-write-note"
           >
             <Feather className="w-3.5 h-3.5 text-amber-200" />
-            <span>Laisser un mot doux à {otherPartner.name}</span>
+            <span>Écrire un mot doux</span>
           </motion.button>
         </motion.div>
 
         {/* Météo du Cœur (5 cols) */}
         <motion.div
           whileHover={{ y: -2 }}
-          className="md:col-span-5 rounded-3xl bg-white border border-stone-200/70 p-5 sm:p-6 shadow-xs flex flex-col justify-between"
+          className="md:col-span-5 rounded-3xl bg-white border border-stone-200/80 p-4 sm:p-5 shadow-xs flex flex-col justify-between"
           id="section-meteo-du-coeur"
         >
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600">
-                  <Smile className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg bg-pink-50 border border-pink-100 flex items-center justify-center text-pink-600">
+                  <Smile className="w-3.5 h-3.5" />
                 </div>
-                <h4 className="text-sm font-bold text-stone-800">Météo du Cœur</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-stone-800">Météo du Cœur</h4>
               </div>
               <span className="text-[11px] text-stone-400 font-medium">Humeurs</span>
             </div>
 
-            <div className="space-y-2.5 my-2">
+            <div className="space-y-2 my-2">
               {/* Partner 1 Mood */}
-              <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-100 flex items-center justify-between">
+              <div className="p-2 rounded-xl bg-stone-50 border border-stone-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <PartnerAvatar
                     name={profile.partner1.name}
@@ -672,13 +658,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] text-stone-500 bg-white px-2 py-0.5 rounded-md border border-stone-200">
-                  {profile.partner1.mood?.need || 'Envie d’un câlin'}
+                <span className="text-[10px] text-stone-600 bg-white px-2 py-0.5 rounded-md border border-stone-200">
+                  {profile.partner1.mood?.need || 'Câlin'}
                 </span>
               </div>
 
               {/* Partner 2 Mood */}
-              <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-100 flex items-center justify-between">
+              <div className="p-2 rounded-xl bg-stone-50 border border-stone-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <PartnerAvatar
                     name={profile.partner2.name}
@@ -693,8 +679,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] text-stone-500 bg-white px-2 py-0.5 rounded-md border border-stone-200">
-                  {profile.partner2.mood?.need || 'Envie de te voir'}
+                <span className="text-[10px] text-stone-600 bg-white px-2 py-0.5 rounded-md border border-stone-200">
+                  {profile.partner2.mood?.need || 'Te voir'}
                 </span>
               </div>
             </div>
@@ -702,9 +688,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           <button
             onClick={() => onOpenProfileModal && onOpenProfileModal(activePartnerId)}
-            className="w-full mt-3 py-2 text-center text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/60 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+            className="w-full mt-2 py-1.5 text-center text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/70 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
           >
-            Mettre à jour mon humeur
+            Changer mon humeur
           </button>
         </motion.div>
       </section>
