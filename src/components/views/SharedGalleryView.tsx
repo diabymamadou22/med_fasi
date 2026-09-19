@@ -25,6 +25,8 @@ import {
   Video,
   Film,
   Play,
+  MoreHorizontal,
+  Maximize2,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -111,6 +113,33 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   const [galleryLayout, setGalleryLayout] = useState<'fit' | 'natural'>('fit');
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Close active dropdown on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && activeMenuId) {
+        setActiveMenuId(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeMenuId]);
+
+  const handleDownloadMedia = (item: GalleryItem) => {
+    try {
+      const link = document.createElement('a');
+      link.href = item.videoUrl || item.photoUrl;
+      link.download = `${item.title ? item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'media'}-${item.id}.${
+        item.mediaType === 'video' ? 'mp4' : 'jpg'
+      }`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download error:', err);
+    }
+  };
 
   const handlePhotoCapturedFromCamera = (dataUrl: string, caption?: string) => {
     if (onAddMemory) {
@@ -371,6 +400,140 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           bg: 'bg-stone-50 text-stone-700 border-stone-200',
         };
     }
+  };
+
+  // Sleek popover menu for media items containing all metadata and actions
+  const renderMediaMenu = (
+    item: GalleryItem,
+    badge: { label: string; bg: string },
+    author: { id: PartnerId; name: string; avatar?: string } | null,
+    index: number
+  ) => {
+    if (activeMenuId !== item.id) return null;
+
+    return (
+      <div
+        className="absolute top-9 right-0 w-64 max-w-[calc(100vw-2.5rem)] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-stone-200/90 p-3 text-left z-30 animate-in fade-in zoom-in-95 duration-150 select-text"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header with Source Badge and Close Button */}
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-100">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.bg}`}>
+            {badge.label}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenuId(null);
+            }}
+            className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+            aria-label="Fermer le menu"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Details and Information */}
+        <div className="space-y-2 mb-2.5">
+          {item.title && item.title !== 'Sans titre' && (
+            <div>
+              <p className="text-[9px] uppercase tracking-wider font-semibold text-stone-400">Titre</p>
+              <p className="text-xs font-semibold text-stone-800 line-clamp-2">{item.title}</p>
+            </div>
+          )}
+
+          {item.description && (
+            <div>
+              <p className="text-[9px] uppercase tracking-wider font-semibold text-stone-400">Note</p>
+              <p className="text-xs text-stone-600 line-clamp-3 leading-relaxed">{item.description}</p>
+            </div>
+          )}
+
+          <div className="space-y-1.5 pt-1.5 border-t border-stone-100 text-xs text-stone-600">
+            {author ? (
+              <div className="flex items-center gap-1.5">
+                <PartnerAvatar name={author.name} avatar={author.avatar} partnerId={author.id} size="xs" />
+                <span className="text-[11px] truncate">
+                  Partagé par <strong className="font-semibold text-stone-800">{author.name}</strong>
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[11px] text-stone-600">
+                <Heart className="w-3 h-3 text-rose-500 fill-rose-500 shrink-0" />
+                <span>Souvenir de couple en duo</span>
+              </div>
+            )}
+
+            {item.date && (
+              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
+                <span className="truncate">{item.date}</span>
+              </div>
+            )}
+
+            {item.locationName && (
+              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                <span className="truncate">{item.locationName}</span>
+              </div>
+            )}
+
+            {item.sourceType === 'memory' && item.likes && item.likes.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px] text-rose-500 font-medium">
+                <Heart className="w-3 h-3 fill-rose-500" />
+                <span>{item.likes.length} coup{item.likes.length > 1 ? 's' : ''} de cœur</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="pt-2 border-t border-stone-100 space-y-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenuId(null);
+              setActiveLightboxIndex(index);
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition-colors font-medium text-left cursor-pointer"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
+            <span>Plein écran</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenuId(null);
+              handleDownloadMedia(item);
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition-colors font-medium text-left cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-stone-500" />
+            <span>Télécharger</span>
+          </button>
+
+          {onDeleteMediaItem && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveMenuId(null);
+                soundEffects.playTrashDelete();
+                onDeleteMediaItem(item);
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors font-medium text-left cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+              <span>Supprimer de la galerie</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   // Mobile & Desktop Swipeable Photo Items for Lightbox
@@ -940,10 +1103,10 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           </div>
         </div>
       ) : galleryLayout === 'fit' ? (
-        /* Fit Grid: Square frames with 100% full uncropped image and soft ambient blur */
+        /* Fit Grid: Square frames with 100% full uncropped image, ambient glow, and no clutter */
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {filteredItems.map((item, index) => {
-            const badge = getSourceBadgeInfo(item.sourceType);
+            const badge = getSourceBadgeInfo(item.sourceType, item.mediaType);
             const author =
               item.authorId === 'p1'
                 ? profile.partner1
@@ -962,152 +1125,68 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                   soundEffects.playNoteClick();
                   setActiveLightboxIndex(index);
                 }}
-                className="group relative bg-white rounded-2xl overflow-hidden border border-stone-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all cursor-pointer flex flex-col"
+                className="group relative aspect-square w-full bg-stone-900/5 rounded-2xl overflow-hidden border border-stone-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all cursor-pointer flex items-center justify-center p-2 select-none"
               >
-                {/* Image Container with 100% uncropped display */}
-                <div className="relative aspect-square w-full overflow-hidden bg-stone-900/5 flex items-center justify-center p-2">
-                  {/* Soft ambient blur in background */}
-                  <img
-                    src={item.photoUrl}
-                    alt=""
-                    aria-hidden="true"
-                    className="absolute inset-0 w-full h-full object-cover blur-xl opacity-20 scale-125 select-none pointer-events-none"
-                  />
+                {/* Soft ambient blur in background */}
+                <img
+                  src={item.photoUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover blur-xl opacity-20 scale-125 select-none pointer-events-none"
+                />
 
-                  {/* Main Full Image: Exactly in full, never cropped */}
-                  <img
-                    src={item.photoUrl}
-                    alt={item.title}
-                    loading="lazy"
-                    className="relative max-w-full max-h-full w-auto h-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-[1.02] select-none"
-                  />
+                {/* Main Full Image: Exactly in full, never cropped */}
+                <img
+                  src={item.photoUrl}
+                  alt=""
+                  loading="lazy"
+                  className="relative max-w-full max-h-full w-auto h-auto object-contain drop-shadow-xs transition-transform duration-300 group-hover:scale-[1.02] select-none"
+                />
 
-                  {/* Video Play Overlay */}
-                  {item.mediaType === 'video' && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/60 text-white backdrop-blur-xs flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 group-hover:bg-rose-600/90 transition-all duration-300">
-                        <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-white text-white ml-0.5" />
-                      </div>
+                {/* Video Play Overlay */}
+                {item.mediaType === 'video' && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/60 text-white backdrop-blur-xs flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 group-hover:bg-rose-600/90 transition-all duration-300">
+                      <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-white text-white ml-0.5" />
                     </div>
-                  )}
-
-                  {/* Video duration pill */}
-                  {item.mediaType === 'video' && item.videoDuration && (
-                    <div className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-white text-[10px] font-semibold flex items-center gap-1 border border-white/20">
-                      <Film className="w-3 h-3 text-rose-400" />
-                      <span>{item.videoDuration}</span>
-                    </div>
-                  )}
-
-                  {/* Top Badges */}
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md shadow-2xs ${badge.bg}`}
-                    >
-                      {badge.label}
-                    </span>
                   </div>
+                )}
 
-                  {/* Author Avatar Pill & Delete Button */}
-                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
-                    {author ? (
-                      <div
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
-                        title={`Partagé par ${author.name}`}
-                      >
-                        <PartnerAvatar
-                          name={author.name}
-                          avatar={author.avatar}
-                          partnerId={author.id}
-                          size="xs"
-                        />
-                        <span className="hidden group-hover:inline pr-0.5">
-                          {author.name}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
-                        title="Souvenir de couple"
-                      >
-                        <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
-                        <span className="hidden group-hover:inline pr-0.5">En duo</span>
-                      </div>
-                    )}
-
-                    {onDeleteMediaItem && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          soundEffects.playTrashDelete();
-                          onDeleteMediaItem(item);
-                        }}
-                        className="p-1.5 rounded-full bg-black/60 hover:bg-rose-600 active:bg-rose-700 text-white backdrop-blur-md transition-all shadow-md border border-white/30 hover:scale-110 active:scale-95 cursor-pointer"
-                        title="Supprimer ce média de la galerie"
-                        aria-label="Supprimer ce média de la galerie"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                {/* Video duration pill */}
+                {item.mediaType === 'video' && item.videoDuration && (
+                  <div className="absolute bottom-2.5 left-2.5 z-10 px-2 py-0.5 rounded-lg bg-black/75 backdrop-blur-md text-white text-[10px] font-semibold flex items-center gap-1 border border-white/20">
+                    <Film className="w-3 h-3 text-rose-400" />
+                    <span>{item.videoDuration}</span>
                   </div>
-                </div>
+                )}
 
-                {/* Card Details below image (never covers photo) */}
-                <div className="p-3 sm:p-3.5 bg-white flex-1 flex flex-col justify-between border-t border-stone-100">
-                  <div>
-                    <h4 className="font-serif font-bold text-sm text-stone-800 line-clamp-1 group-hover:text-rose-600 transition-colors">
-                      {item.title}
-                    </h4>
-                    {item.description && (
-                      <p className="text-xs text-stone-500 line-clamp-2 mt-1 leading-relaxed">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
+                {/* Top-Right Options & Details Button (...) */}
+                <div className="absolute top-2.5 right-2.5 z-20">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      soundEffects.playSoftTap();
+                      setActiveMenuId(activeMenuId === item.id ? null : item.id);
+                    }}
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/45 hover:bg-black/75 active:scale-95 text-white backdrop-blur-md transition-all shadow-md border border-white/25 flex items-center justify-center cursor-pointer"
+                    title="Options et informations"
+                    aria-label="Options et informations"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
 
-                  <div className="flex items-center justify-between text-[11px] text-stone-400 mt-2.5 pt-2 border-t border-stone-100">
-                    <div className="flex items-center gap-1 truncate max-w-[70%]">
-                      {item.locationName ? (
-                        <>
-                          <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-                          <span className="truncate text-stone-600 font-medium">
-                            {item.locationName}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
-                          <span className="truncate text-stone-500">
-                            {item.date || 'Moment précieux'}
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                    {item.sourceType === 'memory' && item.likes && (
-                      <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500">
-                        <Heart
-                          className={`w-3 h-3 ${
-                            item.likes.length > 0
-                              ? 'fill-rose-500 text-rose-500'
-                              : 'text-stone-300'
-                          }`}
-                        />
-                        {item.likes.length}
-                      </span>
-                    )}
-                  </div>
+                  {renderMediaMenu(item, badge, author, index)}
                 </div>
               </motion.div>
             );
           })}
         </div>
       ) : (
-        /* Natural Masonry: Each photo in its 100% natural height and aspect ratio */
+        /* Natural Masonry: Each photo in its 100% natural height and aspect ratio without clutter */
         <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
           {filteredItems.map((item, index) => {
-            const badge = getSourceBadgeInfo(item.sourceType);
+            const badge = getSourceBadgeInfo(item.sourceType, item.mediaType);
             const author =
               item.authorId === 'p1'
                 ? profile.partner1
@@ -1125,13 +1204,13 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                   soundEffects.playNoteClick();
                   setActiveLightboxIndex(index);
                 }}
-                className="break-inside-avoid group relative bg-white rounded-2xl overflow-hidden border border-stone-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all cursor-pointer flex flex-col"
+                className="break-inside-avoid group relative bg-stone-100 rounded-2xl overflow-hidden border border-stone-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition-all cursor-pointer select-none"
               >
                 {/* Natural Image View */}
                 <div className="relative w-full bg-stone-100 flex items-center justify-center overflow-hidden">
                   <img
                     src={item.photoUrl}
-                    alt={item.title}
+                    alt=""
                     loading="lazy"
                     className="w-full h-auto object-contain block transition-transform duration-300 group-hover:scale-[1.01]"
                   />
@@ -1153,110 +1232,40 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     </div>
                   )}
 
-                  {/* Top Badges */}
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border backdrop-blur-md shadow-2xs ${badge.bg}`}
+                  {/* Top-Right Options & Details Button (...) */}
+                  <div className="absolute top-2.5 right-2.5 z-20">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundEffects.playSoftTap();
+                        setActiveMenuId(activeMenuId === item.id ? null : item.id);
+                      }}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/45 hover:bg-black/75 active:scale-95 text-white backdrop-blur-md transition-all shadow-md border border-white/25 flex items-center justify-center cursor-pointer"
+                      title="Options et informations"
+                      aria-label="Options et informations"
                     >
-                      {badge.label}
-                    </span>
-                  </div>
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
 
-                  {/* Author Avatar Pill & Delete Button */}
-                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
-                    {author ? (
-                      <div
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
-                        title={`Partagé par ${author.name}`}
-                      >
-                        <PartnerAvatar
-                          name={author.name}
-                          avatar={author.avatar}
-                          partnerId={author.id}
-                          size="xs"
-                        />
-                        <span className="hidden group-hover:inline pr-0.5">
-                          {author.name}
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md text-white text-[10px] font-medium border border-white/20"
-                        title="Souvenir de couple"
-                      >
-                        <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
-                        <span className="hidden group-hover:inline pr-0.5">En duo</span>
-                      </div>
-                    )}
-
-                    {onDeleteMediaItem && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          soundEffects.playTrashDelete();
-                          onDeleteMediaItem(item);
-                        }}
-                        className="p-1.5 rounded-full bg-black/60 hover:bg-rose-600 active:bg-rose-700 text-white backdrop-blur-md transition-all shadow-md border border-white/30 hover:scale-110 active:scale-95 cursor-pointer"
-                        title="Supprimer ce média de la galerie"
-                        aria-label="Supprimer ce média de la galerie"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card Details below image */}
-                <div className="p-3 sm:p-3.5 bg-white flex-1 flex flex-col justify-between border-t border-stone-100">
-                  <div>
-                    <h4 className="font-serif font-bold text-sm text-stone-800 line-clamp-1 group-hover:text-rose-600 transition-colors">
-                      {item.title}
-                    </h4>
-                    {item.description && (
-                      <p className="text-xs text-stone-500 line-clamp-2 mt-1 leading-relaxed">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-stone-400 mt-2.5 pt-2 border-t border-stone-100">
-                    <div className="flex items-center gap-1 truncate max-w-[70%]">
-                      {item.locationName ? (
-                        <>
-                          <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
-                          <span className="truncate text-stone-600 font-medium">
-                            {item.locationName}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <Calendar className="w-3 h-3 text-stone-400 shrink-0" />
-                          <span className="truncate text-stone-500">
-                            {item.date || 'Moment précieux'}
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                    {item.sourceType === 'memory' && item.likes && (
-                      <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500">
-                        <Heart
-                          className={`w-3 h-3 ${
-                            item.likes.length > 0
-                              ? 'fill-rose-500 text-rose-500'
-                              : 'text-stone-300'
-                          }`}
-                        />
-                        {item.likes.length}
-                      </span>
-                    )}
+                    {renderMediaMenu(item, badge, author, index)}
                   </div>
                 </div>
               </motion.div>
             );
           })}
         </div>
+      )}
+
+      {/* Backdrop for closing dropdown menu on click outside */}
+      {activeMenuId && (
+        <div
+          className="fixed inset-0 z-20 cursor-default"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveMenuId(null);
+          }}
+        />
       )}
 
       {/* Fullscreen Mobile & Desktop Photo Viewer (Swipe & Pinch-to-Zoom like Android / iOS) */}
