@@ -182,9 +182,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     return () => clearTimeout(timer);
   }, [isCurrentItemVideo, isVideoPlaying, showUiChrome]);
 
+  // Stable handler for video playback state changes (avoids loop cascades)
+  const handleVideoPlayingChange = useCallback((playing: boolean) => {
+    setIsVideoPlaying(playing);
+  }, []);
+
   // Toggle UI Chrome (appear on 1st click, disappear on 2nd click)
   const toggleUiChrome = useCallback(() => {
     soundEffects.playSoftTap();
+    triggerVibration([15]);
     setShowUiChrome((prev) => {
       const next = !prev;
       if (!next) {
@@ -195,24 +201,22 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     });
   }, []);
 
-  const handleTogglePlayVideo = useCallback((e?: React.MouseEvent) => {
+  const handleTogglePlayVideo = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     e?.stopPropagation();
     soundEffects.playSoftTap();
+    triggerVibration([20]);
     const el = videoElRef.current;
     if (!el) return;
     if (el.paused || el.ended) {
       el.play()
         .then(() => {
           setIsVideoPlaying(true);
-          // When resuming playback, hide all buttons so the video takes full screen
-          setShowUiChrome(false);
-          setShowOptionsMenu(false);
-          setShowVisionOverlay(false);
         })
         .catch(() => {});
     } else {
       el.pause();
       setIsVideoPlaying(false);
+      setShowUiChrome(true);
     }
   }, []);
 
@@ -768,8 +772,10 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           ref={containerRef}
           {...(!isCurrentItemVideo ? bindGesture() : {})}
           onClick={handleStageClick}
-          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden touch-none cursor-grab active:cursor-grabbing"
-          style={{ touchAction: 'none' }}
+          className={`absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden ${
+            isCurrentItemVideo ? 'cursor-pointer select-none' : 'touch-none cursor-grab active:cursor-grabbing'
+          }`}
+          style={{ touchAction: isCurrentItemVideo ? 'manipulation' : 'none' }}
         >
           {/* Navigation Arrows (Desktop / Tablet) */}
           {items.length > 1 && (
@@ -859,15 +865,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                       setVideoDuration(el.duration || 0);
                     }
                   }}
-                  onPlayingChange={(playing) => {
-                    setIsVideoPlaying(playing);
-                    if (playing) {
-                      // Hide buttons during video playback so the video takes the entire screen
-                      setShowUiChrome(false);
-                      setShowOptionsMenu(false);
-                      setShowVisionOverlay(false);
-                    }
-                  }}
+                  onPlayingChange={handleVideoPlayingChange}
                   onTimeUpdate={(cur, dur) => {
                     if (!isScrubbing) {
                       setVideoCurrentTime(cur);
@@ -915,6 +913,30 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               Pincer pour zoomer • Glisser pour défiler
             </div>
           )}
+
+          {/* Central Play/Pause Button on Video tap for iPhone & Mobile */}
+          <AnimatePresence>
+            {isCurrentItemVideo && (showUiChrome || !isVideoPlaying) && (
+              <motion.button
+                key="central-video-play-btn"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.7 }}
+                transition={{ duration: 0.18 }}
+                type="button"
+                onClick={handleTogglePlayVideo}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/65 hover:bg-black/85 active:scale-90 text-white flex items-center justify-center backdrop-blur-xl border border-white/25 shadow-2xl transition-transform cursor-pointer pointer-events-auto select-none"
+                title={isVideoPlaying ? 'Mettre en pause' : 'Lire la vidéo'}
+                aria-label={isVideoPlaying ? 'Pause' : 'Lecture'}
+              >
+                {isVideoPlaying ? (
+                  <Pause className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white" />
+                ) : (
+                  <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white ml-1" />
+                )}
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* =========================================================

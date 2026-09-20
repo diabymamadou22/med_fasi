@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { resolveMediaUrl, formatVideoDuration } from '../lib/videoUtils';
 import { useBackHandler } from '../lib/backNavigation';
+import { triggerVibration } from '../lib/notificationService';
 
 interface SleekLoveVideoPlayerProps {
   src: string;
@@ -73,6 +74,9 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   const hideControlsTimerRef = useRef<any>(null);
   const lastTapTimeRef = useRef<number>(0);
   const tapTimeoutRef = useRef<any>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number; time: number }>({ x: 0, y: 0, time: 0 });
+  const lastProcessedTouchTimeRef = useRef<number>(0);
+  const prevIsPlayingRef = useRef<boolean | null>(null);
 
   // States
   const [resolvedSrc, setResolvedSrc] = useState<string>('');
@@ -192,7 +196,11 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   }, [showControls, isPlaying, isEnded, onControlsVisibilityChange]);
 
   useEffect(() => {
-    onPlayingChange?.(isPlaying);
+    // Only invoke when isPlaying actually toggles value to prevent loop cascades
+    if (prevIsPlayingRef.current !== isPlaying) {
+      prevIsPlayingRef.current = isPlaying;
+      onPlayingChange?.(isPlaying);
+    }
   }, [isPlaying, onPlayingChange]);
 
   useEffect(() => {
@@ -246,14 +254,88 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
     resetHideTimer();
   }, [resetHideTimer]);
 
-  // Screen click handler:
-  // - If controls/buttons are hidden while playing: single tap reveals all buttons & text with smooth transition
-  // - If controls are already shown while playing: tap pauses the video
-  // - If video is paused: tap resumes playback (and buttons/text auto-hide)
+  // Execute Stage Tap:
+  // - High-performance tap execution for iPhone / iOS and desktop
   // - Double tap on left/right side skips -5s / +5s
+  // - Single tap reveals/hides UI controls instantly with haptic feedback
+  const executeStageTap = useCallback(
+    (clientX: number) => {
+      triggerVibration([15]);
+      const rect = containerRef.current?.getBoundingClientRect();
+      const clickX = rect ? clientX - rect.left : 0;
+      const width = rect ? rect.width : 0;
+      const now = Date.now();
+
+      // Check double tap (within 280ms)
+      if (now - lastTapTimeRef.current < 280 && width > 0) {
+        if (tapTimeoutRef.current) {
+          clearTimeout(tapTimeoutRef.current);
+          tapTimeoutRef.current = null;
+        }
+        lastTapTimeRef.current = 0;
+
+        if (clickX < width * 0.35) {
+          seekRelative(-5);
+          return;
+        } else if (clickX > width * 0.65) {
+          seekRelative(5);
+          return;
+        }
+      }
+
+      lastTapTimeRef.current = now;
+
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+      }
+
+      tapTimeoutRef.current = setTimeout(() => {
+        if (onStageClick) {
+          onStageClick();
+        } else {
+          setShowControls((prev) => !prev);
+        }
+      }, 100);
+    },
+    [onStageClick, seekRelative]
+  );
+
+  // Dedicated touch events for mobile / iPhone iOS Safari
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartPosRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        time: Date.now(),
+      };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartPosRef.current;
+    if (!start.time) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const deltaX = Math.abs(touch.clientX - start.x);
+    const deltaY = Math.abs(touch.clientY - start.y);
+    const deltaTime = Date.now() - start.time;
+
+    // Genuine tap: minimal travel (< 18px) and quick duration (< 450ms)
+    if (deltaX < 18 && deltaY < 18 && deltaTime < 450) {
+      lastProcessedTouchTimeRef.current = Date.now();
+      executeStageTap(touch.clientX);
+    }
+  };
+
+  // Screen click handler (for desktop mouse / synthetic clicks)
   const handleStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    // If clicking directly on controls bar, buttons, links, or sliders, do not toggle
+    // Ignore synthetic click if touch was already processed within last 500ms
+    if (Date.now() - lastProcessedTouchTimeRef.current < 500) {
+      return;
+    }
+
     const target = e.target as HTMLElement;
     if (
       target.closest('.video-controls-bar') ||
@@ -264,41 +346,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       return;
     }
 
-    const rect = containerRef.current?.getBoundingClientRect();
-    const clickX = rect ? e.clientX - rect.left : 0;
-    const width = rect ? rect.width : 0;
-    const now = Date.now();
-
-    // Check double tap (within 280ms)
-    if (now - lastTapTimeRef.current < 280 && width > 0) {
-      if (tapTimeoutRef.current) {
-        clearTimeout(tapTimeoutRef.current);
-        tapTimeoutRef.current = null;
-      }
-      lastTapTimeRef.current = 0;
-
-      if (clickX < width * 0.35) {
-        seekRelative(-5);
-        return;
-      } else if (clickX > width * 0.65) {
-        seekRelative(5);
-        return;
-      }
-    }
-
-    lastTapTimeRef.current = now;
-
-    if (tapTimeoutRef.current) {
-      clearTimeout(tapTimeoutRef.current);
-    }
-
-    tapTimeoutRef.current = setTimeout(() => {
-      if (onStageClick) {
-        onStageClick();
-      } else {
-        setShowControls((prev) => !prev);
-      }
-    }, 180);
+    executeStageTap(e.clientX);
   };
 
   const handleMouseMove = () => {
@@ -390,6 +438,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
           src={resolvedSrc || undefined}
           poster={poster}
           playsInline
+          {...{ 'webkit-playsinline': 'true', 'x5-playsinline': 'true' }}
           autoPlay={autoPlay}
           loop={isLooping}
           muted={isMuted}
@@ -440,6 +489,16 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
           className="w-full h-full object-contain cursor-pointer"
         />
       )}
+
+      {/* Dedicated Transparent Touch Stage Layer for iPhone iOS & Android Mobile (z-15) */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onClick={handleStageClick}
+        className="absolute inset-0 w-full h-full z-15 cursor-pointer touch-manipulation select-none"
+        style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+        aria-label="Contrôles vidéo"
+      />
 
       {/* Loading Spinner */}
       {isLoading && !hasError && (
