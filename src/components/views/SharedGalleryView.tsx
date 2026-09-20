@@ -798,7 +798,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="min-h-screen bg-[#F7F8FA] dark:bg-[#121418] text-stone-900 dark:text-stone-100 pb-32 select-none relative"
+      className="min-h-screen bg-[#F7F8FA] dark:bg-[#121418] text-stone-900 dark:text-stone-100 pb-44 sm:pb-32 select-none relative"
     >
       {/* Hidden File Inputs */}
       <input
@@ -1357,9 +1357,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
 
       {/* =========================================================
           SAMSUNG ONE UI SIGNATURE FLOATING NAVIGATION DOCK
-          (Exactly as depicted at the bottom of the user's screenshot)
+          (Positioned nicely above the bottom navigation bar on mobile)
          ========================================================= */}
-      <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40">
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-6 left-1/2 -translate-x-1/2 z-35 pointer-events-auto">
         <div className="flex items-center bg-white/90 dark:bg-stone-900/90 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-[0_12px_36px_rgba(0,0,0,0.16)] rounded-full px-3.5 sm:px-4 py-1.5 sm:py-2 gap-2 sm:gap-4">
           {/* 1. Pictures / Photos Tab */}
           <button
