@@ -34,6 +34,7 @@ import {
   startTabMessageAlert,
 } from './lib/notificationService';
 import { onPwaNavigate } from './lib/pwaService';
+import { useBackHandler, backNavigation } from './lib/backNavigation';
 import { WifiOff } from 'lucide-react';
 import {
   CoupleProfile,
@@ -492,6 +493,30 @@ export default function App() {
     itemName?: string;
     onConfirm: () => void;
   } | null>(null);
+
+  // Phone hardware/gesture Back Button Navigation
+  // When an open modal/view is active, pressing the phone back button closes only that element instead of the app!
+  useBackHandler(showProfileModal, () => setShowProfileModal(false), 'app-modal-profile');
+  useBackHandler(showWriteNoteModal, () => setShowWriteNoteModal(false), 'app-modal-write-note');
+  useBackHandler(showAddMemoryModal, () => setShowAddMemoryModal(false), 'app-modal-add-memory');
+  useBackHandler(showAddCapsuleModal, () => setShowAddCapsuleModal(false), 'app-modal-add-capsule');
+  useBackHandler(showAddLocationModal, () => setShowAddLocationModal(false), 'app-modal-add-location');
+  useBackHandler(showAddVoucherModal, () => setShowAddVoucherModal(false), 'app-modal-add-voucher');
+  useBackHandler(showAddBucketModal, () => setShowAddBucketModal(false), 'app-modal-add-bucket');
+  useBackHandler(showInstallModal, () => setShowInstallModal(false), 'app-modal-install');
+  useBackHandler(showNotificationModal, () => setShowNotificationModal(false), 'app-modal-notification');
+  useBackHandler(Boolean(deleteTarget), () => setDeleteTarget(null), 'app-modal-delete-target');
+  useBackHandler(Boolean(activeMissYouPulse), () => setActiveMissYouPulse(null), 'app-modal-miss-you');
+  useBackHandler(activeTab !== 'home', () => setActiveTab('home'), 'app-tab-navigation');
+
+  const [showExitToast, setShowExitToast] = useState(false);
+
+  useEffect(() => {
+    backNavigation.setExitPromptCallback(() => {
+      setShowExitToast(true);
+      setTimeout(() => setShowExitToast(false), 2200);
+    });
+  }, []);
 
   // Initial seed to Firebase if database is empty
   useEffect(() => {

@@ -32,6 +32,7 @@ import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
 import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
 import { CameraCaptureModal } from '../modals/CameraCaptureModal';
+import { useBackHandler } from '../../lib/backNavigation';
 import { processPhotoWithoutCropping } from '../../lib/imageUtils';
 import {
   extractVideoThumbnail,
@@ -110,6 +111,8 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
+
+  useBackHandler(showCameraModal, () => setShowCameraModal(false), 'gallery-camera-modal');
 
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);

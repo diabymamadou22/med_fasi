@@ -16,6 +16,7 @@ import {
   RotateCw,
 } from 'lucide-react';
 import { resolveMediaUrl, formatVideoDuration } from '../lib/videoUtils';
+import { useBackHandler } from '../lib/backNavigation';
 
 interface SleekLoveVideoPlayerProps {
   src: string;
@@ -81,6 +82,8 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   const isMuted = externalIsMuted !== undefined ? externalIsMuted : internalIsMuted;
   const isLooping = externalIsLooping !== undefined ? externalIsLooping : internalIsLooping;
   const playbackRate = externalPlaybackRate !== undefined ? externalPlaybackRate : internalPlaybackRate;
+
+  useBackHandler(showStandaloneMenu, () => setShowStandaloneMenu(false), 'standalone-video-menu');
 
   // Sync playbackRate & loop with video element
   useEffect(() => {
@@ -205,43 +208,22 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
     resetHideTimer();
   }, [resetHideTimer]);
 
-  // Double tap / Click handler for mobile & desktop
+  // Screen click handler: immediate toggle between pause and play!
+  // 1st click = pause, 2nd click = resume playing, etc.
   const handleStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // If clicking directly on controls, ignore
+    // If clicking directly on controls bar, buttons, links, or sliders, do not toggle
     const target = e.target as HTMLElement;
-    if (target.closest('.video-controls-bar')) return;
-
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) {
-      togglePlay();
+    if (
+      target.closest('.video-controls-bar') ||
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('a')
+    ) {
       return;
     }
 
-    const clickX = e.clientX - rect.left;
-    const width = rect.width;
-    const now = Date.now();
-    const timeSinceLastTap = now - lastTapTimeRef.current;
-
-    // Detect double tap (< 300ms)
-    if (timeSinceLastTap < 300) {
-      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
-      lastTapTimeRef.current = 0;
-
-      // Check if left third (-5s) or right third (+5s)
-      if (clickX < width * 0.35) {
-        seekRelative(-5);
-      } else if (clickX > width * 0.65) {
-        seekRelative(5);
-      } else {
-        togglePlay();
-      }
-    } else {
-      lastTapTimeRef.current = now;
-      tapTimeoutRef.current = setTimeout(() => {
-        // Single tap: toggle play or toggle controls visibility
-        togglePlay();
-      }, 250);
-    }
+    // Immediate play/pause toggle! 1st click = pause, 2nd click = resume playing
+    togglePlay();
   };
 
   // Toggle Mute
@@ -370,9 +352,9 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Center Icon Flash (Play / Pause feedback) */}
+      {/* Center Icon Flash (Play / Pause feedback) and Paused State Indicator */}
       <AnimatePresence>
-        {centerAnimation && (
+        {centerAnimation ? (
           <motion.div
             key={centerAnimation}
             initial={{ opacity: 0, scale: 0.6 }}
@@ -381,7 +363,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
             transition={{ duration: 0.3 }}
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-30"
           >
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/65 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/75 backdrop-blur-md border border-white/25 flex items-center justify-center text-white shadow-2xl">
               {centerAnimation === 'play' ? (
                 <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white text-white ml-1" />
               ) : (
@@ -389,7 +371,20 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
               )}
             </div>
           </motion.div>
-        )}
+        ) : !isPlaying && !isLoading && !hasError && !isEnded ? (
+          <motion.div
+            key="center-paused-state"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+          >
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/55 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white shadow-xl">
+              <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white text-white ml-1" />
+            </div>
+          </motion.div>
+        ) : null}
       </AnimatePresence>
 
       {/* Double Tap Skip Feedback (-5s / +5s) */}

@@ -38,6 +38,7 @@ import {
   formatVideoDuration,
 } from '../lib/videoUtils';
 import { SleekLoveVideoPlayer } from './SleekLoveVideoPlayer';
+import { useBackHandler } from '../lib/backNavigation';
 
 export interface PhotoViewerItem {
   id: string;
@@ -147,6 +148,11 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const [videoPlaybackRate, setVideoPlaybackRate] = useState<number>(1);
   const [showOptionsMenu, setShowOptionsMenu] = useState<boolean>(false);
   const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
+
+  // Mobile Back Button Support: closes modals/menus first, then closes viewer without exiting the app
+  useBackHandler(isOpen && showDetailsModal, () => setShowDetailsModal(false), 'photo-viewer-details');
+  useBackHandler(isOpen && showOptionsMenu, () => setShowOptionsMenu(false), 'photo-viewer-options');
+  useBackHandler(isOpen, onClose, 'mobile-photo-viewer');
 
   const isCurrentItemVideo = Boolean(
     activeItem &&
@@ -267,6 +273,10 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
 
   // Touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isCurrentItemVideo) {
+      // For videos, let SleekLoveVideoPlayer handle direct touches and screen clicks without interference
+      return;
+    }
     setIsInteracting(true);
     if (e.touches.length === 1) {
       const touch = e.touches[0];
@@ -316,7 +326,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDraggingRef.current) return;
+    if (isCurrentItemVideo || !isDraggingRef.current) return;
 
     // Two finger pinch to zoom
     if (e.touches.length === 2 && touchStartRef.current.initialDistance > 0) {
@@ -375,6 +385,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (isCurrentItemVideo) return;
     isDraggingRef.current = false;
     setIsInteracting(false);
 
@@ -584,6 +595,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onClick={(e) => {
+            if (isCurrentItemVideo) return;
             // Single tap toggles UI chrome
             if (scale <= 1.05 && Math.abs(swipeOffset) < 5 && Math.abs(pullDownOffset) < 5) {
               setShowUiChrome((prev) => !prev);
