@@ -18,6 +18,9 @@ import {
   Maximize2,
   Sparkles,
   Play,
+  Pause,
+  Camera,
+  Share2,
   Video,
   MoreVertical,
   Volume2,
@@ -142,6 +145,12 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
 
   const activeItem = items[currentIndex] || null;
 
+  const isCurrentItemVideo = Boolean(
+    activeItem &&
+      (activeItem.mediaType === 'video' ||
+        isVideoMediaType(activeItem.videoUrl || activeItem.photoUrl, activeItem.mediaType))
+  );
+
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>('');
   const [isVideoMuted, setIsVideoMuted] = useState<boolean>(false);
   const [isVideoLooping, setIsVideoLooping] = useState<boolean>(false);
@@ -149,16 +158,122 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const [showOptionsMenu, setShowOptionsMenu] = useState<boolean>(false);
   const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
 
+  // Samsung Video Player States & Ref
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const [videoCurrentTime, setVideoCurrentTime] = useState<number>(0);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
+  const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+  const [captureFeedback, setCaptureFeedback] = useState<boolean>(false);
+  const [showVisionOverlay, setShowVisionOverlay] = useState<boolean>(false);
+
+  // Toggle UI Chrome (appear on 1st click, disappear on 2nd click)
+  const toggleUiChrome = useCallback(() => {
+    soundEffects.playSoftTap();
+    setShowUiChrome((prev) => {
+      const next = !prev;
+      if (!next) {
+        setShowOptionsMenu(false);
+        setShowVisionOverlay(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleTogglePlayVideo = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    soundEffects.playSoftTap();
+    const el = videoElRef.current;
+    if (!el) return;
+    if (el.paused || el.ended) {
+      el.play().then(() => setIsVideoPlaying(true)).catch(() => {});
+    } else {
+      el.pause();
+      setIsVideoPlaying(false);
+    }
+  }, []);
+
+  const handleToggleVideoMute = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    soundEffects.playSoftTap();
+    setIsVideoMuted((prev) => {
+      const next = !prev;
+      if (videoElRef.current) {
+        videoElRef.current.muted = next;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleVideoLoop = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    soundEffects.playSoftTap();
+    setIsVideoLooping((prev) => {
+      const next = !prev;
+      if (videoElRef.current) {
+        videoElRef.current.loop = next;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleCaptureFrame = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const el = videoElRef.current;
+    if (!el) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = el.videoWidth || 1280;
+      canvas.height = el.videoHeight || 720;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(el, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `samsung-capture-${Date.now()}.jpg`;
+        a.click();
+        soundEffects.playCameraShutter();
+        triggerVibration([50]);
+        setCaptureFeedback(true);
+        setTimeout(() => setCaptureFeedback(false), 2000);
+      }
+    } catch (err) {
+      console.error('Frame capture error:', err);
+    }
+  }, []);
+
+  const handleShare = useCallback(async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    soundEffects.playSoftTap();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: activeItem?.title || 'Souvenir d’amour',
+          text: activeItem?.description || 'Regarde ce souvenir avec moi ❤️',
+          url: activeItem?.photoUrl || window.location.href,
+        });
+      } catch {
+        // cancelled
+      }
+    } else {
+      const mediaUrl = isCurrentItemVideo
+        ? (resolvedVideoUrl || activeItem?.videoUrl || activeItem?.photoUrl)
+        : activeItem?.photoUrl;
+      if (mediaUrl) {
+        const a = document.createElement('a');
+        a.href = mediaUrl;
+        a.download = isCurrentItemVideo ? 'souvenir.mp4' : 'souvenir.jpg';
+        a.click();
+      }
+      triggerVibration([30]);
+    }
+  }, [activeItem, isCurrentItemVideo, resolvedVideoUrl]);
+
   // Mobile Back Button Support: closes modals/menus first, then closes viewer without exiting the app
   useBackHandler(isOpen && showDetailsModal, () => setShowDetailsModal(false), 'photo-viewer-details');
   useBackHandler(isOpen && showOptionsMenu, () => setShowOptionsMenu(false), 'photo-viewer-options');
   useBackHandler(isOpen, onClose, 'mobile-photo-viewer');
-
-  const isCurrentItemVideo = Boolean(
-    activeItem &&
-      (activeItem.mediaType === 'video' ||
-        isVideoMediaType(activeItem.videoUrl || activeItem.photoUrl, activeItem.mediaType))
-  );
 
   useEffect(() => {
     if (!activeItem || !isCurrentItemVideo) {
@@ -460,130 +575,144 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         }}
       >
         {/* =========================================================
-            1. FLOATING HEADER (CONTROLS, COUNTER & ZOOM)
+            1. SAMSUNG ONE UI TOP BAR (BACK, CAPSULE & QUICK ACTIONS)
            ========================================================= */}
         <div
-          className={`relative z-50 flex items-center justify-between px-3 sm:px-6 py-3 bg-gradient-to-b from-black/85 via-black/50 to-transparent transition-opacity duration-300 ${
+          className={`relative z-50 flex items-center justify-between px-3 sm:px-6 py-3 bg-gradient-to-b from-black/90 via-black/50 to-transparent transition-opacity duration-300 ${
             showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
-          {/* Close button & Counter / Title */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          {/* Back button & Samsung Memory Capsule */}
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={onClose}
-              className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer shadow-md shrink-0"
-              title="Fermer (Échap ou glisser vers le bas)"
-              aria-label="Fermer la vue photo"
+              className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all shadow-md shrink-0 cursor-pointer"
+              title="Retour"
+              aria-label="Retour"
             >
-              <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              <ChevronLeft className="w-6 h-6 -ml-0.5" />
             </button>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white text-xs sm:text-sm font-semibold tracking-wide shrink-0">
-                <span>{currentIndex + 1}</span>
-                <span className="text-white/40 mx-1">/</span>
-                <span>{items?.length || 0}</span>
-              </div>
-
-              {isCurrentItemVideo && activeItem.title && (
-                <span className="text-xs sm:text-sm font-medium text-white/90 truncate hidden xs:inline max-w-[160px] sm:max-w-[260px]">
-                  {activeItem.title}
+            {/* Samsung Capsule Card */}
+            <div className="flex flex-col min-w-0 max-w-[210px] sm:max-w-xs md:max-w-md bg-black/45 backdrop-blur-md border border-white/15 px-3 py-1.5 rounded-2xl text-white shadow-lg">
+              <div className="flex items-center gap-1.5 text-xs font-bold leading-tight truncate">
+                <span>{activeItem.authorName || (activeItem.authorId === 'p2' ? 'NID' : 'MD')}</span>
+                <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500 inline shrink-0" />
+                <span className="text-[10px] font-normal text-white/60 truncate">
+                  from {activeItem.authorId === 'p2' ? 'NID' : 'MD'}
                 </span>
-              )}
+              </div>
+              <div className="text-[11px] text-white/80 truncate font-medium">
+                💌 Mot doux : {activeItem.title || activeItem.description || 'Tu es la plus belle chose qui me soit arrivée...'}
+              </div>
             </div>
           </div>
 
-          {/* Action Pills: Distinct for Video vs Photo */}
-          {isCurrentItemVideo ? (
-            /* Video Header Controls: Simple, clean Mute toggle + the requested "..." menu */
-            <div className="flex items-center gap-2">
-              {/* Quick Mute/Unmute Toggle */}
+          {/* Quick Circular Action Buttons (Samsung Style) */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Loop Toggle Button for Videos */}
+            {isCurrentItemVideo && (
               <button
                 type="button"
-                onClick={() => setIsVideoMuted((prev) => !prev)}
-                className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer shadow-md"
-                title={isVideoMuted ? 'Activer le son' : 'Couper le son'}
-                aria-label={isVideoMuted ? 'Son coupé' : 'Son activé'}
-              >
-                {isVideoMuted ? (
-                  <VolumeX className="w-5 h-5 text-rose-400" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </button>
-
-              {/* The requested "..." More Options Menu Button */}
-              <button
-                type="button"
-                onClick={() => setShowOptionsMenu((prev) => !prev)}
-                className={`p-2.5 rounded-full transition-all cursor-pointer shadow-md ${
-                  showOptionsMenu
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-white/15 hover:bg-white/25 text-white active:scale-95'
+                onClick={handleToggleVideoLoop}
+                className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all cursor-pointer shadow-md active:scale-95 ${
+                  isVideoLooping
+                    ? 'bg-rose-600 border-rose-400 text-white shadow-rose-600/30 ring-2 ring-rose-400/40'
+                    : 'bg-black/50 hover:bg-black/70 border-white/15 text-white'
                 }`}
-                title="Options vidéo et détails"
-                aria-label="Options du menu"
+                title={isVideoLooping ? 'Boucle activée' : 'Répéter la vidéo'}
               >
-                <MoreVertical className="w-5 h-5" />
+                <Repeat className="w-4.5 h-4.5" />
               </button>
-            </div>
-          ) : (
-            /* Photo Zoom Tools & Action Pill */
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* Zoom percentage badge */}
-              <div className="hidden sm:flex items-center px-2.5 py-1 rounded-full bg-white/10 text-white/80 text-xs font-mono">
-                {Math.round(scale * 100)}%
-              </div>
+            )}
 
-              {/* Zoom In / Out Buttons */}
-              <button
-                onClick={handleZoomIn}
-                disabled={scale >= 4}
-                className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 text-white transition-all cursor-pointer"
-                title="Agrandir (+)"
-                aria-label="Agrandir"
-              >
-                <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
+            {/* Vision Amour (Sparkles / Smart Scan) */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                soundEffects.playSuccessSparkle();
+                triggerVibration([30, 40]);
+                setShowVisionOverlay((prev) => !prev);
+              }}
+              className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all cursor-pointer shadow-md active:scale-95 ${
+                showVisionOverlay
+                  ? 'bg-purple-600 border-purple-400 text-white shadow-purple-600/30 ring-2 ring-purple-400/40'
+                  : 'bg-black/50 hover:bg-black/70 border-white/15 text-white'
+              }`}
+              title="Vision Amour Samsung ✨"
+            >
+              <Sparkles className="w-4.5 h-4.5 text-purple-200" />
+            </button>
 
-              <button
-                onClick={handleZoomOut}
-                disabled={scale <= 1}
-                className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 text-white transition-all cursor-pointer"
-                title="Réduire (-)"
-                aria-label="Réduire"
-              >
-                <ZoomOut className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-
-              {/* Reset Zoom Button */}
-              {scale > 1.05 && (
-                <button
-                  onClick={resetZoom}
-                  className="p-2 sm:p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white transition-all cursor-pointer shadow-md flex items-center gap-1 text-xs font-bold"
-                  title="Réinitialiser zoom (100%)"
-                  aria-label="Réinitialiser zoom"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span className="hidden sm:inline">1:1</span>
-                </button>
-              )}
-
-              {/* Direct Media Download */}
+            {/* Zoom tool reset / download for photos */}
+            {!isCurrentItemVideo && (
               <a
                 href={activeItem.photoUrl}
-                download={`souvenir-amoureux-${currentIndex + 1}.jpg`}
+                download={`souvenir-${currentIndex + 1}.jpg`}
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer"
+                className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all shadow-md cursor-pointer"
                 title="Télécharger la photo"
-                aria-label="Télécharger la photo"
               >
-                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Download className="w-4.5 h-4.5" />
               </a>
-            </div>
-          )}
+            )}
+
+            {/* Three Dots More Options Button ⋮ */}
+            <button
+              type="button"
+              onClick={() => setShowOptionsMenu((prev) => !prev)}
+              className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all cursor-pointer shadow-md active:scale-95 ${
+                showOptionsMenu
+                  ? 'bg-white/30 border-white/40 text-white'
+                  : 'bg-black/50 hover:bg-black/70 border-white/15 text-white'
+              }`}
+              title="Plus d'options"
+            >
+              <MoreVertical className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+
+        {/* Vision Romance Overlay Banner */}
+        <AnimatePresence>
+          {showVisionOverlay && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowVisionOverlay(false);
+              }}
+              className="absolute top-20 left-1/2 -translate-x-1/2 z-55 max-w-sm w-[calc(100%-32px)] px-4 py-2.5 rounded-2xl bg-purple-900/90 backdrop-blur-xl border border-purple-400/40 text-white text-xs shadow-2xl flex items-center gap-3 cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-full bg-purple-500/40 border border-purple-300 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-purple-200" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-purple-200 truncate">Vision Romance Samsung ✨</div>
+                <div className="text-[11px] text-purple-100/90 truncate">Amour & complicité détectés : 100% pur bonheur</div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Screen Capture Instant Toast */}
+        <AnimatePresence>
+          {captureFeedback && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              className="absolute top-24 left-1/2 -translate-x-1/2 z-55 px-4 py-2 rounded-full bg-black/85 backdrop-blur-xl border border-white/20 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 pointer-events-none"
+            >
+              <Camera className="w-4 h-4 text-rose-400" />
+              <span>Instantané Samsung capturé ! 📸</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* =========================================================
             2. MAIN INTERACTIVE PHOTO/VIDEO STAGE (SWIPE, PINCH, PAN)
@@ -595,11 +724,11 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onClick={(e) => {
-            if (isCurrentItemVideo) return;
-            // Single tap toggles UI chrome
-            if (scale <= 1.05 && Math.abs(swipeOffset) < 5 && Math.abs(pullDownOffset) < 5) {
-              setShowUiChrome((prev) => !prev);
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('input') || target.closest('a')) {
+              return;
             }
+            toggleUiChrome();
           }}
           className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
         >
@@ -667,7 +796,6 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             {isCurrentItemVideo ? (
               <div
                 className="w-full h-full flex items-center justify-center bg-black overflow-hidden select-none"
-                onClick={(e) => e.stopPropagation()}
               >
                 <SleekLoveVideoPlayer
                   key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
@@ -677,18 +805,29 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   autoPlay={true}
                   compact={false}
                   isMuted={isVideoMuted}
-                  onToggleMute={() => setIsVideoMuted((prev) => !prev)}
+                  onToggleMute={handleToggleVideoMute}
                   isLooping={isVideoLooping}
-                  onToggleLoop={() => setIsVideoLooping((prev) => !prev)}
+                  onToggleLoop={handleToggleVideoLoop}
                   playbackRate={videoPlaybackRate}
                   onPlaybackRateChange={setVideoPlaybackRate}
                   hideExtraMenu={true}
-                  onControlsVisibilityChange={(visible) => {
-                    setShowUiChrome(visible);
-                    if (!visible) {
-                      setShowOptionsMenu(false);
+                  hideDefaultControls={true}
+                  onVideoRefReady={(el) => {
+                    videoElRef.current = el;
+                    if (el) {
+                      setIsVideoPlaying(!el.paused);
+                      setVideoCurrentTime(el.currentTime);
+                      setVideoDuration(el.duration || 0);
                     }
                   }}
+                  onPlayingChange={(playing) => setIsVideoPlaying(playing)}
+                  onTimeUpdate={(cur, dur) => {
+                    if (!isScrubbing) {
+                      setVideoCurrentTime(cur);
+                      setVideoDuration(dur);
+                    }
+                  }}
+                  onStageClick={toggleUiChrome}
                   className="w-full h-full"
                 />
               </div>
@@ -719,7 +858,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Quick hint on mobile (only shown for photos, completely hidden for video playback) */}
+          {/* Quick hint on mobile (only shown for photos) */}
           {!isCurrentItemVideo && (
             <div
               className={`absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white/70 text-[11px] font-medium pointer-events-none transition-opacity duration-300 sm:hidden ${
@@ -732,167 +871,217 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         </div>
 
         {/* =========================================================
-            3. BOTTOM SHEET: THUMBNAILS FILMSTRIP & PHOTO DETAILS
-               (Hidden during video playback for a pure full-screen experience)
+            3. SAMSUNG ONE UI CONTROLS & BOTTOM FLOATING DOCK
            ========================================================= */}
-        {!isCurrentItemVideo && (
-          <div
-            className={`relative z-50 bg-gradient-to-t from-black/95 via-stone-950/90 to-transparent pt-3 pb-4 sm:pb-6 px-3 sm:px-6 transition-opacity duration-300 ${
-              showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          >
-            {/* Filmstrip of all photos */}
-            {items.length > 1 && (
-              <div
-                ref={thumbnailStripRef}
-                className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none snap-x"
+        <div
+          className={`relative z-50 bg-gradient-to-t from-black/95 via-stone-950/85 to-transparent pt-2 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 transition-opacity duration-300 flex flex-col gap-2.5 ${
+            showUiChrome ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Samsung Mid-Lower Video Control Pill (Capture [◎], Play/Pause, Timeline, Mute 🔊) */}
+          {isCurrentItemVideo && (
+            <div className="w-full max-w-xl mx-auto flex items-center justify-between gap-2.5 mb-1 px-1">
+              {/* Capture frame snapshot button [◎] */}
+              <button
+                type="button"
+                onClick={handleCaptureFrame}
+                className="w-10 h-10 rounded-full bg-black/65 hover:bg-black/85 active:scale-90 text-white flex items-center justify-center backdrop-blur-xl border border-white/15 shadow-xl transition-all cursor-pointer shrink-0"
+                title="Capturer l'image (instantané)"
               >
-                {items.map((item, idx) => {
-                  const itemIsVideo = item.mediaType === 'video' || isVideoMediaType(item.videoUrl, item.mediaType);
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => goToIndex(idx)}
-                      className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer snap-center ${
-                        idx === currentIndex
-                          ? 'border-rose-500 scale-105 shadow-md shadow-rose-500/30 ring-2 ring-rose-400/40'
-                          : 'border-white/20 opacity-50 hover:opacity-90'
-                      }`}
-                      title={item.title || `Média ${idx + 1}`}
-                    >
-                      <img
-                        src={item.photoUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      {itemIsVideo && (
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <Play className="w-3.5 h-3.5 text-white fill-white" />
-                        </div>
-                      )}
-                      {idx === currentIndex && (
-                        <div className="absolute inset-0 bg-rose-500/10 pointer-events-none" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                <Camera className="w-4.5 h-4.5 text-white" />
+              </button>
 
-            {/* Photo Details & Actions Bar */}
-            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  {activeItem.badgeLabel && (
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md ${
-                        activeItem.badgeBg || 'bg-rose-500/30 border-rose-400/50 text-rose-200'
-                      }`}
-                    >
-                      {activeItem.badgeLabel}
-                    </span>
+              {/* Samsung Center Scrubber Pill */}
+              <div className="flex-1 rounded-full bg-black/80 backdrop-blur-2xl border border-white/15 px-3.5 py-1.5 flex items-center gap-2.5 shadow-2xl text-white min-w-0">
+                {/* Play / Pause */}
+                <button
+                  type="button"
+                  onClick={handleTogglePlayVideo}
+                  className="p-1 rounded-full hover:bg-white/15 active:scale-95 text-white transition-all cursor-pointer shrink-0"
+                  title={isVideoPlaying ? 'Pause' : 'Lecture'}
+                >
+                  {isVideoPlaying ? (
+                    <Pause className="w-4 h-4 fill-white" />
+                  ) : (
+                    <Play className="w-4 h-4 fill-white ml-0.5" />
                   )}
-                  {activeItem.locationName && (
-                    <span className="flex items-center gap-1 text-rose-300 font-medium">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {activeItem.locationName}
-                    </span>
-                  )}
-                  {activeItem.date && (
-                    <span className="flex items-center gap-1 text-stone-400">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {activeItem.date}
-                    </span>
-                  )}
+                </button>
+
+                {/* Progress bar / Scrubber */}
+                <div className="flex-1 relative flex items-center group/scrub min-w-[60px]">
+                  <div className="w-full h-1 bg-white/25 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white rounded-full transition-all duration-75"
+                      style={{
+                        width: `${videoDuration > 0 ? (videoCurrentTime / videoDuration) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={videoDuration || 100}
+                    step={0.1}
+                    value={videoCurrentTime}
+                    onMouseDown={() => setIsScrubbing(true)}
+                    onTouchStart={() => setIsScrubbing(true)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setVideoCurrentTime(val);
+                      if (videoElRef.current) videoElRef.current.currentTime = val;
+                    }}
+                    onMouseUp={() => {
+                      setIsScrubbing(false);
+                      if (isVideoPlaying && videoElRef.current) videoElRef.current.play().catch(() => {});
+                    }}
+                    onTouchEnd={() => {
+                      setIsScrubbing(false);
+                      if (isVideoPlaying && videoElRef.current) videoElRef.current.play().catch(() => {});
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    title="Défilement de la vidéo"
+                  />
                 </div>
 
-                {activeItem.title && (
-                  <h3 className="text-base sm:text-lg font-serif font-bold text-white mt-1 truncate">
-                    {activeItem.title}
-                  </h3>
-                )}
-
-                {activeItem.description && (
-                  <p className="text-xs sm:text-sm text-stone-300 mt-0.5 line-clamp-2 leading-relaxed">
-                    {activeItem.description}
-                  </p>
-                )}
+                {/* Time Readout: 00:32 / 00:33 */}
+                <div className="text-[11px] font-mono text-white/90 font-medium select-none whitespace-nowrap shrink-0">
+                  <span>{formatVideoDuration(videoCurrentTime)}</span>
+                  <span className="text-white/40 mx-1">/</span>
+                  <span className="text-white/70">{formatVideoDuration(videoDuration)}</span>
+                </div>
               </div>
 
-              {/* Action Buttons (Like, Edit, Delete) */}
-              <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
-                {activeItem.onLike && (
+              {/* Sound Mute / Unmute */}
+              <button
+                type="button"
+                onClick={handleToggleVideoMute}
+                className="w-10 h-10 rounded-full bg-black/65 hover:bg-black/85 active:scale-90 text-white flex items-center justify-center backdrop-blur-xl border border-white/15 shadow-xl transition-all cursor-pointer shrink-0"
+                title={isVideoMuted ? 'Activer le son' : 'Couper le son'}
+              >
+                {isVideoMuted ? (
+                  <VolumeX className="w-4.5 h-4.5 text-rose-400" />
+                ) : (
+                  <Volume2 className="w-4.5 h-4.5 text-white" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Samsung Filmstrip of thumbnails (Both photos & videos) */}
+          {items.length > 1 && (
+            <div
+              ref={thumbnailStripRef}
+              className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x px-2 max-w-2xl mx-auto"
+            >
+              {items.map((item, idx) => {
+                const itemIsVideo = item.mediaType === 'video' || isVideoMediaType(item.videoUrl, item.mediaType);
+                return (
                   <button
-                    onClick={() => {
-                      triggerHeartConfetti();
-                      soundEffects.playHeartPulse();
-                      triggerVibration([40, 30, 40]);
-                      activeItem.onLike?.();
-                    }}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
-                      activeItem.isLiked
-                        ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                        : 'bg-white/10 hover:bg-white/20 text-rose-300'
+                    key={item.id}
+                    onClick={() => goToIndex(idx)}
+                    className={`relative shrink-0 w-12 h-12 rounded-xl overflow-hidden transition-all cursor-pointer snap-center ${
+                      idx === currentIndex
+                        ? 'ring-2 ring-white scale-105 shadow-xl'
+                        : 'border border-white/20 opacity-50 hover:opacity-90'
                     }`}
-                    title="Aimer ce souvenir"
+                    title={item.title || `Média ${idx + 1}`}
                   >
-                    <Heart
-                      className={`w-4 h-4 ${
-                        activeItem.isLiked ? 'fill-white text-white' : 'fill-rose-400 text-rose-400'
-                      }`}
+                    <img
+                      src={item.photoUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
                     />
-                    <span>{activeItem.likeCount ?? 0}</span>
+                    {itemIsVideo && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Play className="w-3.5 h-3.5 text-white fill-white" />
+                      </div>
+                    )}
                   </button>
-                )}
+                );
+              })}
+            </div>
+          )}
 
-                {activeItem.onEdit && (
-                  <button
-                    onClick={() => {
-                      onClose();
-                      activeItem.onEdit?.();
-                    }}
-                    className="px-3 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Modifier ce souvenir"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Modifier</span>
-                  </button>
-                )}
+          {/* Samsung Bottom Floating Action Dock */}
+          <div className="max-w-xs sm:max-w-sm mx-auto w-full px-2 pt-0.5">
+            <div className="rounded-full bg-white/95 dark:bg-stone-900/95 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-2xl px-6 py-2.5 flex items-center justify-between gap-4">
+              {/* Favoris (Heart) */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHeartConfetti();
+                  soundEffects.playHeartPulse();
+                  triggerVibration([40, 30, 40]);
+                  activeItem.onLike?.();
+                }}
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer"
+                title="Ajouter aux favoris"
+              >
+                <Heart
+                  className={`w-5 h-5 ${
+                    activeItem.isLiked ? 'fill-rose-500 text-rose-500' : 'stroke-[1.8]'
+                  }`}
+                />
+              </button>
 
-                {activeItem.onRemovePhotoOnly && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      activeItem.onRemovePhotoOnly?.();
-                    }}
-                    className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Retirer uniquement cette photo"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Retirer photo</span>
-                  </button>
-                )}
+              {/* Modifier (Pencil) */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  activeItem.onEdit?.();
+                }}
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer"
+                title="Modifier"
+              >
+                <Pencil className="w-5 h-5 stroke-[1.8]" />
+              </button>
 
-                {activeItem.onDelete && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      activeItem.onDelete?.();
-                    }}
-                    className="px-3 py-2 bg-rose-600/90 hover:bg-rose-600 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-                    title="Supprimer ce média"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Supprimer</span>
-                  </button>
-                )}
-              </div>
+              {/* Détails (Info ⓘ) */}
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setShowDetailsModal(true);
+                }}
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer"
+                title="Détails"
+              >
+                <Info className="w-5 h-5 stroke-[1.8]" />
+              </button>
+
+              {/* Partager (Share2) */}
+              <button
+                type="button"
+                onClick={handleShare}
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer"
+                title="Partager"
+              >
+                <Share2 className="w-5 h-5 stroke-[1.8]" />
+              </button>
+
+              {/* Supprimer (Trash2) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeItem.onDelete) {
+                    activeItem.onDelete();
+                    onClose();
+                  } else if (activeItem.onRemovePhotoOnly) {
+                    activeItem.onRemovePhotoOnly();
+                    onClose();
+                  }
+                }}
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer"
+                title="Supprimer"
+              >
+                <Trash2 className="w-5 h-5 stroke-[1.8]" />
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* =========================================================
             4. THE REQUESTED "..." VIDEO OPTIONS MENU
