@@ -14,6 +14,11 @@ import {
   ArrowLeft,
   ChevronRight,
   Flame,
+  Grid3X3,
+  HelpCircle,
+  Users,
+  Timer,
+  Puzzle,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -39,6 +44,12 @@ import { LoveSpeedMatchGame } from './games/LoveSpeedMatchGame';
 import { LoveVoiceChallengeGame } from './games/LoveVoiceChallengeGame';
 import { RomanticMadLibsGame } from './games/RomanticMadLibsGame';
 import { SecretDateMissionsGame } from './games/SecretDateMissionsGame';
+import { LoveTicTacToeGame } from '../games/LoveTicTacToeGame';
+import { CompatibilityQuizGame } from '../games/CompatibilityQuizGame';
+import { WhoMostLikelyGame } from '../games/WhoMostLikelyGame';
+import { WouldYouRatherGame } from '../games/WouldYouRatherGame';
+import { SixtySecondsLoveGame } from '../games/SixtySecondsLoveGame';
+import { LovePuzzleGame } from '../games/LovePuzzleGame';
 import { INITIAL_LEXICON_WORDS } from '../../data/initialLexiconData';
 import { INITIAL_WEEKLY_LEARNING_CHALLENGES } from '../../data/initialWeeklyChallenges';
 
@@ -52,6 +63,12 @@ export type EnglishGameTab =
   | 'cards'
   | 'roleplay'
   | 'trivia'
+  | 'tic_tac_toe'
+  | 'affinity_quiz'
+  | 'who_most_likely'
+  | 'would_you_rather'
+  | 'sixty_seconds'
+  | 'puzzle'
   | 'weekly_challenges'
   | 'vouchers'
   | 'vault'
@@ -361,6 +378,50 @@ export const GamesView: React.FC<GamesViewProps> = ({
       color: 'bg-red-50 hover:bg-red-100/80 border-red-200/80',
     },
     {
+      id: 'tic_tac_toe',
+      title: 'Morpion & Gages',
+      desc: 'Le classique morpion revisité avec gages romantiques',
+      icon: <Grid3X3 className="w-5 h-5 text-rose-500" />,
+      color: 'bg-rose-50 hover:bg-rose-100/80 border-rose-200/80',
+      badge: 'Duo',
+    },
+    {
+      id: 'affinity_quiz',
+      title: 'Quiz de Connivence',
+      desc: 'Testez à quel point vous vous connaissez par cœur',
+      icon: <HelpCircle className="w-5 h-5 text-purple-500" />,
+      color: 'bg-purple-50 hover:bg-purple-100/80 border-purple-200/80',
+      badge: 'Complicité',
+    },
+    {
+      id: 'who_most_likely',
+      title: 'Qui de Nous Deux ?',
+      desc: 'Découvrez vos perceptions mutuelles en votant',
+      icon: <Users className="w-5 h-5 text-blue-500" />,
+      color: 'bg-blue-50 hover:bg-blue-100/80 border-blue-200/80',
+    },
+    {
+      id: 'would_you_rather',
+      title: 'Tu Préfères ?',
+      desc: 'Dilemmes amusants et romantiques à débattre',
+      icon: <Sparkles className="w-5 h-5 text-amber-500" />,
+      color: 'bg-amber-50 hover:bg-amber-100/80 border-amber-200/80',
+    },
+    {
+      id: 'sixty_seconds',
+      title: '60s Mots Doux',
+      desc: 'Écrivez le plus de compliments en 1 minute chrono',
+      icon: <Timer className="w-5 h-5 text-emerald-500" />,
+      color: 'bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200/80',
+    },
+    {
+      id: 'puzzle',
+      title: 'Puzzle Romantique',
+      desc: 'Reconstituez vos photos souvenirs avec un mot secret',
+      icon: <Puzzle className="w-5 h-5 text-pink-500" />,
+      color: 'bg-pink-50 hover:bg-pink-100/80 border-pink-200/80',
+    },
+    {
       id: 'vouchers',
       title: "Bons d'Amour",
       desc: 'Bons massage, petit-déjeuner au lit à utiliser',
@@ -627,6 +688,30 @@ export const GamesView: React.FC<GamesViewProps> = ({
             />
           )}
 
+          {resolvedTab === 'tic_tac_toe' && (
+            <LoveTicTacToeGame profile={profile} activePartnerId={activePartnerId} />
+          )}
+
+          {resolvedTab === 'affinity_quiz' && (
+            <CompatibilityQuizGame profile={profile} activePartnerId={activePartnerId} />
+          )}
+
+          {resolvedTab === 'who_most_likely' && (
+            <WhoMostLikelyGame profile={profile} activePartnerId={activePartnerId} />
+          )}
+
+          {resolvedTab === 'would_you_rather' && (
+            <WouldYouRatherGame profile={profile} activePartnerId={activePartnerId} />
+          )}
+
+          {resolvedTab === 'sixty_seconds' && (
+            <SixtySecondsLoveGame profile={profile} activePartnerId={activePartnerId} />
+          )}
+
+          {resolvedTab === 'puzzle' && (
+            <LovePuzzleGame profile={profile} activePartnerId={activePartnerId} />
+          )}
+
           {resolvedTab === 'weekly_challenges' && (
             <WeeklyChallengesSection
               profile={profile}
@@ -650,7 +735,7 @@ export const GamesView: React.FC<GamesViewProps> = ({
               profile={profile}
               activePartnerId={activePartnerId}
               xpPoints={xpPoints}
-              dateIdeas={dateIdeas}
+              dateIdeas={dateIdeas || []}
               onSendChatMessage={onSendChatMessage}
               onOpenLexicon={() => setActiveTab('vault')}
             />

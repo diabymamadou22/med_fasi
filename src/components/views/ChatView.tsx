@@ -41,6 +41,7 @@ import {
   AudioWaveform,
   Square as SquareIcon,
   Sticker as StickerIcon,
+  Upload,
 } from 'lucide-react';
 import { NotificationActivationBanner } from '../NotificationActivationBanner';
 import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
@@ -610,14 +611,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Floating hearts particles
   const [particles, setParticles] = useState<FloatingHeartParticle[]>([]);
 
-  // Photo compression status banner state
+  // Photo/Video compression and batch status banner state
   const [compressingStats, setCompressingStats] = useState<{
     isCompressing: boolean;
     filename?: string;
     originalSize?: number;
     compressedSize?: number;
     reduction?: number;
+    customMessage?: string;
   } | null>(null);
+
+  // Drag & drop state for chat
+  const [isChatDragOver, setIsChatDragOver] = useState<boolean>(false);
 
   // Scroll to bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1089,109 +1094,134 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   };
 
-  // Video Upload & Compression / IndexedDB Storage handler
-  const handleVideoFile = async (file: File) => {
+  // Unified Multiple Media Upload handler (supports multiple photos, multiple videos, or mixed)
+  const handleMultipleMediaFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+
+    const total = files.length;
+    let successCount = 0;
+
     try {
-      setCompressingStats({
-        isCompressing: true,
-        filename: file.name,
-        originalSize: file.size,
-      });
+      for (let i = 0; i < total; i++) {
+        const file = files[i];
+        const isVideo = file.type.startsWith('video/');
 
-      const meta = await extractVideoThumbnail(file);
-      const mediaKey = `vid_chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const idbRef = await storeMediaBlob(mediaKey, file);
+        setCompressingStats({
+          isCompressing: true,
+          filename: file.name,
+          originalSize: file.size,
+          customMessage:
+            total > 1
+              ? `Importation de ${i + 1}/${total} (${isVideo ? 'vidéo' : 'photo'})...`
+              : isVideo
+              ? 'Traitement et sécurisation de la vidéo...'
+              : 'Optimisation de la photo mobile...',
+        });
 
-      setCompressingStats({
-        isCompressing: false,
-        filename: file.name,
-        originalSize: file.size,
-        compressedSize: meta.sizeBytes,
-        reduction: 0,
-      });
+        try {
+          if (isVideo) {
+            const meta = await extractVideoThumbnail(file);
+            const mediaKey = `vid_chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const idbRef = await storeMediaBlob(mediaKey, file);
 
-      onSendMessage({
-        senderId: activePartnerId,
-        content: `🎬 Vidéo partagée (${meta.formattedDuration})`,
-        mediaType: 'video',
-        mediaUrl: idbRef,
-        videoUrl: idbRef,
-        videoThumbnail: meta.thumbnailDataUrl,
-        videoDuration: meta.duration,
-      });
+            onSendMessage({
+              senderId: activePartnerId,
+              content: `🎬 Vidéo partagée (${meta.formattedDuration})`,
+              mediaType: 'video',
+              mediaUrl: idbRef,
+              videoUrl: idbRef,
+              videoThumbnail: meta.thumbnailDataUrl,
+              videoDuration: meta.duration,
+            });
+          } else {
+            const result = await compressImageWithStats(file, {
+              maxDimension: 1280,
+              maxSizeBytes: 280 * 1024,
+              initialQuality: 0.82,
+            });
 
-      soundEffects.playMessageSent();
-      triggerHeartConfetti();
+            onSendMessage({
+              senderId: activePartnerId,
+              content: '📷 Photo partagée',
+              mediaType: 'image',
+              mediaUrl: result.dataUrl,
+            });
+          }
 
-      setTimeout(() => {
+          successCount++;
+          soundEffects.playMessageSent();
+
+          // Small stagger between messages to maintain neat chronological order
+          if (total > 1 && i < total - 1) {
+            await new Promise((r) => setTimeout(r, 200));
+          }
+        } catch (itemErr) {
+          console.error(`Erreur d'importation sur ${file.name}:`, itemErr);
+        }
+      }
+
+      if (successCount > 0) {
+        triggerHeartConfetti();
+        setCompressingStats({
+          isCompressing: false,
+          customMessage:
+            total > 1
+              ? `${successCount} médias partagés avec succès ! ❤️`
+              : undefined,
+        });
+
+        setTimeout(() => {
+          setCompressingStats(null);
+        }, 3500);
+      } else {
         setCompressingStats(null);
-      }, 3500);
+        alert("Impossible d'importer les fichiers sélectionnés.");
+      }
     } catch (err: any) {
-      console.error('Erreur traitement vidéo chat:', err);
+      console.error('Erreur importation médias chat:', err);
       setCompressingStats(null);
-      alert('Impossible d’importer cette vidéo. Format ou codec non pris en charge.');
+      alert("Une erreur est survenue lors de l'importation de vos médias.");
     } finally {
       if (videoInputRef.current) videoInputRef.current.value = '';
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    handleVideoFile(file);
+  const handleVideoFile = async (file: File) => {
+    await handleMultipleMediaFiles([file]);
   };
 
-  // Image Upload handler with smart mobile photo auto-compression
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type.startsWith('video/')) {
-      handleVideoFile(file);
-      return;
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleMultipleMediaFiles(e.target.files);
     }
+  };
 
-    try {
-      setCompressingStats({
-        isCompressing: true,
-        filename: file.name,
-        originalSize: file.size,
-      });
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleMultipleMediaFiles(e.target.files);
+    }
+  };
 
-      // Compress 5-15 MB mobile camera photo to ~200-280 KB
-      const result = await compressImageWithStats(file, {
-        maxDimension: 1280,
-        maxSizeBytes: 280 * 1024,
-        initialQuality: 0.82,
-      });
+  // Drag & drop handlers for chat area
+  const handleChatDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsChatDragOver(true);
+  };
 
-      setCompressingStats({
-        isCompressing: false,
-        filename: file.name,
-        originalSize: result.originalSizeBytes,
-        compressedSize: result.compressedSizeBytes,
-        reduction: result.reductionPercent,
-      });
+  const handleChatDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsChatDragOver(false);
+  };
 
-      onSendMessage({
-        senderId: activePartnerId,
-        content: '📷 Photo partagée',
-        mediaType: 'image',
-        mediaUrl: result.dataUrl,
-      });
-      soundEffects.playMessageSent();
-
-      // Clear compression notification badge after 3.5s
-      setTimeout(() => {
-        setCompressingStats(null);
-      }, 3500);
-    } catch (err) {
-      console.error('Erreur compression image chat:', err);
-      setCompressingStats(null);
-      alert('Impossible d’optimiser cette photo. Veuillez en essayer une autre.');
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleChatDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsChatDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleMultipleMediaFiles(e.dataTransfer.files);
     }
   };
 
@@ -1458,17 +1488,27 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       ))}
 
-      {/* Hidden File Input for photo upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-
       {/* Main Chat Window Card - edge to edge on mobile like WhatsApp / native chat apps */}
-      <div className={`${themeStyles.cardBg} rounded-none sm:rounded-3xl shadow-none sm:shadow-xl border-0 sm:border overflow-hidden flex flex-col flex-1 min-h-0 h-full relative transition-colors duration-300`}>
+      <div
+        onDragOver={handleChatDragOver}
+        onDragLeave={handleChatDragLeave}
+        onDrop={handleChatDrop}
+        className={`${themeStyles.cardBg} rounded-none sm:rounded-3xl shadow-none sm:shadow-xl border-0 sm:border overflow-hidden flex flex-col flex-1 min-h-0 h-full relative transition-colors duration-300`}
+      >
+        {/* Chat Drag & Drop Overlay */}
+        {isChatDragOver && (
+          <div className="absolute inset-0 z-50 bg-rose-950/75 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-white pointer-events-none transition-all">
+            <div className="p-8 rounded-3xl bg-white/10 border-2 border-dashed border-rose-300 text-center max-w-sm shadow-2xl">
+              <Upload className="w-12 h-12 text-rose-300 mx-auto mb-3 animate-bounce" />
+              <h3 className="text-lg font-bold font-serif-romantic">
+                Déposez vos photos et vidéos ici
+              </h3>
+              <p className="text-xs text-rose-200 mt-1">
+                Elles seront toutes partagées ensemble dans votre salon d'amoureux ❤️
+              </p>
+            </div>
+          </div>
+        )}
         
         {/* Floating Chat Notification Toast */}
         <AnimatePresence>
@@ -2791,15 +2831,20 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <>
                     <Loader2 className="w-4 h-4 text-amber-600 animate-spin shrink-0" />
                     <span className="truncate">
-                      Optimisation de la photo mobile ({formatBytes(compressingStats.originalSize || 0)})...
+                      {compressingStats.customMessage ||
+                        `Optimisation de la photo mobile (${formatBytes(compressingStats.originalSize || 0)})...`}
                     </span>
                   </>
                 ) : (
                   <>
                     <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span className="truncate">
-                      Photo optimisée : {formatBytes(compressingStats.originalSize || 0)} ➔ {formatBytes(compressingStats.compressedSize || 0)}{' '}
-                      <strong className="text-emerald-700">(-{compressingStats.reduction}%)</strong>
+                      {compressingStats.customMessage || (
+                        <>
+                          Photo optimisée : {formatBytes(compressingStats.originalSize || 0)} ➔ {formatBytes(compressingStats.compressedSize || 0)}{' '}
+                          <strong className="text-emerald-700">(-{compressingStats.reduction}%)</strong>
+                        </>
+                      )}
                     </span>
                   </>
                 )}
@@ -2912,7 +2957,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
                   <ImageIcon className="w-4 h-4" />
                 </div>
-                <span>Choisir une photo</span>
+                <div>
+                  <div className="font-semibold">Photos & Vidéos (multiples)</div>
+                  <div className="text-[10px] text-stone-500 font-normal">Importer plusieurs photos et vidéos à la fois</div>
+                </div>
               </button>
 
               <button
@@ -2925,7 +2973,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <div className="p-1.5 rounded-lg bg-purple-100 text-purple-600">
                   <Video className="w-4 h-4" />
                 </div>
-                <span>Importer une vidéo</span>
+                <div>
+                  <div className="font-semibold">Vidéos (multiples)</div>
+                  <div className="text-[10px] text-stone-500 font-normal">Importer plusieurs vidéos souvenirs</div>
+                </div>
               </button>
 
               <button
@@ -3133,11 +3184,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
         </div>
 
-        {/* Hidden inputs for image and video uploads */}
+        {/* Hidden inputs for batch image and video uploads */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*,video/*"
+          multiple
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -3145,6 +3197,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           ref={videoInputRef}
           type="file"
           accept="video/*"
+          multiple
           onChange={handleVideoSelect}
           className="hidden"
         />

@@ -22,6 +22,7 @@ import {
   formatVideoDuration,
   resolveMediaUrl,
 } from '../../lib/videoUtils';
+import { SleekLoveVideoPlayer } from '../SleekLoveVideoPlayer';
 import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface AddMemoryModalProps {
@@ -299,13 +300,12 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
                 {/* Uncropped preview or Video Player */}
                 <div className="relative flex items-center justify-center min-h-[200px] max-h-[320px] p-2 bg-black/5">
                   {mediaType === 'video' ? (
-                    <div className="relative max-h-[300px] w-full flex items-center justify-center">
-                      <video
+                    <div className="relative max-h-[300px] w-full flex items-center justify-center rounded-xl overflow-hidden shadow-md bg-black">
+                      <SleekLoveVideoPlayer
                         src={resolvedVideoSrc || videoUrl || photoUrl}
                         poster={photoUrl}
-                        controls
-                        playsInline
-                        className="max-h-[300px] max-w-full rounded-xl shadow-md bg-black"
+                        compact={true}
+                        className="max-h-[300px] w-full"
                       />
                     </div>
                   ) : (

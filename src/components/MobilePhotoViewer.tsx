@@ -30,6 +30,7 @@ import {
   resolveMediaUrl,
   formatVideoDuration,
 } from '../lib/videoUtils';
+import { SleekLoveVideoPlayer } from './SleekLoveVideoPlayer';
 
 export interface PhotoViewerItem {
   id: string;
@@ -65,13 +66,13 @@ interface MobilePhotoViewerProps {
 }
 
 export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
-  items,
-  initialIndex,
+  items = [],
+  initialIndex = 0,
   isOpen,
   onClose,
   onIndexChange,
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -107,23 +108,29 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   // Keep index in sync with initialIndex when opening
   useEffect(() => {
     if (isOpen) {
-      setCurrentIndex(Math.max(0, Math.min(initialIndex, items.length - 1)));
+      const safeItems = items || [];
+      if (safeItems.length === 0) {
+        setCurrentIndex(0);
+      } else {
+        const safeInit = typeof initialIndex === 'number' ? initialIndex : 0;
+        setCurrentIndex(Math.max(0, Math.min(safeInit, safeItems.length - 1)));
+      }
       setScale(1);
       setPan({ x: 0, y: 0 });
       setSwipeOffset(0);
       setPullDownOffset(0);
       setShowUiChrome(true);
     }
-  }, [isOpen, initialIndex, items.length]);
+  }, [isOpen, initialIndex, items]);
 
   // Scroll active thumbnail into view
   useEffect(() => {
-    if (!thumbnailStripRef.current) return;
+    if (!thumbnailStripRef.current || !items || items.length === 0) return;
     const activeThumb = thumbnailStripRef.current.children[currentIndex] as HTMLElement;
     if (activeThumb) {
       activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
-  }, [currentIndex]);
+  }, [currentIndex, items]);
 
   const activeItem = items[currentIndex] || null;
 
@@ -157,8 +164,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   // Navigate to photo
   const goToIndex = useCallback(
     (newIndex: number, navDirection?: number) => {
-      if (items.length === 0) return;
-      const targetIndex = (newIndex + items.length) % items.length;
+      const len = items?.length || 0;
+      if (len === 0) return;
+      const targetIndex = (newIndex + len) % len;
       setDirection(navDirection ?? (newIndex > currentIndex ? 1 : -1));
       setCurrentIndex(targetIndex);
       resetZoom();
@@ -168,18 +176,18 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         onIndexChange(targetIndex);
       }
     },
-    [items.length, currentIndex, resetZoom, onIndexChange]
+    [items, currentIndex, resetZoom, onIndexChange]
   );
 
   const goNext = useCallback(() => {
-    if (items.length <= 1) return;
+    if (!items || items.length <= 1) return;
     goToIndex(currentIndex + 1, 1);
-  }, [items.length, currentIndex, goToIndex]);
+  }, [items, currentIndex, goToIndex]);
 
   const goPrev = useCallback(() => {
-    if (items.length <= 1) return;
+    if (!items || items.length <= 1) return;
     goToIndex(currentIndex - 1, -1);
-  }, [items.length, currentIndex, goToIndex]);
+  }, [items, currentIndex, goToIndex]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -448,7 +456,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             <div className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white text-xs sm:text-sm font-semibold tracking-wide">
               <span>{currentIndex + 1}</span>
               <span className="text-white/40 mx-1">/</span>
-              <span>{items.length}</span>
+              <span>{items?.length || 0}</span>
             </div>
           </div>
 
@@ -580,17 +588,17 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           >
             {isCurrentItemVideo ? (
               <div
-                className="relative max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] flex items-center justify-center"
+                className="relative max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] flex items-center justify-center rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl bg-black"
                 onClick={(e) => e.stopPropagation()}
               >
-                <video
+                <SleekLoveVideoPlayer
                   key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
                   src={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
                   poster={activeItem.photoUrl}
-                  controls
-                  playsInline
-                  autoPlay
-                  className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto rounded-xl sm:rounded-2xl shadow-2xl bg-black"
+                  title={activeItem.title}
+                  autoPlay={true}
+                  compact={false}
+                  className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto rounded-xl sm:rounded-2xl"
                 />
               </div>
             ) : (

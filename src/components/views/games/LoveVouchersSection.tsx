@@ -119,7 +119,8 @@ export const LoveVouchersSection: React.FC<LoveVouchersSectionProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isSpinningDateWheel, setIsSpinningDateWheel] = useState(false);
   const [dateWheelAngle, setDateWheelAngle] = useState(0);
-  const [pickedDate, setPickedDate] = useState<DateIdea>(dateIdeas[0]);
+  const safeDateIdeas = dateIdeas || [];
+  const [pickedDate, setPickedDate] = useState<DateIdea | undefined>(safeDateIdeas[0]);
 
   const activePartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -146,7 +147,7 @@ export const LoveVouchersSection: React.FC<LoveVouchersSectionProps> = ({
     });
   };
 
-  const filteredDates = dateIdeas.filter((d) => {
+  const filteredDates = safeDateIdeas.filter((d) => {
     if (selectedBudget !== 'all' && d.budget !== selectedBudget) return false;
     if (selectedCategory !== 'all' && d.category !== selectedCategory) return false;
     return true;
@@ -154,7 +155,7 @@ export const LoveVouchersSection: React.FC<LoveVouchersSectionProps> = ({
 
   const handleSpinDateWheel = () => {
     if (isSpinningDateWheel) return;
-    const pool = filteredDates.length > 0 ? filteredDates : dateIdeas;
+    const pool = filteredDates.length > 0 ? filteredDates : safeDateIdeas;
     if (pool.length === 0) return;
 
     setIsSpinningDateWheel(true);
@@ -375,7 +376,7 @@ export const LoveVouchersSection: React.FC<LoveVouchersSectionProps> = ({
 
             {/* Picked Idea Card */}
             <div className="md:col-span-7">
-              {pickedDate && (
+              {pickedDate ? (
                 <div className="bg-gradient-to-br from-rose-50/80 to-amber-50/60 p-6 rounded-3xl border border-rose-200/90 shadow-2xs space-y-3">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500 text-white">
@@ -416,6 +417,11 @@ export const LoveVouchersSection: React.FC<LoveVouchersSectionProps> = ({
                     <Send className="w-3.5 h-3.5" />
                     <span>Proposer ce rencard dans le Chat 💌</span>
                   </button>
+                </div>
+              ) : (
+                <div className="bg-stone-50/80 border border-stone-200 p-6 rounded-3xl text-center space-y-2">
+                  <p className="text-stone-700 font-medium text-sm">Prêts pour votre prochain rendez-vous ?</p>
+                  <p className="text-xs text-stone-500">Cliquez sur « Tourner » pour tirer au sort une idée romantique sur-mesure ! ✨</p>
                 </div>
               )}
             </div>
