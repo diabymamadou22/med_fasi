@@ -160,12 +160,16 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const [captureFeedback, setCaptureFeedback] = useState<boolean>(false);
   const [showVisionOverlay, setShowVisionOverlay] = useState<boolean>(false);
 
-  // When switching to a video: hide all buttons so the video takes full screen
+  // When switching to a video: hide all buttons so the video takes full screen and lock position perfectly fixed
   useEffect(() => {
     if (isCurrentItemVideo) {
       setShowUiChrome(false);
       setShowOptionsMenu(false);
       setShowVisionOverlay(false);
+      setScale(1);
+      setPan({ x: 0, y: 0 });
+      setSwipeOffset(0);
+      setIsInteracting(false);
     }
   }, [currentIndex, isCurrentItemVideo]);
 
@@ -390,8 +394,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     });
   };
 
-  // Double tap / double click to toggle zoom (1x <-> 2.5x)
+  // Double tap / double click to toggle zoom (1x <-> 2.5x) - photos only
   const handleDoubleTap = (clientX: number, clientY: number) => {
+    if (isCurrentItemVideo) return;
     triggerVibration([30]);
     soundEffects.playSoftTap();
     setIsInteracting(false);
@@ -594,6 +599,10 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     }
     if (gestureStateRef.current.wasGesture) {
       gestureStateRef.current.wasGesture = false;
+      return;
+    }
+    if (isCurrentItemVideo) {
+      toggleUiChrome();
       return;
     }
     const now = Date.now();
@@ -810,17 +819,19 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             </>
           )}
 
-          {/* Render Active Image / Video with smooth Pan/Zoom & Swipe translation */}
+          {/* Render Active Image / Video with smooth Pan/Zoom & Swipe translation (Videos are locked perfectly fixed) */}
           <motion.div
             key={activeItem.id}
-            initial={{ opacity: 0, x: direction * 40 }}
+            initial={isCurrentItemVideo ? { opacity: 0 } : { opacity: 0, x: direction * 40 }}
             animate={{
               opacity: 1,
-              x: swipeOffset,
-              scale: scale,
+              x: isCurrentItemVideo ? 0 : swipeOffset,
+              scale: isCurrentItemVideo ? 1 : scale,
             }}
             transition={
-              isInteracting
+              isCurrentItemVideo
+                ? { duration: 0.15 }
+                : isInteracting
                 ? { duration: 0 }
                 : {
                     type: 'spring',
@@ -828,13 +839,17 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                     damping: 30,
                   }
             }
-            style={{
-              translateX: pan.x,
-              translateY: pan.y,
-            }}
+            style={
+              isCurrentItemVideo
+                ? { transform: 'none' }
+                : {
+                    translateX: pan.x,
+                    translateY: pan.y,
+                  }
+            }
             className={
               isCurrentItemVideo
-                ? 'absolute inset-0 w-full h-full flex items-center justify-center bg-black'
+                ? 'absolute inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none'
                 : 'relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6'
             }
           >
