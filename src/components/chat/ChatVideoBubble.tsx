@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Maximize2, Download, Video } from 'lucide-react';
 import { ChatMessage } from '../../types';
 import { formatVideoDuration } from '../../lib/videoUtils';
@@ -17,6 +17,7 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
   isMe,
   chatTheme,
 }) => {
+  const [showOverlay, setShowOverlay] = useState(true);
   const rawUrl = message.videoUrl || message.mediaUrl || '';
 
   const formattedDuration = message.videoDuration
@@ -32,11 +33,16 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
           poster={message.videoThumbnail}
           compact={true}
           onOpenFullscreen={onOpenFullscreen}
+          onControlsVisibilityChange={setShowOverlay}
           className="w-full h-full"
         />
 
         {/* Top Badges (Duration & Video type) */}
-        <div className="absolute top-2 left-2 flex items-center gap-1.5 pointer-events-none z-20">
+        <div
+          className={`absolute top-2 left-2 flex items-center gap-1.5 pointer-events-none z-20 transition-opacity duration-300 ${
+            showOverlay ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/60 backdrop-blur-md text-white border border-white/20 flex items-center gap-1 shadow-xs">
             <Video className="w-3 h-3 text-purple-300" />
             <span>{formattedDuration || 'Vidéo'}</span>
@@ -44,7 +50,11 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
         </div>
 
         {/* Top Right Quick Actions */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 z-20">
+        <div
+          className={`absolute top-2 right-2 flex items-center gap-1 z-20 transition-opacity duration-300 ${
+            showOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
           {onOpenFullscreen && (
             <button
               type="button"

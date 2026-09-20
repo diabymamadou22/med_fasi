@@ -319,17 +319,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Bulk actions modal state
   const [showBulkActionModal, setShowBulkActionModal] = useState<boolean>(false);
 
-  // Phone back button handlers for Chat overlays and modals
-  useBackHandler(Boolean(editingMessage), () => setEditingMessage(null), 'chat-edit-modal');
-  useBackHandler(showDeleteConfirmModal, () => setShowDeleteConfirmModal(false), 'chat-delete-confirm');
-  useBackHandler(showClearChatModal, () => setShowClearChatModal(false), 'chat-clear-confirm');
-  useBackHandler(showBulkActionModal, () => setShowBulkActionModal(false), 'chat-bulk-actions');
-  useBackHandler(showCameraModal, () => setShowCameraModal(false), 'chat-camera-modal');
-  useBackHandler(showStickerPicker, () => setShowStickerPicker(false), 'chat-sticker-picker');
-  useBackHandler(showEmojiPicker, () => setShowEmojiPicker(false), 'chat-emoji-picker');
-  useBackHandler(showAttachmentMenu, () => setShowAttachmentMenu(false), 'chat-attachment-menu');
-  useBackHandler(showSearchBar, () => setShowSearchBar(false), 'chat-search-bar');
-
   // Theme selection stored in state
   const [chatTheme, setChatTheme] = useState<ChatTheme>(() => {
     return (localStorage.getItem('nid_amour_chat_theme') as ChatTheme) || 'rose-powder';
@@ -643,6 +632,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [showCameraModal, setShowCameraModal] = useState(false);
+
+  // Phone back button handlers for Chat overlays and modals
+  useBackHandler(Boolean(editingMessage), () => setEditingMessage(null), 'chat-edit-modal');
+  useBackHandler(showDeleteConfirmModal, () => setShowDeleteConfirmModal(false), 'chat-delete-confirm');
+  useBackHandler(showClearChatModal, () => setShowClearChatModal(false), 'chat-clear-confirm');
+  useBackHandler(showBulkActionModal, () => setShowBulkActionModal(false), 'chat-bulk-actions');
+  useBackHandler(showCameraModal, () => setShowCameraModal(false), 'chat-camera-modal');
+  useBackHandler(showStickerPicker, () => setShowStickerPicker(false), 'chat-sticker-picker');
+  useBackHandler(showEmojiPicker, () => setShowEmojiPicker(false), 'chat-emoji-picker');
+  useBackHandler(showAttachmentMenu, () => setShowAttachmentMenu(false), 'chat-attachment-menu');
+  useBackHandler(showSearchBar, () => setShowSearchBar(false), 'chat-search-bar');
 
   const handlePhotoCapturedFromCamera = (dataUrl: string, caption?: string) => {
     onSendMessage({

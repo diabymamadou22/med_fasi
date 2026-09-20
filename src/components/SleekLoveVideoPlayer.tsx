@@ -36,6 +36,8 @@ interface SleekLoveVideoPlayerProps {
   playbackRate?: number;
   onPlaybackRateChange?: (rate: number) => void;
   hideExtraMenu?: boolean;
+  onPlayingChange?: (isPlaying: boolean) => void;
+  onControlsVisibilityChange?: (visible: boolean) => void;
 }
 
 export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
@@ -55,6 +57,8 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   playbackRate: externalPlaybackRate,
   onPlaybackRateChange: externalPlaybackRateChange,
   hideExtraMenu = false,
+  onPlayingChange,
+  onControlsVisibilityChange,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -137,21 +141,25 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   }, [src]);
 
   // Controls auto-hide timer
-  const resetHideTimer = useCallback(() => {
-    setShowControls(true);
-    if (hideControlsTimerRef.current) {
-      clearTimeout(hideControlsTimerRef.current);
-    }
-    if (isPlaying && !isScrubbing) {
-      hideControlsTimerRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, compact ? 2200 : 3000);
-    }
-  }, [isPlaying, isScrubbing, compact]);
+  const resetHideTimer = useCallback(
+    (delay = 2500) => {
+      setShowControls(true);
+      if (hideControlsTimerRef.current) {
+        clearTimeout(hideControlsTimerRef.current);
+      }
+      if (isPlaying && !isScrubbing) {
+        hideControlsTimerRef.current = setTimeout(() => {
+          setShowControls(false);
+        }, compact ? Math.min(delay, 1800) : delay);
+      }
+    },
+    [isPlaying, isScrubbing, compact]
+  );
 
   useEffect(() => {
     if (isPlaying && !isScrubbing) {
-      resetHideTimer();
+      // When playback starts / launches, auto-hide all buttons & text after a brief moment
+      resetHideTimer(1200);
     } else {
       setShowControls(true);
       if (hideControlsTimerRef.current) {
@@ -162,6 +170,21 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       if (hideControlsTimerRef.current) clearTimeout(hideControlsTimerRef.current);
     };
   }, [isPlaying, isScrubbing, resetHideTimer]);
+
+  useEffect(() => {
+    const isVisible = showControls || !isPlaying || isEnded;
+    onControlsVisibilityChange?.(isVisible);
+  }, [showControls, isPlaying, isEnded, onControlsVisibilityChange]);
+
+  useEffect(() => {
+    onPlayingChange?.(isPlaying);
+  }, [isPlaying, onPlayingChange]);
+
+  useEffect(() => {
+    return () => {
+      if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    };
+  }, []);
 
   // Play / Pause Toggle
   const togglePlay = useCallback(() => {
@@ -208,8 +231,11 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
     resetHideTimer();
   }, [resetHideTimer]);
 
-  // Screen click handler: immediate toggle between pause and play!
-  // 1st click = pause, 2nd click = resume playing, etc.
+  // Screen click handler:
+  // - If controls/buttons are hidden while playing: single tap reveals all buttons & text with smooth transition
+  // - If controls are already shown while playing: tap pauses the video
+  // - If video is paused: tap resumes playback (and buttons/text auto-hide)
+  // - Double tap on left/right side skips -5s / +5s
   const handleStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // If clicking directly on controls bar, buttons, links, or sliders, do not toggle
     const target = e.target as HTMLElement;
@@ -222,8 +248,58 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       return;
     }
 
-    // Immediate play/pause toggle! 1st click = pause, 2nd click = resume playing
-    togglePlay();
+    const rect = containerRef.current?.getBoundingClientRect();
+    const clickX = rect ? e.clientX - rect.left : 0;
+    const width = rect ? rect.width : 0;
+    const now = Date.now();
+
+    // Check double tap (within 280ms)
+    if (now - lastTapTimeRef.current < 280 && width > 0) {
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
+      lastTapTimeRef.current = 0;
+
+      if (clickX < width * 0.35) {
+        seekRelative(-5);
+        return;
+      } else if (clickX > width * 0.65) {
+        seekRelative(5);
+        return;
+      }
+    }
+
+    lastTapTimeRef.current = now;
+
+    if (tapTimeoutRef.current) {
+      clearTimeout(tapTimeoutRef.current);
+    }
+
+    tapTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) {
+        if (!showControls) {
+          // Playback is running and UI is hidden: reveal all buttons and text!
+          setShowControls(true);
+          resetHideTimer(2800);
+        } else {
+          // UI is already visible: tap pauses
+          togglePlay();
+        }
+      } else {
+        // Paused: tap plays video and auto-hides UI
+        togglePlay();
+      }
+    }, 200);
+  };
+
+  const handleMouseMove = () => {
+    if (isPlaying) {
+      if (!showControls) {
+        setShowControls(true);
+      }
+      resetHideTimer(2500);
+    }
   };
 
   // Toggle Mute
@@ -288,7 +364,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   return (
     <div
       ref={containerRef}
-      onMouseMove={resetHideTimer}
+      onMouseMove={handleMouseMove}
       onClick={handleStageClick}
       className={`relative select-none overflow-hidden bg-black flex items-center justify-center group/player ${className}`}
       style={{ touchAction: 'manipulation' }}
@@ -322,8 +398,13 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
           onPlay={() => {
             setIsPlaying(true);
             setIsEnded(false);
+            // When playback launches: smoothly auto-hide all buttons & text
+            resetHideTimer(1000);
           }}
-          onPause={() => setIsPlaying(false)}
+          onPause={() => {
+            setIsPlaying(false);
+            setShowControls(true);
+          }}
           onEnded={() => {
             setIsPlaying(false);
             setIsEnded(true);
@@ -331,7 +412,10 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
             if (onEnded) onEnded();
           }}
           onWaiting={() => setIsLoading(true)}
-          onPlaying={() => setIsLoading(false)}
+          onPlaying={() => {
+            setIsLoading(false);
+            resetHideTimer(1000);
+          }}
           className="w-full h-full object-contain cursor-pointer"
         />
       )}

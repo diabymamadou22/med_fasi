@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Images,
+  Image as ImageIcon,
   Plus,
   Camera,
   Video,
@@ -19,6 +20,21 @@ import {
   ChevronRight,
   ArrowLeft,
   Heart,
+  Search,
+  MoreVertical,
+  BookOpen,
+  Bookmark,
+  Menu,
+  X,
+  Share2,
+  SlidersHorizontal,
+  Layers,
+  MapPin,
+  Clock,
+  Settings,
+  Check,
+  Star,
+  Eye,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -74,6 +90,17 @@ export interface GalleryItem {
   originalEntityId?: string;
 }
 
+export interface SamsungAlbum {
+  id: string;
+  title: string;
+  count: number;
+  coverUrl: string;
+  type: 'stacked' | 'photo' | 'pastel';
+  badge?: 'camera' | 'dot' | 'video' | 'heart';
+  items: GalleryItem[];
+  isEssential?: boolean;
+}
+
 interface SharedGalleryViewProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
@@ -107,17 +134,64 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   onDeleteMediaItem,
   onRemovePhotoOnly,
 }) => {
+  // Samsung One UI Bottom Dock Tab: 'pictures' | 'albums' | 'stories'
+  const [oneUiTab, setOneUiTab] = useState<'pictures' | 'albums' | 'stories'>('albums');
+
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Dropdown menus
+  const [showTopMenu, setShowTopMenu] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [showSamsungMenu, setShowSamsungMenu] = useState(false);
+
+  // View All albums toggle
+  const [showViewAll, setShowViewAll] = useState(false);
+
+  // Active focused album
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
+
+  // Media filter for pictures tab ('all', 'photos', 'videos')
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'photos' | 'videos'>('all');
+  const [selectedYear, setSelectedYear] = useState<number | 'all' | 'undated'>('all');
+
+  // Lightbox & Viewer
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
+  const [lightboxContextItems, setLightboxContextItems] = useState<GalleryItem[] | null>(null);
+
+  // Upload & Camera
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  useBackHandler(showCameraModal, () => setShowCameraModal(false), 'gallery-camera-modal');
+  // Gallery Settings (Auto-play videos in grid, etc.)
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [autoplayVideosInGrid, setAutoplayVideosInGrid] = useState<boolean>(() => {
+    const saved = localStorage.getItem('samsung_gallery_autoplay_videos');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const handleToggleAutoplayVideos = (val: boolean) => {
+    soundEffects.playSoftTap();
+    setAutoplayVideosInGrid(val);
+    localStorage.setItem('samsung_gallery_autoplay_videos', String(val));
+  };
 
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Compile all photos & videos into unified items
+  // Android / Mobile back navigation handlers
+  useBackHandler(Boolean(selectedAlbumId), () => setSelectedAlbumId(null), 'samsung-album-detail');
+  useBackHandler(showSamsungMenu, () => setShowSamsungMenu(false), 'samsung-bottom-menu');
+  useBackHandler(showCreateMenu, () => setShowCreateMenu(false), 'samsung-create-menu');
+  useBackHandler(showTopMenu, () => setShowTopMenu(false), 'samsung-top-menu');
+  useBackHandler(showSearch, () => setShowSearch(false), 'samsung-search');
+  useBackHandler(showCameraModal, () => setShowCameraModal(false), 'gallery-camera-modal');
+  useBackHandler(showSettingsModal, () => setShowSettingsModal(false), 'samsung-gallery-settings');
+
+  // Compile all photos & videos into unified gallery items
   const allGalleryItems: GalleryItem[] = useMemo(() => {
     const items: GalleryItem[] = [];
 
@@ -150,29 +224,24 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       });
     }
 
-    // 2. Timeline Memories
+    // 2. Timeline memories
     memories.forEach((mem) => {
-      const isVideo = Boolean(
-        mem.mediaType === 'video' ||
-        mem.videoUrl ||
-        mem.photoUrl?.startsWith('data:video/')
-      );
-      if ((mem.photoUrl && mem.photoUrl.trim().length > 0) || isVideo) {
+      if (mem.photoUrl && mem.photoUrl.trim().length > 0) {
         items.push({
           id: `mem-${mem.id}`,
           sourceType: 'memory',
-          sourceLabel: isVideo ? 'Vidéo' : 'Souvenir',
+          sourceLabel: 'Souvenir',
           title: mem.title,
-          photoUrl: mem.photoUrl || '',
-          mediaType: isVideo ? 'video' : 'image',
+          photoUrl: mem.photoUrl,
+          mediaType: mem.mediaType || 'image',
           videoUrl: mem.videoUrl,
           videoDuration: mem.videoDuration,
           date: mem.date,
-          locationName: mem.locationName,
+          locationName: mem.location,
           description: mem.description,
           authorId: mem.authorId,
           likes: mem.likes,
-          tags: mem.tags || [],
+          tags: mem.tags,
           originalEntityId: mem.id,
         });
       }
@@ -188,10 +257,10 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           title: loc.name,
           photoUrl: loc.photoUrl,
           date: loc.date,
-          locationName: loc.city,
-          description: loc.description,
+          locationName: loc.address || loc.name,
+          description: loc.notes,
           authorId: 'both',
-          tags: ['Lieu'],
+          tags: ['Lieu', loc.category || 'Balade'],
           originalEntityId: loc.id,
         });
       }
@@ -253,25 +322,333 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     });
   }, [profile, memories, locations, capsules, challenges]);
 
-  // Drag & drop state for multiple media upload
-  const [isDragOver, setIsDragOver] = useState(false);
+  // Fallback romantic cover if no media uploaded yet
+  const defaultRomanticCover =
+    'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop&q=80';
 
-  // View modes: 'timeline' (grouped chronologically by month), 'albums' (automatic monthly album cards), 'grid' (continuous flat grid)
-  const [viewMode, setViewMode] = useState<'timeline' | 'albums' | 'grid'>('timeline');
+  // Monthly albums generated from dates
+  const { albums: monthAlbums, yearGroups } = useMemo(() => {
+    return groupGalleryItemsByDate(allGalleryItems);
+  }, [allGalleryItems]);
 
-  // Selected Album for focused exploration
-  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
+  // Curated Samsung One UI Albums (Matching the exact cards in user's screenshot)
+  const samsungAlbums: SamsungAlbum[] = useMemo(() => {
+    const list: SamsungAlbum[] = [];
 
-  // Year filter ('all', specific year number, or 'undated')
-  const [selectedYear, setSelectedYear] = useState<number | 'all' | 'undated'>('all');
+    // 1. Recent (Récents) - Stacked style
+    list.push({
+      id: 'recent',
+      title: 'Recent',
+      count: allGalleryItems.length,
+      coverUrl: allGalleryItems[0]?.photoUrl || defaultRomanticCover,
+      type: 'stacked',
+      items: allGalleryItems,
+      isEssential: true,
+    });
 
-  // Media type filter ('all', 'photos', 'videos')
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'photos' | 'videos'>('all');
+    // 2. Favourites (Favoris) - Stacked style
+    const favItems = allGalleryItems.filter(
+      (i) => (i.likes && i.likes.length > 0) || i.tags?.includes('Favoris')
+    );
+    list.push({
+      id: 'favourites',
+      title: 'Favourites',
+      count: favItems.length,
+      coverUrl: favItems[0]?.photoUrl || allGalleryItems[1]?.photoUrl || defaultRomanticCover,
+      type: 'stacked',
+      badge: 'heart',
+      items: favItems.length > 0 ? favItems : allGalleryItems.slice(0, 5),
+      isEssential: true,
+    });
 
-  // Lightbox context items
-  const [lightboxContextItems, setLightboxContextItems] = useState<GalleryItem[] | null>(null);
+    // 3. Camera (Appareil photo) - Photo card with camera icon badge in top-right
+    const cameraItems = allGalleryItems.filter((i) => i.mediaType !== 'video');
+    list.push({
+      id: 'camera',
+      title: 'Camera',
+      count: cameraItems.length,
+      coverUrl: cameraItems[0]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      badge: 'camera',
+      items: cameraItems,
+      isEssential: true,
+    });
 
-  // Helper for single video processing
+    // 4. Screenshots (Captures & Notes) - Photo card with orange dot
+    const screenshotItems = allGalleryItems.filter(
+      (i) => i.sourceType === 'capsule' || i.sourceType === 'challenge' || i.tags?.includes('Note')
+    );
+    list.push({
+      id: 'screenshots',
+      title: 'Screenshots',
+      count: screenshotItems.length || Math.min(allGalleryItems.length, 3),
+      coverUrl: screenshotItems[0]?.photoUrl || allGalleryItems[2]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      badge: 'dot',
+      items: screenshotItems.length > 0 ? screenshotItems : allGalleryItems.slice(0, 4),
+      isEssential: true,
+    });
+
+    // 5. Download (Téléchargements / Reçus)
+    const downloadItems = allGalleryItems.filter((i) => i.sourceType === 'memory');
+    list.push({
+      id: 'download',
+      title: 'Download',
+      count: downloadItems.length || 1,
+      coverUrl: downloadItems[0]?.photoUrl || allGalleryItems[3]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      items: downloadItems.length > 0 ? downloadItems : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 6. Ray Ban Meta (Moments duo & complices)
+    const duoItems = allGalleryItems.filter(
+      (i) => i.authorId === 'both' || i.tags?.includes('Duo') || i.tags?.includes('Profil')
+    );
+    list.push({
+      id: 'rayban',
+      title: 'Ray Ban Meta',
+      count: duoItems.length || Math.min(allGalleryItems.length, 2),
+      coverUrl: duoItems[0]?.photoUrl || allGalleryItems[4]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      items: duoItems.length > 0 ? duoItems : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 7. Hawaaiiii (Voyages & Escapades)
+    const tripItems = allGalleryItems.filter(
+      (i) => i.locationName || i.sourceType === 'location' || i.tags?.includes('Voyage')
+    );
+    list.push({
+      id: 'hawaaiiii',
+      title: 'Hawaaiiii',
+      count: tripItems.length || 1,
+      coverUrl: tripItems[0]?.photoUrl || allGalleryItems[5]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      items: tripItems.length > 0 ? tripItems : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 8. Quick Share (Partages complices / Profils) - Pastel gradient style
+    const quickShareItems = allGalleryItems.filter(
+      (i) => i.sourceType === 'profile' || i.sourceType === 'capsule'
+    );
+    list.push({
+      id: 'quickshare',
+      title: 'Quick Share',
+      count: quickShareItems.length || 2,
+      coverUrl: quickShareItems[0]?.photoUrl || allGalleryItems[0]?.photoUrl || defaultRomanticCover,
+      type: 'pastel',
+      items: quickShareItems.length > 0 ? quickShareItems : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 9. AdobeLightroom (Retouches & Portraits)
+    const lightroomItems = allGalleryItems.slice(0, 8);
+    list.push({
+      id: 'lightroom',
+      title: 'AdobeLightroom',
+      count: lightroomItems.length || 1,
+      coverUrl: lightroomItems[0]?.photoUrl || allGalleryItems[1]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      items: lightroomItems.length > 0 ? lightroomItems : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 10. Expert RAW (Vidéos & HD)
+    const videoItems = allGalleryItems.filter((i) => i.mediaType === 'video');
+    list.push({
+      id: 'expertraw',
+      title: 'Expert RAW',
+      count: videoItems.length || Math.min(allGalleryItems.length, 1),
+      coverUrl: videoItems[0]?.photoUrl || allGalleryItems[2]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      badge: 'video',
+      items: videoItems.length > 0 ? videoItems : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 11. Pictures (Toutes les photos)
+    list.push({
+      id: 'pictures-album',
+      title: 'Pictures',
+      count: allGalleryItems.length,
+      coverUrl: allGalleryItems[3]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      items: allGalleryItems,
+      isEssential: true,
+    });
+
+    // 12. SS24 (Saison & Année)
+    const ss24Items = allGalleryItems.filter(
+      (i) => (i.date && i.date.includes('2024')) || (i.date && i.date.includes('2026'))
+    );
+    list.push({
+      id: 'ss24',
+      title: 'SS24',
+      count: ss24Items.length || 1,
+      coverUrl: ss24Items[0]?.photoUrl || allGalleryItems[4]?.photoUrl || defaultRomanticCover,
+      type: 'photo',
+      items: ss24Items.length > 0 ? ss24Items : allGalleryItems,
+      isEssential: true,
+    });
+
+    // 13+. Add Monthly Albums when viewing all
+    monthAlbums.forEach((ma) => {
+      list.push({
+        id: `month-${ma.id}`,
+        title: ma.label,
+        count: ma.items.length,
+        coverUrl: ma.coverPhoto || defaultRomanticCover,
+        type: 'photo',
+        items: ma.items,
+        isEssential: false,
+      });
+    });
+
+    return list;
+  }, [allGalleryItems, monthAlbums, defaultRomanticCover]);
+
+  // Filtered albums based on search and "View all" toggle
+  const displayedAlbums = useMemo(() => {
+    let base = showViewAll ? samsungAlbums : samsungAlbums.filter((a) => a.isEssential);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      base = base.filter(
+        (a) =>
+          a.title.toLowerCase().includes(q) ||
+          a.items.some(
+            (it) =>
+              it.title.toLowerCase().includes(q) ||
+              (it.description && it.description.toLowerCase().includes(q)) ||
+              (it.locationName && it.locationName.toLowerCase().includes(q))
+          )
+      );
+    }
+    return base;
+  }, [samsungAlbums, showViewAll, searchQuery]);
+
+  // Currently active selected album for detail exploration
+  const activeSelectedAlbum = useMemo(() => {
+    if (!selectedAlbumId) return null;
+    return samsungAlbums.find((a) => a.id === selectedAlbumId) || null;
+  }, [samsungAlbums, selectedAlbumId]);
+
+  // Filtered items for Pictures tab (Timeline)
+  const picturesTabItems = useMemo(() => {
+    let items = allGalleryItems;
+
+    if (mediaFilter === 'photos') {
+      items = items.filter((i) => i.mediaType !== 'video');
+    } else if (mediaFilter === 'videos') {
+      items = items.filter((i) => i.mediaType === 'video');
+    }
+
+    if (selectedYear !== 'all') {
+      if (selectedYear === 'undated') {
+        items = items.filter((i) => !i.date || isNaN(new Date(i.date).getTime()));
+      } else {
+        items = items.filter((i) => {
+          if (!i.date) return false;
+          const d = new Date(i.date);
+          return !isNaN(d.getTime()) && d.getFullYear() === selectedYear;
+        });
+      }
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      items = items.filter(
+        (i) =>
+          i.title.toLowerCase().includes(q) ||
+          (i.description && i.description.toLowerCase().includes(q)) ||
+          (i.locationName && i.locationName.toLowerCase().includes(q)) ||
+          (i.tags && i.tags.some((t) => t.toLowerCase().includes(q)))
+      );
+    }
+
+    return items;
+  }, [allGalleryItems, mediaFilter, selectedYear, searchQuery]);
+
+  // Contextual items for Lightbox
+  const currentLightboxItems = useMemo(() => {
+    return (
+      lightboxContextItems ||
+      (activeSelectedAlbum ? activeSelectedAlbum.items : picturesTabItems)
+    );
+  }, [lightboxContextItems, activeSelectedAlbum, picturesTabItems]);
+
+  const openLightboxForItem = (item: GalleryItem, contextList?: GalleryItem[]) => {
+    const list =
+      contextList || (activeSelectedAlbum ? activeSelectedAlbum.items : picturesTabItems);
+    setLightboxContextItems(list);
+    const idx = list.findIndex((x) => x.id === item.id);
+    setActiveLightboxIndex(idx >= 0 ? idx : 0);
+  };
+
+  // Convert GalleryItem to PhotoViewerItem for MobilePhotoViewer
+  const photoViewerItems: PhotoViewerItem[] = useMemo(() => {
+    return currentLightboxItems.map((item) => {
+      const author =
+        item.authorId === 'p1'
+          ? profile.partner1
+          : item.authorId === 'p2'
+          ? profile.partner2
+          : null;
+
+      const mem =
+        item.sourceType === 'memory' && item.originalEntityId
+          ? memories.find((m) => m.id === item.originalEntityId)
+          : null;
+
+      return {
+        id: item.id,
+        photoUrl: item.photoUrl,
+        mediaType: item.mediaType,
+        videoUrl: item.videoUrl,
+        videoDuration: item.videoDuration,
+        title: item.title,
+        description: item.description,
+        date: item.date,
+        locationName: item.locationName,
+        badgeLabel: item.mediaType === 'video' ? 'Vidéo' : item.sourceLabel,
+        badgeBg:
+          item.mediaType === 'video'
+            ? 'bg-purple-100 text-purple-700'
+            : 'bg-rose-100 text-rose-700',
+        authorId: item.authorId,
+        authorName: author?.name || (item.authorId === 'both' ? 'En duo' : undefined),
+        authorAvatar: author?.avatar,
+        isLiked: item.likes?.includes(activePartnerId),
+        likeCount: item.likes?.length,
+        tags: item.tags,
+        onLike:
+          item.sourceType === 'memory' && item.originalEntityId && onLikeMemory
+            ? () => onLikeMemory(item.originalEntityId!)
+            : undefined,
+        onDelete: onDeleteMediaItem
+          ? () => onDeleteMediaItem(item)
+          : item.sourceType === 'memory' && item.originalEntityId && onDeleteMemory
+          ? () => onDeleteMemory(item.originalEntityId!)
+          : undefined,
+        onEdit: mem && onEditMemory ? () => onEditMemory(mem) : undefined,
+        onRemovePhotoOnly: onRemovePhotoOnly ? () => onRemovePhotoOnly(item) : undefined,
+      };
+    });
+  }, [
+    currentLightboxItems,
+    profile.partner1,
+    profile.partner2,
+    activePartnerId,
+    memories,
+    onLikeMemory,
+    onDeleteMediaItem,
+    onDeleteMemory,
+    onEditMemory,
+    onRemovePhotoOnly,
+  ]);
+
+  // Video processor helper
   const processSingleVideo = async (file: File) => {
     const meta = await extractVideoThumbnail(file);
     const mediaKey = `vid_mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -295,7 +672,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     }
   };
 
-  // Unified batch media importer (supports multiple photos, videos, or mixed)
+  // Multiple media files processor
   const handleMediaFiles = async (files: FileList | File[]) => {
     if (!files || files.length === 0) return;
 
@@ -336,10 +713,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
             }
           }
           successCount++;
-          // Small pause between items to ensure clean ordering
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 80));
         } catch (fileErr) {
-          console.error(`Erreur sur le fichier ${file.name}:`, fileErr);
+          console.error(`Erreur fichier ${file.name}:`, fileErr);
         }
       }
 
@@ -348,8 +724,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         triggerHeartConfetti();
       }
     } catch (err) {
-      console.error('Erreur importation médias:', err);
-      alert("Une erreur est survenue lors de l'importation de vos médias.");
+      console.error('Erreur importation média:', err);
     } finally {
       setIsUploading(false);
       setUploadStatus('');
@@ -358,229 +733,74 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     }
   };
 
-  // Handle direct photo & video file selection
   const handlePhotoFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleMediaFiles(e.target.files);
     }
   };
 
-  // Handle direct video file selection
   const handleVideoFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleMediaFiles(e.target.files);
     }
   };
 
-  // Drag & drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleMediaFiles(e.dataTransfer.files);
-    }
-  };
-
-  // Handle photo from live camera
   const handlePhotoCapturedFromCamera = (dataUrl: string, caption?: string) => {
     if (onAddMemory) {
       onAddMemory({
-        title: caption && caption.trim() ? caption.trim() : 'Photo capturée en direct',
+        title: caption && caption.trim().length > 0 ? caption.trim() : 'Instant complice',
         photoUrl: dataUrl,
         date: new Date().toISOString().split('T')[0],
         category: 'souvenir',
-        description: 'Photo prise avec la caméra',
+        description: caption || 'Photo prise en direct depuis la galerie',
         authorId: activePartnerId,
-        tags: ['Galerie', 'En direct'],
+        tags: ['Caméra', 'En direct'],
       });
       soundEffects.playSuccessSparkle();
       triggerHeartConfetti();
     }
   };
 
-  // Direct download
-  const handleDownload = (item: GalleryItem, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    try {
-      const link = document.createElement('a');
-      link.href = item.videoUrl || item.photoUrl;
-      link.download = `${item.title ? item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'souvenir'}-${item.id}.${
-        item.mediaType === 'video' ? 'mp4' : 'jpg'
-      }`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error('Erreur téléchargement:', err);
-    }
+  const handleDownload = (item: GalleryItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    soundEffects.playSoftTap();
+    const a = document.createElement('a');
+    a.href = item.videoUrl || item.photoUrl;
+    a.download = `${item.title.replace(/\s+/g, '_') || 'souvenir'}.${
+      item.mediaType === 'video' ? 'mp4' : 'jpg'
+    }`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
-  // Filter items by media type (photos vs videos)
-  const filteredGalleryItems = useMemo(() => {
-    if (mediaFilter === 'photos') {
-      return allGalleryItems.filter((i) => i.mediaType !== 'video');
-    }
-    if (mediaFilter === 'videos') {
-      return allGalleryItems.filter((i) => i.mediaType === 'video');
-    }
-    return allGalleryItems;
-  }, [allGalleryItems, mediaFilter]);
-
-  // Group into MonthAlbums and YearGroups automatically!
-  const { albums, yearGroups, availableYears, totalPhotos, totalVideos } = useMemo(() => {
-    return groupGalleryItemsByDate(filteredGalleryItems);
-  }, [filteredGalleryItems]);
-
-  // Active focused album if selected
-  const activeAlbum = useMemo(() => {
-    if (!selectedAlbumId) return null;
-    return albums.find((a) => a.id === selectedAlbumId) || null;
-  }, [albums, selectedAlbumId]);
-
-  // Filter albums by selected year if active
-  const displayedAlbums = useMemo(() => {
-    if (selectedYear === 'all') return albums;
-    if (selectedYear === 'undated') {
-      return albums.filter((a) => a.year === null);
-    }
-    return albums.filter((a) => a.year === selectedYear);
-  }, [albums, selectedYear]);
-
-  // Items to display in continuous grid view (filtered by year if applicable)
-  const gridDisplayedItems = useMemo(() => {
-    if (selectedYear === 'all') return filteredGalleryItems;
-    if (selectedYear === 'undated') {
-      return filteredGalleryItems.filter(
-        (item) => !item.date || isNaN(new Date(item.date).getTime())
-      );
-    }
-    return filteredGalleryItems.filter((item) => {
-      if (!item.date) return false;
-      const d = new Date(item.date);
-      return !isNaN(d.getTime()) && d.getFullYear() === selectedYear;
-    });
-  }, [filteredGalleryItems, selectedYear]);
-
-  // Contextual items currently for Lightbox
-  const currentLightboxItems = useMemo(() => {
-    return (
-      lightboxContextItems ||
-      (activeAlbum ? activeAlbum.items : filteredGalleryItems)
-    );
-  }, [lightboxContextItems, activeAlbum, filteredGalleryItems]);
-
-  const openLightboxForItem = (
-    item: GalleryItem,
-    contextItems?: GalleryItem[]
-  ) => {
-    const list =
-      contextItems || (activeAlbum ? activeAlbum.items : filteredGalleryItems);
-    setLightboxContextItems(list);
-    const idx = list.findIndex((x) => x.id === item.id);
-    setActiveLightboxIndex(idx >= 0 ? idx : 0);
+  // Drag & drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
   };
 
-  // Lightbox items mapping
-  const photoViewerItems: PhotoViewerItem[] = useMemo(() => {
-    return currentLightboxItems.map((item) => {
-      const author =
-        item.authorId === 'p1'
-          ? profile.partner1
-          : item.authorId === 'p2'
-          ? profile.partner2
-          : null;
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
 
-      const mem =
-        item.sourceType === 'memory' && item.originalEntityId
-          ? memories.find((m) => m.id === item.originalEntityId)
-          : null;
-
-      return {
-        id: item.id,
-        photoUrl: item.photoUrl,
-        mediaType: item.mediaType,
-        videoUrl: item.videoUrl,
-        videoDuration: item.videoDuration,
-        title: item.title,
-        description: item.description,
-        date: item.date,
-        locationName: item.locationName,
-        badgeLabel: item.mediaType === 'video' ? 'Vidéo' : item.sourceLabel,
-        badgeBg:
-          item.mediaType === 'video'
-            ? 'bg-purple-100 text-purple-700'
-            : 'bg-rose-100 text-rose-700',
-        authorId: item.authorId,
-        authorName:
-          author?.name || (item.authorId === 'both' ? 'En duo' : undefined),
-        authorAvatar: author?.avatar,
-        isLiked: item.likes?.includes(activePartnerId),
-        likeCount: item.likes?.length,
-        tags: item.tags,
-        onLike:
-          item.sourceType === 'memory' && item.originalEntityId && onLikeMemory
-            ? () => onLikeMemory(item.originalEntityId!)
-            : undefined,
-        onDelete: onDeleteMediaItem
-          ? () => onDeleteMediaItem(item)
-          : item.sourceType === 'memory' && item.originalEntityId && onDeleteMemory
-          ? () => onDeleteMemory(item.originalEntityId!)
-          : undefined,
-        onEdit: mem && onEditMemory ? () => onEditMemory(mem) : undefined,
-        onRemovePhotoOnly: onRemovePhotoOnly
-          ? () => onRemovePhotoOnly(item)
-          : undefined,
-      };
-    });
-  }, [
-    currentLightboxItems,
-    profile.partner1,
-    profile.partner2,
-    activePartnerId,
-    memories,
-    onLikeMemory,
-    onDeleteMediaItem,
-    onDeleteMemory,
-    onEditMemory,
-    onRemovePhotoOnly,
-  ]);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleMediaFiles(e.dataTransfer.files);
+    }
+  };
 
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="max-w-6xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 relative"
+      className="min-h-screen bg-[#F7F8FA] dark:bg-[#121418] text-stone-900 dark:text-stone-100 pb-32 select-none relative"
     >
-      {/* Drag & Drop Visual Dropzone Overlay */}
-      {isDragOver && (
-        <div className="fixed inset-0 z-50 bg-rose-950/70 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-white pointer-events-none transition-all">
-          <div className="p-8 rounded-3xl bg-white/10 border-2 border-dashed border-rose-300 text-center max-w-md shadow-2xl">
-            <Upload className="w-14 h-14 text-rose-300 mx-auto mb-4 animate-bounce" />
-            <h3 className="text-xl font-bold font-serif-romantic">
-              Déposez vos photos et vidéos complices
-            </h3>
-            <p className="text-xs sm:text-sm text-rose-200 mt-2">
-              Toutes vos photos et vidéos sélectionnées seront importées ensemble dans votre galerie ❤️
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Hidden File Inputs for Direct Native Pickers */}
+      {/* Hidden File Inputs */}
       <input
         type="file"
         ref={photoFileInputRef}
@@ -598,296 +818,34 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         className="hidden"
       />
 
-      {/* 1. Header Principal avec Statistiques et Boutons d'Importation */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <Images className="w-4 h-4" />
-            </div>
-            <h1 className="text-lg sm:text-xl font-bold text-stone-900 font-serif-romantic tracking-tight">
-              Galerie Photos & Vidéos
-            </h1>
+      {/* Drag & Drop Overlay */}
+      {isDragOver && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-white pointer-events-none transition-all">
+          <div className="p-8 rounded-3xl bg-stone-900/80 border-2 border-dashed border-sky-400 text-center max-w-md shadow-2xl">
+            <Upload className="w-14 h-14 text-sky-400 mx-auto mb-4 animate-bounce" />
+            <h3 className="text-xl font-bold">Déposez vos photos et vidéos</h3>
+            <p className="text-xs sm:text-sm text-stone-300 mt-2">
+              Importation directe dans votre galerie Samsung One UI
+            </p>
           </div>
-          <p className="text-xs sm:text-sm text-stone-500 mt-0.5 ml-10">
-            {allGalleryItems.length === 0
-              ? 'Aucun média pour le moment'
-              : `${allGalleryItems.length} souvenir${
-                  allGalleryItems.length > 1 ? 's' : ''
-                } • ${albums.length} album${albums.length > 1 ? 's' : ''} mensuel${
-                  albums.length > 1 ? 's' : ''
-                }`}
-          </p>
         </div>
-
-        {/* Boutons d'action et d'importation */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {/* Importer Photos & Vidéos (Multiple) */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              photoFileInputRef.current?.click();
-            }}
-            disabled={isUploading}
-            className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Importer plusieurs photos et vidéos à la fois"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Importer photos & vidéos</span>
-          </button>
-
-          {/* Importer Vidéos (Multiple) */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              videoFileInputRef.current?.click();
-            }}
-            disabled={isUploading}
-            className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs sm:text-sm font-semibold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Importer une ou plusieurs vidéos souvenirs"
-          >
-            <Video className="w-4 h-4" />
-            <span>Importer vidéos</span>
-          </button>
-
-          {/* Prendre Photo Caméra */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setShowCameraModal(true);
-            }}
-            disabled={isUploading}
-            className="p-2 sm:px-3 sm:py-2 rounded-xl bg-stone-100 hover:bg-stone-200 active:scale-95 text-stone-700 text-xs sm:text-sm font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            title="Prendre une photo en direct"
-          >
-            <Camera className="w-4 h-4 text-stone-600" />
-            <span className="hidden sm:inline">Caméra</span>
-          </button>
-
-          {/* Ajouter avec Titre & Note (Modal détaillé) */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playNoteClick();
-              onOpenAddMemoryModal('image');
-            }}
-            className="p-2 sm:p-2 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors cursor-pointer"
-            title="Ajouter un souvenir avec titre, note et date"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Uploading Status Banner */}
       {isUploading && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 flex items-center justify-center gap-2 text-xs sm:text-sm text-rose-700 font-medium animate-pulse">
-          <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+        <div className="sticky top-0 z-30 bg-sky-500 text-white py-2 px-4 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm font-medium animate-pulse">
+          <Loader2 className="w-4 h-4 animate-spin" />
           <span>{uploadStatus || 'Importation en cours...'}</span>
         </div>
       )}
 
-      {/* 2. Barre de Navigation et Modes d'Album (Par Mois, Albums, Grille) */}
-      {allGalleryItems.length > 0 && !activeAlbum && (
-        <div className="bg-white rounded-2xl border border-stone-200/80 p-2.5 sm:p-3 shadow-2xs space-y-2.5">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-            {/* Mode Switcher */}
-            <div className="flex items-center bg-stone-100/90 p-1 rounded-xl gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setViewMode('timeline');
-                  setSelectedAlbumId(null);
-                }}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  viewMode === 'timeline'
-                    ? 'bg-white text-stone-900 shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
-                }`}
-                title="Regroupement automatique chronologique par mois et par année"
-              >
-                <CalendarDays className="w-4 h-4 text-rose-500" />
-                <span>Par Mois</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setViewMode('albums');
-                  setSelectedAlbumId(null);
-                }}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  viewMode === 'albums'
-                    ? 'bg-white text-stone-900 shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
-                }`}
-                title="Albums photo mensuels automatiques avec couvertures"
-              >
-                <FolderHeart className="w-4 h-4 text-rose-500" />
-                <span>Albums</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 font-medium">
-                  {albums.length}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setViewMode('grid');
-                  setSelectedAlbumId(null);
-                }}
-                className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  viewMode === 'grid'
-                    ? 'bg-white text-stone-900 shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
-                }`}
-                title="Affichage continu de tous les médias"
-              >
-                <LayoutGrid className="w-4 h-4 text-stone-500" />
-                <span>Grille</span>
-              </button>
-            </div>
-
-            {/* Media Type Filter Pills (Tous, Photos, Vidéos) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0 scrollbar-none">
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setMediaFilter('all');
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                  mediaFilter === 'all'
-                    ? 'bg-stone-900 text-white shadow-2xs'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                Tous ({allGalleryItems.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setMediaFilter('photos');
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
-                  mediaFilter === 'photos'
-                    ? 'bg-rose-600 text-white shadow-2xs'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                <span>Photos ({totalPhotos})</span>
-              </button>
-
-              {totalVideos > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEffects.playSoftTap();
-                    setMediaFilter('videos');
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
-                    mediaFilter === 'videos'
-                      ? 'bg-purple-600 text-white shadow-2xs'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                  }`}
-                >
-                  <span>Vidéos ({totalVideos})</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Year Selector Pills */}
-          {(availableYears.length > 1 || availableYears.length === 1) && (
-            <div className="pt-2 border-t border-stone-100 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-              <span className="text-[11px] text-stone-400 font-medium shrink-0 flex items-center gap-1 mr-1">
-                <Calendar className="w-3 h-3 text-stone-400" />
-                <span>Année :</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setSelectedYear('all');
-                }}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                  selectedYear === 'all'
-                    ? 'bg-rose-50 text-rose-700 font-semibold border border-rose-200'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                Toutes ({filteredGalleryItems.length})
-              </button>
-
-              {yearGroups.map((yg) => (
-                <button
-                  key={String(yg.year)}
-                  type="button"
-                  onClick={() => {
-                    soundEffects.playSoftTap();
-                    setSelectedYear(yg.year);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-                    selectedYear === yg.year
-                      ? 'bg-rose-50 text-rose-700 font-semibold border border-rose-200'
-                      : 'text-stone-600 hover:bg-stone-100'
-                  }`}
-                >
-                  {yg.yearLabel} ({yg.totalItems})
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 3. Empty State */}
-      {allGalleryItems.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-dashed border-stone-200 p-8 sm:p-12 text-center max-w-md mx-auto space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
-            <Images className="w-7 h-7" />
-          </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-bold text-stone-800 font-serif-romantic">
-              Votre galerie est vide
-            </h3>
-            <p className="text-xs sm:text-sm text-stone-500 mt-1">
-              Importez vos photos et vidéos de couple. Elles seront automatiquement organisées en albums par mois et par année !
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => photoFileInputRef.current?.click()}
-              className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold shadow-xs flex items-center gap-2 cursor-pointer"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Importer photos & vidéos</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => videoFileInputRef.current?.click()}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-semibold shadow-xs flex items-center gap-2 cursor-pointer"
-            >
-              <Video className="w-4 h-4" />
-              <span>Importer vidéos</span>
-            </button>
-          </div>
-        </div>
-      ) : activeAlbum ? (
-        /* 4. Vue Détaillée d'un Album Spécifique */
-        <div className="space-y-4 sm:space-y-6">
-          {/* Bannière de l'Album Sélectionné */}
-          <div className="bg-gradient-to-r from-rose-50 via-pink-50 to-purple-50 rounded-2xl sm:rounded-3xl border border-rose-200/70 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* =========================================================
+          SAMSUNG ONE UI TOP BAR & HEADER
+         ========================================================= */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6">
+        {activeSelectedAlbum ? (
+          /* Album Detail Header */
+          <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -895,183 +853,752 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                   soundEffects.playSoftTap();
                   setSelectedAlbumId(null);
                 }}
-                className="p-2 sm:p-2.5 rounded-xl bg-white border border-rose-200 text-stone-700 hover:bg-rose-100 hover:text-rose-900 transition-all flex items-center gap-1 text-xs sm:text-sm font-semibold cursor-pointer shadow-2xs"
-                title="Revenir aux albums"
+                className="w-10 h-10 -ml-2 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 flex items-center justify-center text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+                title="Retour"
+                aria-label="Retour"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Retour aux albums</span>
+                <ArrowLeft className="w-5 h-5" />
               </button>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg sm:text-2xl font-bold text-stone-900 font-serif-romantic tracking-tight">
-                    {activeAlbum.label}
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">
-                    {activeAlbum.items.length} {activeAlbum.items.length > 1 ? 'médias' : 'média'}
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm text-stone-600 mt-0.5">
-                  {activeAlbum.photoCount} photo{activeAlbum.photoCount > 1 ? 's' : ''}
-                  {activeAlbum.videoCount > 0
-                    ? ` • ${activeAlbum.videoCount} vidéo${activeAlbum.videoCount > 1 ? 's' : ''}`
-                    : ''}
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100 truncate max-w-[200px] sm:max-w-md">
+                  {activeSelectedAlbum.title}
+                </h1>
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                  {activeSelectedAlbum.items.length}{' '}
+                  {activeSelectedAlbum.items.length > 1 ? 'éléments' : 'élément'}
                 </p>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (activeAlbum.items.length > 0) {
-                  soundEffects.playNoteClick();
-                  openLightboxForItem(activeAlbum.items[0], activeAlbum.items);
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all"
-            >
-              <Play className="w-4 h-4 fill-white" />
-              <span>Diaporama de l'album</span>
-            </button>
-          </div>
-
-          {/* Grille des photos de l'album */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3.5">
-            {activeAlbum.items.map((item, index) => (
-              <MediaCard
-                key={item.id}
-                item={item}
-                index={index}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
                 onClick={() => {
-                  soundEffects.playNoteClick();
-                  openLightboxForItem(item, activeAlbum.items);
+                  if (activeSelectedAlbum.items.length > 0) {
+                    soundEffects.playNoteClick();
+                    openLightboxForItem(activeSelectedAlbum.items[0], activeSelectedAlbum.items);
+                  }
                 }}
-                onDownload={(e) => handleDownload(item, e)}
-                onDelete={
-                  onDeleteMediaItem
-                    ? () => {
-                        soundEffects.playTrashDelete();
-                        onDeleteMediaItem(item);
-                      }
-                    : undefined
-                }
-              />
-            ))}
+                className="p-2.5 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 transition-colors cursor-pointer"
+                title="Lancer le diaporama"
+                aria-label="Diaporama"
+              >
+                <Play className="w-5 h-5 fill-current" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTopMenu((prev) => !prev)}
+                className="p-2.5 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 transition-colors cursor-pointer"
+                title="Options"
+                aria-label="Options"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-        </div>
-      ) : viewMode === 'albums' ? (
-        /* 5. Vue Albums Automatiques (Cartes d'Albums Mensuels avec Effet Empilé) */
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-bold text-stone-800 font-serif-romantic">
-              Albums mensuels ({displayedAlbums.length})
-            </h2>
-            <span className="text-xs text-stone-500">
-              Touchez un album pour explorer ses souvenirs
-            </span>
-          </div>
+        ) : (
+          /* Main Samsung Header: "Albums" or "Pictures" or "Stories" */
+          <div className="space-y-3">
+            {/* Top row: Big Bold Title + (+, Search, More) */}
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-stone-900 dark:text-stone-100">
+                {oneUiTab === 'albums'
+                  ? 'Albums'
+                  : oneUiTab === 'pictures'
+                  ? 'Photos'
+                  : 'Histoires'}
+              </h1>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 pt-1">
-            {displayedAlbums.map((album, index) => (
-              <MonthAlbumCard
-                key={album.id}
-                album={album}
-                index={index}
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setSelectedAlbumId(album.id);
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      ) : viewMode === 'timeline' ? (
-        /* 6. Vue Chronologique par Mois & Année (Sections avec En-têtes) */
-        <div className="space-y-6 sm:space-y-8">
-          {displayedAlbums.map((album) => (
-            <div key={album.id} className="space-y-2.5 sm:space-y-3">
-              {/* En-tête de section mensuelle élégante */}
-              <div className="sticky top-2 z-20 backdrop-blur-md bg-white/95 border border-stone-200/80 rounded-xl sm:rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 shadow-2xs flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                    <CalendarDays className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-stone-900 font-serif-romantic tracking-tight">
-                      {album.label}
-                    </h3>
-                  </div>
-                  <span className="text-[11px] sm:text-xs text-stone-500 font-medium">
-                    • {album.items.length} {album.items.length > 1 ? 'souvenirs' : 'souvenir'}
-                  </span>
-                </div>
-
+              <div className="flex items-center gap-0.5 sm:gap-1">
+                {/* Add (+) Button */}
                 <button
                   type="button"
                   onClick={() => {
                     soundEffects.playSoftTap();
-                    setSelectedAlbumId(album.id);
+                    setShowCreateMenu((prev) => !prev);
                   }}
-                  className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-0.5 hover:underline cursor-pointer"
-                  title="Ouvrir cet album"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 flex items-center justify-center text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+                  title="Ajouter"
+                  aria-label="Ajouter"
                 >
-                  <span>Ouvrir l'album</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <Plus className="w-6 h-6 stroke-[2.2]" />
+                </button>
+
+                {/* Search Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setShowSearch((prev) => !prev);
+                  }}
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+                    showSearch
+                      ? 'bg-stone-200 text-stone-900 dark:bg-stone-800 dark:text-white'
+                      : 'hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200'
+                  }`}
+                  title="Rechercher"
+                  aria-label="Rechercher"
+                >
+                  <Search className="w-5 h-5 stroke-[2.2]" />
+                </button>
+
+                {/* Three dots (⋮) Menu Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setShowTopMenu((prev) => !prev);
+                  }}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 flex items-center justify-center text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+                  title="Plus d'options"
+                  aria-label="Plus d'options"
+                >
+                  <MoreVertical className="w-5 h-5 stroke-[2.2]" />
                 </button>
               </div>
+            </div>
 
-              {/* Grille de photos pour ce mois */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3.5">
-                {album.items.map((item, index) => (
-                  <MediaCard
+            {/* Inline Search Bar if activated */}
+            <AnimatePresence>
+              {showSearch && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="relative flex items-center">
+                    <Search className="w-4 h-4 text-stone-400 absolute left-3.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Rechercher dans les albums, titres, lieux..."
+                      className="w-full pl-10 pr-9 py-2 rounded-2xl bg-stone-200/70 dark:bg-stone-800/90 text-sm text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      autoFocus
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 text-stone-400 hover:text-stone-600 p-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Subheader: "Essential albums" & "View all" (Exactly as in Samsung screenshot) */}
+            {oneUiTab === 'albums' && (
+              <div className="flex items-center justify-between pt-1 pb-1">
+                <h2 className="text-[15px] sm:text-base font-semibold text-stone-900 dark:text-stone-100">
+                  {showViewAll ? 'All albums' : 'Essential albums'}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setShowViewAll((prev) => !prev);
+                  }}
+                  className="text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 hover:underline cursor-pointer"
+                >
+                  {showViewAll ? 'Essential albums' : 'View all'}
+                </button>
+              </div>
+            )}
+
+            {/* Filter Row for "Pictures" Tab */}
+            {oneUiTab === 'pictures' && (
+              <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEffects.playSoftTap();
+                      setMediaFilter('all');
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      mediaFilter === 'all'
+                        ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-900'
+                        : 'bg-stone-200/80 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
+                    }`}
+                  >
+                    Tous ({allGalleryItems.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEffects.playSoftTap();
+                      setMediaFilter('photos');
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      mediaFilter === 'photos'
+                        ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-900'
+                        : 'bg-stone-200/80 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
+                    }`}
+                  >
+                    Photos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEffects.playSoftTap();
+                      setMediaFilter('videos');
+                    }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                      mediaFilter === 'videos'
+                        ? 'bg-stone-900 text-white dark:bg-white dark:text-stone-900'
+                        : 'bg-stone-200/80 text-stone-600 dark:bg-stone-800 dark:text-stone-300'
+                    }`}
+                  >
+                    Vidéos
+                  </button>
+                </div>
+
+                {yearGroups.length > 0 && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedYear('all')}
+                      className={`px-2 py-0.5 rounded-full text-xs transition-all ${
+                        selectedYear === 'all'
+                          ? 'text-sky-600 font-bold'
+                          : 'text-stone-500 hover:text-stone-800'
+                      }`}
+                    >
+                      Toutes
+                    </button>
+                    {yearGroups.map((yg) => (
+                      <button
+                        key={String(yg.year)}
+                        type="button"
+                        onClick={() => setSelectedYear(yg.year)}
+                        className={`px-2 py-0.5 rounded-full text-xs transition-all ${
+                          selectedYear === yg.year
+                            ? 'text-sky-600 font-bold'
+                            : 'text-stone-500 hover:text-stone-800'
+                        }`}
+                      >
+                        {yg.year}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* =========================================================
+          SAMSUNG TOP ACTIONS POPUP MENU (From "+")
+         ========================================================= */}
+      <AnimatePresence>
+        {showCreateMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowCreateMenu(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              className="absolute right-4 sm:right-12 top-16 z-50 w-56 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-2xl p-1.5 space-y-1"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateMenu(false);
+                  photoFileInputRef.current?.click();
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Upload className="w-4 h-4 text-sky-500" />
+                <span>Importer photos & vidéos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateMenu(false);
+                  setShowCameraModal(true);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-rose-500" />
+                <span>Prendre une photo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateMenu(false);
+                  videoFileInputRef.current?.click();
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Video className="w-4 h-4 text-purple-500" />
+                <span>Importer vidéos</span>
+              </button>
+
+              <div className="h-px bg-stone-200 dark:bg-stone-700 my-1" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateMenu(false);
+                  onOpenAddMemoryModal('image');
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-emerald-500" />
+                <span>Nouveau souvenir détaillé</span>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* =========================================================
+          SAMSUNG TOP MORE MENU (From "⋮")
+         ========================================================= */}
+      <AnimatePresence>
+        {showTopMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowTopMenu(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              className="absolute right-4 sm:right-8 top-16 z-50 w-52 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-2xl p-1.5 space-y-1"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTopMenu(false);
+                  setShowViewAll(!showViewAll);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Layers className="w-4 h-4 text-stone-500" />
+                <span>{showViewAll ? 'Afficher essentiels' : 'Tout afficher'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTopMenu(false);
+                  setShowSamsungMenu(true);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4 text-stone-500" />
+                <span>Corbeille</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTopMenu(false);
+                  if (allGalleryItems.length > 0) {
+                    openLightboxForItem(allGalleryItems[0], allGalleryItems);
+                  }
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Play className="w-4 h-4 text-stone-500" />
+                <span>Diaporama</span>
+              </button>
+
+              <div className="h-px bg-stone-200 dark:bg-stone-700 my-1" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTopMenu(false);
+                  setShowSettingsModal(true);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Settings className="w-4 h-4 text-stone-500" />
+                <span>Paramètres de la galerie</span>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* =========================================================
+          MAIN VIEW CONTENT:
+          1. Selected Album Detail View (when an album is clicked)
+          2. Tab "Albums": 3-Column Samsung Grid (Screenshot match!)
+          3. Tab "Pictures": Continuous timeline photos
+          4. Tab "Stories": Romantic Highlight stories
+         ========================================================= */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-3">
+        {activeSelectedAlbum ? (
+          /* 1. FOCUSED ALBUM CONTENT */
+          <div className="space-y-4">
+            {activeSelectedAlbum.items.length === 0 ? (
+              <div className="py-16 text-center text-stone-400">
+                <Images className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Cet album ne contient encore aucun média</p>
+                <button
+                  type="button"
+                  onClick={() => photoFileInputRef.current?.click()}
+                  className="mt-3 px-4 py-1.5 rounded-full bg-sky-600 text-white text-xs font-semibold cursor-pointer"
+                >
+                  Ajouter des photos
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                {activeSelectedAlbum.items.map((item, idx) => (
+                  <SamsungPhotoItem
                     key={item.id}
                     item={item}
-                    index={index}
-                    onClick={() => {
-                      soundEffects.playNoteClick();
-                      openLightboxForItem(item, album.items);
-                    }}
-                    onDownload={(e) => handleDownload(item, e)}
-                    onDelete={
-                      onDeleteMediaItem
-                        ? () => {
-                            soundEffects.playTrashDelete();
-                            onDeleteMediaItem(item);
-                          }
-                        : undefined
-                    }
+                    index={idx}
+                    onClick={() => openLightboxForItem(item, activeSelectedAlbum.items)}
+                    autoplayVideo={autoplayVideosInGrid}
                   />
                 ))}
               </div>
+            )}
+          </div>
+        ) : oneUiTab === 'albums' ? (
+          /* 2. SAMSUNG ALBUMS VIEW: THE EXACT 3-COLUMN ROUNDED CARDS GRID */
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
+              {displayedAlbums.map((album, index) => (
+                <SamsungAlbumCard
+                  key={album.id}
+                  album={album}
+                  index={index}
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setSelectedAlbumId(album.id);
+                  }}
+                />
+              ))}
             </div>
-          ))}
-        </div>
-      ) : (
-        /* 7. Vue Grille Continue Classique */
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3.5">
-          {gridDisplayedItems.map((item, index) => (
-            <MediaCard
-              key={item.id}
-              item={item}
-              index={index}
-              onClick={() => {
-                soundEffects.playNoteClick();
-                openLightboxForItem(item, gridDisplayedItems);
-              }}
-              onDownload={(e) => handleDownload(item, e)}
-              onDelete={
-                onDeleteMediaItem
-                  ? () => {
-                      soundEffects.playTrashDelete();
-                      onDeleteMediaItem(item);
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
 
-      {/* Fullscreen Photo & Video Viewer */}
+            {displayedAlbums.length === 0 && (
+              <div className="py-16 text-center text-stone-400">
+                <p className="text-sm">Aucun album ne correspond à votre recherche</p>
+              </div>
+            )}
+          </div>
+        ) : oneUiTab === 'pictures' ? (
+          /* 3. SAMSUNG PICTURES VIEW: TIMELINE OF PHOTOS */
+          <div className="space-y-4">
+            {picturesTabItems.length === 0 ? (
+              <div className="py-16 text-center text-stone-400">
+                <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Aucune photo ou vidéo trouvée</p>
+                <button
+                  type="button"
+                  onClick={() => photoFileInputRef.current?.click()}
+                  className="mt-3 px-4 py-1.5 rounded-full bg-sky-600 text-white text-xs font-semibold cursor-pointer"
+                >
+                  Importer des photos
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
+                {picturesTabItems.map((item, idx) => (
+                  <SamsungPhotoItem
+                    key={item.id}
+                    item={item}
+                    index={idx}
+                    onClick={() => openLightboxForItem(item, picturesTabItems)}
+                    autoplayVideo={autoplayVideosInGrid}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* 4. SAMSUNG STORIES VIEW: ROMANTIC HIGHLIGHT REELS */
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SamsungStoryCard
+                title="Nos plus beaux moments"
+                subtitle="Sélection complice"
+                count={allGalleryItems.length}
+                coverUrl={allGalleryItems[0]?.photoUrl || defaultRomanticCover}
+                onClick={() => {
+                  if (allGalleryItems.length > 0) {
+                    openLightboxForItem(allGalleryItems[0], allGalleryItems);
+                  }
+                }}
+              />
+              <SamsungStoryCard
+                title="Coup de cœur & Souvenirs"
+                subtitle="Moments favoris à deux"
+                count={Math.max(1, allGalleryItems.filter((i) => i.likes?.length).length)}
+                coverUrl={allGalleryItems[1]?.photoUrl || allGalleryItems[0]?.photoUrl || defaultRomanticCover}
+                onClick={() => {
+                  const favs = allGalleryItems.filter((i) => i.likes?.length);
+                  if (favs.length > 0) openLightboxForItem(favs[0], favs);
+                  else if (allGalleryItems.length > 0) openLightboxForItem(allGalleryItems[0], allGalleryItems);
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* =========================================================
+          SAMSUNG ONE UI SIGNATURE FLOATING NAVIGATION DOCK
+          (Exactly as depicted at the bottom of the user's screenshot)
+         ========================================================= */}
+      <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40">
+        <div className="flex items-center bg-white/90 dark:bg-stone-900/90 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-[0_12px_36px_rgba(0,0,0,0.16)] rounded-full px-3.5 sm:px-4 py-1.5 sm:py-2 gap-2 sm:gap-4">
+          {/* 1. Pictures / Photos Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setOneUiTab('pictures');
+              setSelectedAlbumId(null);
+            }}
+            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+              oneUiTab === 'pictures'
+                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+            }`}
+            title="Photos"
+            aria-label="Photos"
+          >
+            <ImageIcon className="w-5 h-5" />
+          </button>
+
+          {/* 2. Albums Tab (Active pill style matching the screenshot) */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setOneUiTab('albums');
+              setSelectedAlbumId(null);
+            }}
+            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+              oneUiTab === 'albums'
+                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+            }`}
+            title="Albums"
+            aria-label="Albums"
+          >
+            <BookOpen className="w-5 h-5" />
+          </button>
+
+          {/* 3. Stories Tab */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setOneUiTab('stories');
+              setSelectedAlbumId(null);
+            }}
+            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+              oneUiTab === 'stories'
+                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+            }`}
+            title="Histoires"
+            aria-label="Histoires"
+          >
+            <Bookmark className="w-5 h-5" />
+          </button>
+
+          {/* 4. More Menu Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playSoftTap();
+              setShowSamsungMenu(true);
+            }}
+            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+              showSamsungMenu
+                ? 'bg-stone-200 text-stone-900 dark:bg-stone-700 dark:text-white'
+                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+            }`}
+            title="Menu de la galerie"
+            aria-label="Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* =========================================================
+          SAMSUNG BOTTOM DRAWER / MENU SHEET (From "☰")
+         ========================================================= */}
+      <AnimatePresence>
+        {showSamsungMenu && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSamsungMenu(false)}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs"
+            />
+
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800 p-5 shadow-2xl max-w-lg mx-auto space-y-4"
+            >
+              {/* Top pill bar */}
+              <div className="w-10 h-1 rounded-full bg-stone-300 dark:bg-stone-700 mx-auto -mt-1" />
+
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-stone-900 dark:text-stone-100">
+                  Galerie One UI
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowSamsungMenu(false)}
+                  className="p-1 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Samsung Quick Navigation Grid */}
+              <div className="grid grid-cols-4 gap-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    setOneUiTab('pictures');
+                    setMediaFilter('photos');
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 flex items-center justify-center shadow-xs">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-medium text-stone-700 dark:text-stone-300">
+                    Photos
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    setOneUiTab('pictures');
+                    setMediaFilter('videos');
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center shadow-xs">
+                    <Video className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-medium text-stone-700 dark:text-stone-300">
+                    Vidéos
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    setSelectedAlbumId('favourites');
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center shadow-xs">
+                    <Heart className="w-5 h-5 fill-rose-500" />
+                  </div>
+                  <span className="text-xs font-medium text-stone-700 dark:text-stone-300">
+                    Favoris
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    setShowCameraModal(true);
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-2xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shadow-xs">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-medium text-stone-700 dark:text-stone-300">
+                    Caméra
+                  </span>
+                </button>
+              </div>
+
+              {/* Action List Items */}
+              <div className="space-y-1 pt-2 border-t border-stone-100 dark:border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    photoFileInputRef.current?.click();
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-between text-xs sm:text-sm text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Upload className="w-4 h-4 text-sky-500" />
+                    <span>Importer plusieurs photos / vidéos</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    onOpenAddMemoryModal('image');
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-between text-xs sm:text-sm text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="w-4 h-4 text-rose-500" />
+                    <span>Ajouter un souvenir détaillé</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSamsungMenu(false);
+                    setShowSettingsModal(true);
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-between text-xs sm:text-sm text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings className="w-4 h-4 text-stone-500" />
+                    <span>Paramètres de la galerie</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* =========================================================
+          FULLSCREEN MOBILE PHOTO & VIDEO VIEWER (Auto-Hides UI)
+         ========================================================= */}
       <MobilePhotoViewer
         items={photoViewerItems}
         initialIndex={activeLightboxIndex ?? 0}
@@ -1083,161 +1610,388 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
         onIndexChange={(newIndex) => setActiveLightboxIndex(newIndex)}
       />
 
-      {/* Live Camera Viewfinder Modal */}
+      {/* Live Direct Camera Modal */}
       <CameraCaptureModal
         isOpen={showCameraModal}
         onClose={() => setShowCameraModal(false)}
         onPhotoCaptured={handlePhotoCapturedFromCamera}
-        title="Prendre une photo"
-        subtitle="Capturez cet instant à deux pour la galerie"
+        title="Appareil photo complice"
+        subtitle="Capturez un instant en direct pour votre galerie"
         submitLabel="Ajouter à la galerie"
         allowCaption={true}
       />
+
+      {/* =========================================================
+          SAMSUNG ONE UI GALLERY SETTINGS MODAL / SHEET
+         ========================================================= */}
+      <AnimatePresence>
+        {showSettingsModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSettingsModal(false)}
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: '100%' }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 z-50 max-w-lg mx-auto rounded-t-[32px] bg-[#F7F8FA] dark:bg-[#16181D] border-t border-stone-200 dark:border-stone-800 shadow-2xl p-5 sm:p-6 max-h-[85vh] overflow-y-auto"
+            >
+              {/* Handle bar */}
+              <div className="w-12 h-1.5 rounded-full bg-stone-300 dark:bg-stone-700 mx-auto -mt-1 mb-4" />
+
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-stone-200/80 dark:border-stone-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-sky-100 dark:bg-sky-950/60 text-sky-600 flex items-center justify-center">
+                    <Settings className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100">
+                      Paramètres de la galerie
+                    </h2>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      Personnalisez l'affichage Samsung One UI
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  className="p-1.5 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-500 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Settings Body */}
+              <div className="space-y-4 pt-4">
+                {/* Section: LECTURE ET APERÇU */}
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500 px-1 mb-2">
+                    Lecture et affichage
+                  </div>
+
+                  <div className="rounded-2xl bg-white dark:bg-stone-800/90 border border-stone-200/80 dark:border-stone-700/80 shadow-2xs divide-y divide-stone-100 dark:divide-stone-700/60">
+                    {/* Option: Lecture automatique des vidéos dans la grille */}
+                    <div className="p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-950/50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <Film className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                            Lecture automatique des vidéos
+                          </div>
+                          <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5 leading-relaxed">
+                            Lire automatiquement et en boucle les vidéos sans le son directement dans la grille d'aperçu.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Samsung Toggle Switch */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={autoplayVideosInGrid}
+                        onClick={() => handleToggleAutoplayVideos(!autoplayVideosInGrid)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                          autoplayVideosInGrid
+                            ? 'bg-sky-600'
+                            : 'bg-stone-300 dark:bg-stone-700'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                            autoplayVideosInGrid ? 'translate-x-5' : 'translate-x-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Status hint */}
+                    <div className="px-4 py-2.5 bg-stone-50/50 dark:bg-stone-800/50 flex items-center justify-between text-xs">
+                      <span className="text-stone-500 dark:text-stone-400">
+                        État de la lecture automatique
+                      </span>
+                      <span
+                        className={`font-semibold flex items-center gap-1 ${
+                          autoplayVideosInGrid
+                            ? 'text-sky-600 dark:text-sky-400'
+                            : 'text-stone-400 dark:text-stone-500'
+                        }`}
+                      >
+                        {autoplayVideosInGrid ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Activée</span>
+                          </>
+                        ) : (
+                          <span>Désactivée</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section: INFORMATIONS & ASTUCES */}
+                <div className="rounded-2xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200/70 dark:border-sky-800/50 p-3.5 text-xs text-sky-900 dark:text-sky-200 flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+                  <p>
+                    Lorsque cette option est activée, les vidéos défilent silencieusement dans vos albums et dans l'onglet Photos comme dans l'application Samsung Gallery.
+                  </p>
+                </div>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(false)}
+                  className="w-full py-3 rounded-2xl bg-stone-900 hover:bg-stone-800 dark:bg-white dark:hover:bg-stone-100 text-white dark:text-stone-900 text-sm font-semibold shadow-xs transition-colors cursor-pointer text-center"
+                >
+                  Terminé
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-// Sub-component: MediaCard for photo or video item
-const MediaCard: React.FC<{
-  item: GalleryItem;
+// =========================================================
+// SUB-COMPONENT: SAMSUNG ONE UI ALBUM CARD
+// (Matches the exact 3-column rounded look from the user's screenshot)
+// =========================================================
+const SamsungAlbumCard: React.FC<{
+  album: SamsungAlbum;
   index: number;
   onClick: () => void;
-  onDownload: (e: React.MouseEvent) => void;
-  onDelete?: () => void;
-}> = ({ item, index, onClick, onDownload, onDelete }) => {
-  const isVideo = item.mediaType === 'video';
+}> = ({ album, index, onClick }) => {
+  if (album.type === 'stacked') {
+    // STACKED CARD VARIANT (For "Recent" and "Favourites" as in screenshot)
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.25) }}
+        onClick={onClick}
+        className="group relative aspect-[1/1.12] rounded-[20px] sm:rounded-[24px] bg-[#E8EAEF] dark:bg-stone-800 p-2.5 sm:p-3 flex flex-col items-center justify-between cursor-pointer select-none transition-transform active:scale-[0.97] shadow-2xs hover:shadow-md overflow-hidden"
+      >
+        {/* Layered Cards Stack Miniature */}
+        <div className="relative w-14 h-14 sm:w-18 sm:h-18 mt-1">
+          {/* Layer 2 (Backmost shadow card) */}
+          <div className="absolute inset-0 translate-x-2 -translate-y-1.5 rounded-xl bg-stone-300/80 dark:bg-stone-700 shadow-xs border border-white/20" />
+          {/* Layer 1 (Middle card) */}
+          <div className="absolute inset-0 translate-x-1 -translate-y-0.5 rounded-xl bg-stone-400/80 dark:bg-stone-600 shadow-xs border border-white/20" />
+          {/* Top cover miniature */}
+          <img
+            src={album.coverUrl}
+            alt={album.title}
+            loading="lazy"
+            className="relative z-10 w-full h-full object-cover rounded-xl shadow-md border border-white/40"
+          />
+        </div>
 
+        {/* Text at Bottom */}
+        <div className="w-full text-center pb-0.5">
+          <div className="text-stone-900 dark:text-stone-100 text-[13px] sm:text-[14px] font-semibold tracking-tight truncate leading-tight">
+            {album.title}
+          </div>
+          <div className="text-stone-500 dark:text-stone-400 text-[11px] sm:text-xs font-normal mt-0.5">
+            {album.count}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (album.type === 'pastel') {
+    // PASTEL VARIANT (For "Quick Share" as in screenshot)
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.25) }}
+        onClick={onClick}
+        className="group relative aspect-[1/1.12] rounded-[20px] sm:rounded-[24px] overflow-hidden bg-gradient-to-br from-pink-200 via-rose-300 to-purple-300 dark:from-pink-900/60 dark:to-purple-900/60 p-2 flex flex-col justify-end items-center cursor-pointer select-none transition-transform active:scale-[0.97] shadow-2xs hover:shadow-md"
+      >
+        {/* Soft UI illustration preview */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-70">
+          <div className="flex items-center gap-1">
+            <span className="w-6 h-6 rounded-lg bg-pink-400/80 text-white font-bold text-[10px] flex items-center justify-center shadow-xs">
+              A
+            </span>
+            <span className="w-6 h-6 rounded-lg bg-indigo-400/80 text-white font-bold text-[10px] flex items-center justify-center shadow-xs">
+              B
+            </span>
+            <span className="w-6 h-6 rounded-lg bg-purple-400/80 text-white font-bold text-[10px] flex items-center justify-center shadow-xs">
+              C
+            </span>
+          </div>
+        </div>
+
+        <div className="relative z-10 w-full text-center pb-1">
+          <div className="text-white text-[13px] sm:text-[14px] font-semibold tracking-tight truncate drop-shadow-md">
+            {album.title}
+          </div>
+          <div className="text-white/90 text-[11px] sm:text-xs font-normal mt-0.5 drop-shadow-sm">
+            {album.count}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // STANDARD PHOTO BACKGROUND CARD VARIANT (For Camera, Screenshots, Download, SS24, etc.)
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.15, delay: Math.min(index * 0.015, 0.2) }}
+      transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.25) }}
       onClick={onClick}
-      className="group relative aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-stone-100 border border-stone-200/80 shadow-2xs hover:shadow-md transition-all cursor-pointer select-none"
+      className="group relative aspect-[1/1.12] rounded-[20px] sm:rounded-[24px] overflow-hidden bg-stone-200 dark:bg-stone-800 cursor-pointer select-none transition-transform active:scale-[0.97] shadow-2xs hover:shadow-md"
     >
-      {/* Media Image / Video Thumbnail */}
+      {/* Photo cover */}
       <img
-        src={item.photoUrl}
-        alt={item.title || 'Souvenir'}
+        src={album.coverUrl}
+        alt={album.title}
         loading="lazy"
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
       />
 
-      {/* Video Play Overlay */}
-      {isVideo && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/40 transition-colors">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/90 text-stone-900 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-            <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-stone-900 ml-0.5" />
-          </div>
+      {/* Dark gradient for high contrast bottom text */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+
+      {/* Top right icon badges if applicable */}
+      {album.badge === 'camera' && (
+        <div className="absolute top-2 right-2 p-1 rounded-full bg-black/40 backdrop-blur-xs text-white">
+          <Camera className="w-3 h-3" />
         </div>
       )}
 
-      {/* Video duration pill */}
-      {isVideo && item.videoDuration && (
-        <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/75 text-white text-[10px] font-medium flex items-center gap-1">
-          <Film className="w-2.5 h-2.5 text-rose-400" />
-          <span>{item.videoDuration}</span>
+      {album.badge === 'video' && (
+        <div className="absolute top-2 right-2 p-1 rounded-full bg-black/40 backdrop-blur-xs text-white">
+          <Film className="w-3 h-3 text-purple-300" />
         </div>
       )}
 
-      {/* Quick actions on hover (Desktop) */}
-      <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          type="button"
-          onClick={onDownload}
-          className="p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-xs transition-colors cursor-pointer"
-          title="Télécharger"
-        >
-          <Download className="w-3 h-3" />
-        </button>
-        {onDelete && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="p-1.5 rounded-full bg-rose-600/80 hover:bg-rose-700 text-white backdrop-blur-xs transition-colors cursor-pointer"
-            title="Supprimer"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        )}
+      {album.badge === 'dot' && (
+        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white/40" />
+      )}
+
+      {/* Centered Title and Item Count at the Bottom */}
+      <div className="absolute bottom-2 inset-x-1 text-center">
+        <div className="text-white text-[13px] sm:text-[14px] font-semibold tracking-tight truncate px-1 drop-shadow-md">
+          {album.title}
+        </div>
+        <div className="text-white/85 text-[11px] sm:text-xs font-normal mt-0.5 drop-shadow-sm">
+          {album.count}
+        </div>
       </div>
     </motion.div>
   );
 };
 
-// Sub-component: MonthAlbumCard (Automatic monthly album card with layered romantic look)
-const MonthAlbumCard: React.FC<{
-  album: MonthAlbum;
+// =========================================================
+// SUB-COMPONENT: SAMSUNG PHOTO ITEM (For Pictures & Detail View)
+// =========================================================
+const SamsungPhotoItem: React.FC<{
+  item: GalleryItem;
   index: number;
   onClick: () => void;
-}> = ({ album, index, onClick }) => {
+  autoplayVideo?: boolean;
+}> = ({ item, index, onClick, autoplayVideo = false }) => {
+  const isVideo = item.mediaType === 'video';
+  const [videoError, setVideoError] = useState(false);
+
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3) }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.12, delay: Math.min(index * 0.01, 0.2) }}
       onClick={onClick}
-      className="group relative cursor-pointer select-none"
+      className="group relative aspect-square overflow-hidden bg-stone-100 dark:bg-stone-800 cursor-pointer select-none"
     >
-      {/* Background stacked polaroid illusion layers */}
-      <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-rose-200/40 transform rotate-2 group-hover:rotate-3 transition-transform duration-300 pointer-events-none" />
-      <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-stone-200/50 transform -rotate-1 group-hover:-rotate-2 transition-transform duration-300 pointer-events-none" />
+      {isVideo && autoplayVideo && !videoError ? (
+        <video
+          src={item.videoUrl || item.photoUrl}
+          poster={item.photoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          onError={() => setVideoError(true)}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+        />
+      ) : (
+        <img
+          src={item.photoUrl}
+          alt={item.title || 'Souvenir'}
+          loading="lazy"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+        />
+      )}
 
-      {/* Main Album Card */}
-      <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white border border-stone-200/90 shadow-xs group-hover:shadow-xl transition-all duration-300 flex flex-col">
-        {/* Cover Photo */}
-        <div className="relative aspect-4/3 w-full overflow-hidden bg-stone-100">
-          <img
-            src={album.coverPhoto}
-            alt={album.label}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-stone-950/70 via-transparent to-black/10" />
-
-          {/* Badges on Cover */}
-          <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
-            <span className="px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium shadow-xs">
-              {album.items.length} {album.items.length > 1 ? 'souvenirs' : 'souvenir'}
-            </span>
-          </div>
-
-          {/* Quick open hover button */}
-          <div className="absolute bottom-2.5 right-2.5 w-7 h-7 rounded-full bg-white/90 text-stone-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transform translate-y-1 group-hover:translate-y-0 transition-all shadow-sm">
-            <ChevronRight className="w-4 h-4 text-stone-800" />
-          </div>
+      {/* Video Indicator */}
+      {isVideo && (
+        <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-white text-[10px] font-medium flex items-center gap-1">
+          {autoplayVideo && !videoError ? (
+            <Film className="w-2.5 h-2.5 text-purple-300 animate-pulse" />
+          ) : (
+            <Play className="w-2.5 h-2.5 fill-white" />
+          )}
+          <span>{item.videoDuration || 'Vidéo'}</span>
         </div>
+      )}
 
-        {/* Album Label & Details */}
-        <div className="p-3 sm:p-4 bg-white flex flex-col justify-between">
-          <div className="flex items-center justify-between gap-1">
-            <h3 className="text-sm sm:text-base font-bold text-stone-900 font-serif-romantic tracking-tight group-hover:text-rose-600 transition-colors truncate">
-              {album.label}
-            </h3>
-            {album.year && (
-              <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 shrink-0">
-                {album.year}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-1.5 text-[11px] sm:text-xs text-stone-500">
-            {album.photoCount > 0 && (
-              <span className="flex items-center gap-1">
-                📸 {album.photoCount} photo{album.photoCount > 1 ? 's' : ''}
-              </span>
-            )}
-            {album.videoCount > 0 && (
-              <span className="flex items-center gap-1">
-                🎬 {album.videoCount} vidéo{album.videoCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
+      {/* Favorite Heart Badge if liked */}
+      {item.likes && item.likes.length > 0 && (
+        <div className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/40 backdrop-blur-xs text-rose-400">
+          <Heart className="w-3 h-3 fill-rose-500 text-rose-500" />
         </div>
+      )}
+    </motion.div>
+  );
+};
+
+// =========================================================
+// SUB-COMPONENT: SAMSUNG STORIES CARD
+// =========================================================
+const SamsungStoryCard: React.FC<{
+  title: string;
+  subtitle: string;
+  count: number;
+  coverUrl: string;
+  onClick: () => void;
+}> = ({ title, subtitle, count, coverUrl, onClick }) => {
+  return (
+    <motion.div
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="relative aspect-16/10 rounded-3xl overflow-hidden bg-stone-200 dark:bg-stone-800 cursor-pointer shadow-md group"
+    >
+      <img
+        src={coverUrl}
+        alt={title}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+      <div className="absolute bottom-4 left-4 right-4">
+        <span className="px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white text-[11px] font-medium">
+          {count} souvenirs
+        </span>
+        <h3 className="text-base sm:text-lg font-bold text-white mt-1.5">{title}</h3>
+        <p className="text-xs text-white/80">{subtitle}</p>
       </div>
     </motion.div>
   );

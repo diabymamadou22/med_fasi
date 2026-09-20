@@ -611,7 +611,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   e.stopPropagation();
                   goPrev();
                 }}
-                className="absolute left-2 sm:left-5 top-1/2 -translate-y-1/2 z-40 p-3 sm:p-4 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md border border-white/10 hidden sm:flex items-center justify-center shadow-xl"
+                className={`absolute left-2 sm:left-5 top-1/2 -translate-y-1/2 z-40 p-3 sm:p-4 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md border border-white/10 hidden sm:flex items-center justify-center shadow-xl ${
+                  showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
                 title="Précédent"
                 aria-label="Précédent"
               >
@@ -623,7 +625,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   e.stopPropagation();
                   goNext();
                 }}
-                className="absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 z-40 p-3 sm:p-4 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md border border-white/10 hidden sm:flex items-center justify-center shadow-xl"
+                className={`absolute right-2 sm:right-5 top-1/2 -translate-y-1/2 z-40 p-3 sm:p-4 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white transition-all cursor-pointer backdrop-blur-md border border-white/10 hidden sm:flex items-center justify-center shadow-xl ${
+                  showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
                 title="Suivant"
                 aria-label="Suivant"
               >
@@ -679,6 +683,12 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   playbackRate={videoPlaybackRate}
                   onPlaybackRateChange={setVideoPlaybackRate}
                   hideExtraMenu={true}
+                  onControlsVisibilityChange={(visible) => {
+                    setShowUiChrome(visible);
+                    if (!visible) {
+                      setShowOptionsMenu(false);
+                    }
+                  }}
                   className="w-full h-full"
                 />
               </div>
@@ -709,14 +719,16 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Quick hint on mobile */}
-          <div
-            className={`absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white/70 text-[11px] font-medium pointer-events-none transition-opacity duration-300 sm:hidden ${
-              showUiChrome && scale <= 1 ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            {isCurrentItemVideo ? 'Touchez pour afficher/masquer les contrôles' : 'Pincer pour zoomer • Glisser pour défiler'}
-          </div>
+          {/* Quick hint on mobile (only shown for photos, completely hidden for video playback) */}
+          {!isCurrentItemVideo && (
+            <div
+              className={`absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white/70 text-[11px] font-medium pointer-events-none transition-opacity duration-300 sm:hidden ${
+                showUiChrome && scale <= 1 ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              Pincer pour zoomer • Glisser pour défiler
+            </div>
+          )}
         </div>
 
         {/* =========================================================
