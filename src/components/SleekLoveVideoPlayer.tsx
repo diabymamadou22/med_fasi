@@ -5,16 +5,15 @@ import {
   Pause,
   Volume2,
   VolumeX,
+  Maximize2,
+  Repeat,
+  Heart,
+  AlertCircle,
+  MoreVertical,
+  Download,
+  Sliders,
   RotateCcw,
   RotateCw,
-  Maximize2,
-  Minimize2,
-  Repeat,
-  Sparkles,
-  Heart,
-  FastForward,
-  AlertCircle,
-  Film,
 } from 'lucide-react';
 import { resolveMediaUrl, formatVideoDuration } from '../lib/videoUtils';
 
@@ -28,6 +27,14 @@ interface SleekLoveVideoPlayerProps {
   onOpenFullscreen?: () => void;
   className?: string;
   onEnded?: () => void;
+  // Options to coordinate with parent viewer (e.g. MobilePhotoViewer)
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  isLooping?: boolean;
+  onToggleLoop?: () => void;
+  playbackRate?: number;
+  onPlaybackRateChange?: (rate: number) => void;
+  hideExtraMenu?: boolean;
 }
 
 export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
@@ -40,6 +47,13 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   onOpenFullscreen,
   className = '',
   onEnded,
+  isMuted: externalIsMuted,
+  onToggleMute: externalToggleMute,
+  isLooping: externalIsLooping,
+  onToggleLoop: externalToggleLoop,
+  playbackRate: externalPlaybackRate,
+  onPlaybackRateChange: externalPlaybackRateChange,
+  hideExtraMenu = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,16 +66,40 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [internalIsMuted, setInternalIsMuted] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
-  const [isLooping, setIsLooping] = useState<boolean>(loop);
-  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [internalIsLooping, setInternalIsLooping] = useState<boolean>(loop);
+  const [internalPlaybackRate, setInternalPlaybackRate] = useState<number>(1);
   const [showControls, setShowControls] = useState<boolean>(true);
   const [isEnded, setIsEnded] = useState<boolean>(false);
-  const [skipFeedback, setSkipFeedback] = useState<{ type: 'rewind' | 'forward'; id: number } | null>(null);
   const [centerAnimation, setCenterAnimation] = useState<'play' | 'pause' | null>(null);
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
+  const [showStandaloneMenu, setShowStandaloneMenu] = useState<boolean>(false);
+  const [skipFeedback, setSkipFeedback] = useState<{ type: 'rewind' | 'forward'; id: number } | null>(null);
+
+  const isMuted = externalIsMuted !== undefined ? externalIsMuted : internalIsMuted;
+  const isLooping = externalIsLooping !== undefined ? externalIsLooping : internalIsLooping;
+  const playbackRate = externalPlaybackRate !== undefined ? externalPlaybackRate : internalPlaybackRate;
+
+  // Sync playbackRate & loop with video element
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.loop = isLooping;
+    }
+  }, [isLooping]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
 
   // Resolve source URL (handles IndexedDB idb: references or standard urls)
   useEffect(() => {
@@ -139,7 +177,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
         .catch(() => {
           // Auto-play policy blocked, fallback to mute then play
           video.muted = true;
-          setIsMuted(true);
+          setInternalIsMuted(true);
           video.play().then(() => setIsPlaying(true)).catch(() => {});
         });
     } else {
@@ -209,32 +247,47 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   // Toggle Mute
   const toggleMute = (e?: React.MouseEvent) => {
     e?.stopPropagation();
+    if (externalToggleMute) {
+      externalToggleMute();
+      resetHideTimer();
+      return;
+    }
     if (!videoRef.current) return;
     const nextMuted = !videoRef.current.muted;
     videoRef.current.muted = nextMuted;
-    setIsMuted(nextMuted);
+    setInternalIsMuted(nextMuted);
     resetHideTimer();
   };
 
   // Toggle Speed
-  const cyclePlaybackRate = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!videoRef.current) return;
+  const cyclePlaybackRate = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const rates = [1, 1.25, 1.5, 2, 0.75];
     const nextIndex = (rates.indexOf(playbackRate) + 1) % rates.length;
     const nextRate = rates[nextIndex];
-    videoRef.current.playbackRate = nextRate;
-    setPlaybackRate(nextRate);
+    if (externalPlaybackRateChange) {
+      externalPlaybackRateChange(nextRate);
+    } else {
+      setInternalPlaybackRate(nextRate);
+    }
+    if (videoRef.current) {
+      videoRef.current.playbackRate = nextRate;
+    }
     resetHideTimer();
   };
 
   // Toggle Loop
-  const toggleLoop = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const toggleLoop = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (externalToggleLoop) {
+      externalToggleLoop();
+      resetHideTimer();
+      return;
+    }
     if (!videoRef.current) return;
     const nextLoop = !isLooping;
     videoRef.current.loop = nextLoop;
-    setIsLooping(nextLoop);
+    setInternalIsLooping(nextLoop);
     resetHideTimer();
   };
 
@@ -452,10 +505,10 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
               />
             </div>
 
-            {/* Bottom Actions Row */}
+            {/* Bottom Actions Row: Minimalist, clean, distraction-free */}
             <div className="flex items-center justify-between gap-2 text-white">
-              {/* Left group: Play/Pause, -5s, +5s, Time */}
-              <div className="flex items-center gap-1 sm:gap-2">
+              {/* Left group: Play/Pause, Clean Time */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={togglePlay}
@@ -470,39 +523,16 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
                   )}
                 </button>
 
-                {!compact && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => seekRelative(-5)}
-                      className="p-1.5 rounded-full hover:bg-white/15 active:scale-95 text-white/90 hover:text-white transition-all cursor-pointer hidden sm:flex"
-                      title="Reculer de 5s"
-                      aria-label="Reculer de 5s"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => seekRelative(5)}
-                      className="p-1.5 rounded-full hover:bg-white/15 active:scale-95 text-white/90 hover:text-white transition-all cursor-pointer hidden sm:flex"
-                      title="Avancer de 5s"
-                      aria-label="Avancer de 5s"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-
                 {/* Duration / Timestamp */}
-                <div className="text-[11px] sm:text-xs font-mono text-white/90 font-medium pl-1">
+                <div className="text-[11px] sm:text-xs font-mono text-white/90 font-medium select-none">
                   <span>{formatVideoDuration(currentTime)}</span>
                   <span className="text-white/40 mx-1">/</span>
                   <span className="text-white/70">{formatVideoDuration(duration)}</span>
                 </div>
               </div>
 
-              {/* Right group: Volume, Speed, Loop, Fullscreen */}
-              <div className="flex items-center gap-1 sm:gap-1.5">
+              {/* Right group: Volume, Fullscreen, and optional standalone ... menu */}
+              <div className="relative flex items-center gap-1 sm:gap-1.5">
                 {/* Volume / Mute */}
                 <button
                   type="button"
@@ -518,32 +548,6 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
                   )}
                 </button>
 
-                {/* Speed toggle */}
-                <button
-                  type="button"
-                  onClick={cyclePlaybackRate}
-                  className="px-2 py-0.5 rounded-full hover:bg-white/15 active:scale-95 text-[10px] sm:text-xs font-mono font-bold text-white/90 hover:text-white border border-white/20 transition-all cursor-pointer"
-                  title="Vitesse de lecture"
-                >
-                  {playbackRate}x
-                </button>
-
-                {/* Loop toggle */}
-                {!compact && (
-                  <button
-                    type="button"
-                    onClick={toggleLoop}
-                    className={`p-1.5 rounded-full transition-all cursor-pointer ${
-                      isLooping
-                        ? 'bg-rose-500/30 text-rose-400 border border-rose-500/40'
-                        : 'hover:bg-white/15 text-white/80 hover:text-white'
-                    }`}
-                    title={isLooping ? 'Boucle activée' : 'Activer la boucle'}
-                  >
-                    <Repeat className="w-3.5 h-3.5" />
-                  </button>
-                )}
-
                 {/* Fullscreen Trigger */}
                 {onOpenFullscreen && (
                   <button
@@ -558,6 +562,88 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
                   >
                     <Maximize2 className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                   </button>
+                )}
+
+                {/* Standalone ... menu if not handled by parent (e.g. outside MobilePhotoViewer) */}
+                {!hideExtraMenu && !compact && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStandaloneMenu((prev) => !prev);
+                      }}
+                      className="p-1.5 sm:p-2 rounded-full hover:bg-white/15 active:scale-95 text-white transition-all cursor-pointer"
+                      title="Plus d'options"
+                      aria-label="Plus d'options"
+                    >
+                      <MoreVertical className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                    </button>
+
+                    <AnimatePresence>
+                      {showStandaloneMenu && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 bottom-full mb-2 w-48 rounded-xl bg-stone-900/95 backdrop-blur-md border border-white/15 p-2 shadow-2xl z-50 text-white text-xs space-y-1"
+                        >
+                          <div className="px-2 py-1 text-[10px] text-white/50 uppercase tracking-wider font-semibold">
+                            Options vidéo
+                          </div>
+
+                          {/* Loop toggle */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              toggleLoop(e);
+                              setShowStandaloneMenu(false);
+                            }}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Repeat className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Répéter en boucle</span>
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${isLooping ? 'bg-rose-500/40 text-rose-200' : 'text-white/40'}`}>
+                              {isLooping ? 'Oui' : 'Non'}
+                            </span>
+                          </button>
+
+                          {/* Speed cycle */}
+                          <button
+                            type="button"
+                            onClick={(e) => cyclePlaybackRate(e)}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Sliders className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Vitesse de lecture</span>
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-rose-300">
+                              {playbackRate}x
+                            </span>
+                          </button>
+
+                          {/* Download */}
+                          {resolvedSrc && (
+                            <a
+                              href={resolvedSrc}
+                              download="souvenir-video.mp4"
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() => setShowStandaloneMenu(false)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer text-white"
+                            >
+                              <Download className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Télécharger la vidéo</span>
+                            </a>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
               </div>
             </div>

@@ -19,6 +19,13 @@ import {
   Sparkles,
   Play,
   Video,
+  MoreVertical,
+  Volume2,
+  VolumeX,
+  Repeat,
+  Sliders,
+  Info,
+  Check,
 } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 import { triggerHeartConfetti } from '../lib/confetti';
@@ -135,6 +142,11 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const activeItem = items[currentIndex] || null;
 
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>('');
+  const [isVideoMuted, setIsVideoMuted] = useState<boolean>(false);
+  const [isVideoLooping, setIsVideoLooping] = useState<boolean>(false);
+  const [videoPlaybackRate, setVideoPlaybackRate] = useState<number>(1);
+  const [showOptionsMenu, setShowOptionsMenu] = useState<boolean>(false);
+  const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
 
   const isCurrentItemVideo = Boolean(
     activeItem &&
@@ -159,6 +171,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     setPan({ x: 0, y: 0 });
     setSwipeOffset(0);
     setPullDownOffset(0);
+    setShowOptionsMenu(false);
+    setShowDetailsModal(false);
   }, []);
 
   // Navigate to photo
@@ -438,82 +452,126 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             1. FLOATING HEADER (CONTROLS, COUNTER & ZOOM)
            ========================================================= */}
         <div
-          className={`relative z-50 flex items-center justify-between px-3 sm:px-6 py-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent transition-opacity duration-300 ${
+          className={`relative z-50 flex items-center justify-between px-3 sm:px-6 py-3 bg-gradient-to-b from-black/85 via-black/50 to-transparent transition-opacity duration-300 ${
             showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
-          {/* Close button & Counter */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Close button & Counter / Title */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={onClose}
-              className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer shadow-md"
+              className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer shadow-md shrink-0"
               title="Fermer (Échap ou glisser vers le bas)"
               aria-label="Fermer la vue photo"
             >
               <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
-            <div className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white text-xs sm:text-sm font-semibold tracking-wide">
-              <span>{currentIndex + 1}</span>
-              <span className="text-white/40 mx-1">/</span>
-              <span>{items?.length || 0}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-white text-xs sm:text-sm font-semibold tracking-wide shrink-0">
+                <span>{currentIndex + 1}</span>
+                <span className="text-white/40 mx-1">/</span>
+                <span>{items?.length || 0}</span>
+              </div>
+
+              {isCurrentItemVideo && activeItem.title && (
+                <span className="text-xs sm:text-sm font-medium text-white/90 truncate hidden xs:inline max-w-[160px] sm:max-w-[260px]">
+                  {activeItem.title}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Zoom Tools & Action Pill */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Zoom percentage badge */}
-            <div className="hidden sm:flex items-center px-2.5 py-1 rounded-full bg-white/10 text-white/80 text-xs font-mono">
-              {Math.round(scale * 100)}%
-            </div>
-
-            {/* Zoom In / Out Buttons */}
-            <button
-              onClick={handleZoomIn}
-              disabled={scale >= 4}
-              className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 text-white transition-all cursor-pointer"
-              title="Agrandir (+)"
-              aria-label="Agrandir"
-            >
-              <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-
-            <button
-              onClick={handleZoomOut}
-              disabled={scale <= 1}
-              className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 text-white transition-all cursor-pointer"
-              title="Réduire (-)"
-              aria-label="Réduire"
-            >
-              <ZoomOut className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-
-            {/* Reset Zoom Button */}
-            {scale > 1.05 && (
+          {/* Action Pills: Distinct for Video vs Photo */}
+          {isCurrentItemVideo ? (
+            /* Video Header Controls: Simple, clean Mute toggle + the requested "..." menu */
+            <div className="flex items-center gap-2">
+              {/* Quick Mute/Unmute Toggle */}
               <button
-                onClick={resetZoom}
-                className="p-2 sm:p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white transition-all cursor-pointer shadow-md flex items-center gap-1 text-xs font-bold"
-                title="Réinitialiser zoom (100%)"
-                aria-label="Réinitialiser zoom"
+                type="button"
+                onClick={() => setIsVideoMuted((prev) => !prev)}
+                className="p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer shadow-md"
+                title={isVideoMuted ? 'Activer le son' : 'Couper le son'}
+                aria-label={isVideoMuted ? 'Son coupé' : 'Son activé'}
               >
-                <RotateCcw className="w-4 h-4" />
-                <span className="hidden sm:inline">1:1</span>
+                {isVideoMuted ? (
+                  <VolumeX className="w-5 h-5 text-rose-400" />
+                ) : (
+                  <Volume2 className="w-5 h-5" />
+                )}
               </button>
-            )}
 
-            {/* Direct Media Download */}
-            <a
-              href={isCurrentItemVideo ? (resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl) : activeItem.photoUrl}
-              download={isCurrentItemVideo ? `souvenir-video-${currentIndex + 1}.mp4` : `souvenir-amoureux-${currentIndex + 1}.jpg`}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer"
-              title={isCurrentItemVideo ? "Télécharger la vidéo" : "Télécharger / Ouvrir en taille réelle"}
-              aria-label={isCurrentItemVideo ? "Télécharger la vidéo" : "Télécharger la photo"}
-            >
-              <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-            </a>
-          </div>
+              {/* The requested "..." More Options Menu Button */}
+              <button
+                type="button"
+                onClick={() => setShowOptionsMenu((prev) => !prev)}
+                className={`p-2.5 rounded-full transition-all cursor-pointer shadow-md ${
+                  showOptionsMenu
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-white/15 hover:bg-white/25 text-white active:scale-95'
+                }`}
+                title="Options vidéo et détails"
+                aria-label="Options du menu"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            /* Photo Zoom Tools & Action Pill */
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Zoom percentage badge */}
+              <div className="hidden sm:flex items-center px-2.5 py-1 rounded-full bg-white/10 text-white/80 text-xs font-mono">
+                {Math.round(scale * 100)}%
+              </div>
+
+              {/* Zoom In / Out Buttons */}
+              <button
+                onClick={handleZoomIn}
+                disabled={scale >= 4}
+                className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 text-white transition-all cursor-pointer"
+                title="Agrandir (+)"
+                aria-label="Agrandir"
+              >
+                <ZoomIn className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
+              <button
+                onClick={handleZoomOut}
+                disabled={scale <= 1}
+                className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 text-white transition-all cursor-pointer"
+                title="Réduire (-)"
+                aria-label="Réduire"
+              >
+                <ZoomOut className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
+              {/* Reset Zoom Button */}
+              {scale > 1.05 && (
+                <button
+                  onClick={resetZoom}
+                  className="p-2 sm:p-2.5 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white transition-all cursor-pointer shadow-md flex items-center gap-1 text-xs font-bold"
+                  title="Réinitialiser zoom (100%)"
+                  aria-label="Réinitialiser zoom"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="hidden sm:inline">1:1</span>
+                </button>
+              )}
+
+              {/* Direct Media Download */}
+              <a
+                href={activeItem.photoUrl}
+                download={`souvenir-amoureux-${currentIndex + 1}.jpg`}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 sm:p-2.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white transition-all cursor-pointer"
+                title="Télécharger la photo"
+                aria-label="Télécharger la photo"
+              >
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+              </a>
+            </div>
+          )}
         </div>
 
         {/* =========================================================
@@ -584,11 +642,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               translateX: pan.x,
               translateY: pan.y,
             }}
-            className="relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6"
+            className={
+              isCurrentItemVideo
+                ? 'absolute inset-0 w-full h-full flex items-center justify-center bg-black'
+                : 'relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6'
+            }
           >
             {isCurrentItemVideo ? (
               <div
-                className="relative max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] flex items-center justify-center rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl bg-black"
+                className="w-full h-full flex items-center justify-center bg-black overflow-hidden select-none"
                 onClick={(e) => e.stopPropagation()}
               >
                 <SleekLoveVideoPlayer
@@ -598,7 +660,14 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   title={activeItem.title}
                   autoPlay={true}
                   compact={false}
-                  className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto rounded-xl sm:rounded-2xl"
+                  isMuted={isVideoMuted}
+                  onToggleMute={() => setIsVideoMuted((prev) => !prev)}
+                  isLooping={isVideoLooping}
+                  onToggleLoop={() => setIsVideoLooping((prev) => !prev)}
+                  playbackRate={videoPlaybackRate}
+                  onPlaybackRateChange={setVideoPlaybackRate}
+                  hideExtraMenu={true}
+                  className="w-full h-full"
                 />
               </div>
             ) : (
@@ -634,175 +703,429 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               showUiChrome && scale <= 1 ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            {isCurrentItemVideo ? 'Lecture vidéo complice' : 'Pincer pour zoomer • Glisser pour défiler'}
+            {isCurrentItemVideo ? 'Touchez pour afficher/masquer les contrôles' : 'Pincer pour zoomer • Glisser pour défiler'}
           </div>
         </div>
 
         {/* =========================================================
             3. BOTTOM SHEET: THUMBNAILS FILMSTRIP & PHOTO DETAILS
+               (Hidden during video playback for a pure full-screen experience)
            ========================================================= */}
-        <div
-          className={`relative z-50 bg-gradient-to-t from-black/95 via-stone-950/90 to-transparent pt-3 pb-4 sm:pb-6 px-3 sm:px-6 transition-opacity duration-300 ${
-            showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          {/* Filmstrip of all photos */}
-          {items.length > 1 && (
-            <div
-              ref={thumbnailStripRef}
-              className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none snap-x"
-            >
-              {items.map((item, idx) => {
-                const itemIsVideo = item.mediaType === 'video' || isVideoMediaType(item.videoUrl, item.mediaType);
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => goToIndex(idx)}
-                    className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer snap-center ${
-                      idx === currentIndex
-                        ? 'border-rose-500 scale-105 shadow-md shadow-rose-500/30 ring-2 ring-rose-400/40'
-                        : 'border-white/20 opacity-50 hover:opacity-90'
-                    }`}
-                    title={item.title || `Média ${idx + 1}`}
-                  >
-                    <img
-                      src={item.photoUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    {itemIsVideo && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <Play className="w-3.5 h-3.5 text-white fill-white" />
-                      </div>
-                    )}
-                    {idx === currentIndex && (
-                      <div className="absolute inset-0 bg-rose-500/10 pointer-events-none" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        {!isCurrentItemVideo && (
+          <div
+            className={`relative z-50 bg-gradient-to-t from-black/95 via-stone-950/90 to-transparent pt-3 pb-4 sm:pb-6 px-3 sm:px-6 transition-opacity duration-300 ${
+              showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            {/* Filmstrip of all photos */}
+            {items.length > 1 && (
+              <div
+                ref={thumbnailStripRef}
+                className="flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none snap-x"
+              >
+                {items.map((item, idx) => {
+                  const itemIsVideo = item.mediaType === 'video' || isVideoMediaType(item.videoUrl, item.mediaType);
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => goToIndex(idx)}
+                      className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 transition-all cursor-pointer snap-center ${
+                        idx === currentIndex
+                          ? 'border-rose-500 scale-105 shadow-md shadow-rose-500/30 ring-2 ring-rose-400/40'
+                          : 'border-white/20 opacity-50 hover:opacity-90'
+                      }`}
+                      title={item.title || `Média ${idx + 1}`}
+                    >
+                      <img
+                        src={item.photoUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {itemIsVideo && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <Play className="w-3.5 h-3.5 text-white fill-white" />
+                        </div>
+                      )}
+                      {idx === currentIndex && (
+                        <div className="absolute inset-0 bg-rose-500/10 pointer-events-none" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-          {/* Photo Details & Actions Bar */}
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap text-xs">
-                {isCurrentItemVideo && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md bg-purple-500/30 border-purple-400/50 text-purple-200 flex items-center gap-1">
-                    <Video className="w-3 h-3" />
-                    <span>Vidéo {activeItem.videoDuration ? `(${formatVideoDuration(activeItem.videoDuration)})` : ''}</span>
-                  </span>
+            {/* Photo Details & Actions Bar */}
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  {activeItem.badgeLabel && (
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md ${
+                        activeItem.badgeBg || 'bg-rose-500/30 border-rose-400/50 text-rose-200'
+                      }`}
+                    >
+                      {activeItem.badgeLabel}
+                    </span>
+                  )}
+                  {activeItem.locationName && (
+                    <span className="flex items-center gap-1 text-rose-300 font-medium">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {activeItem.locationName}
+                    </span>
+                  )}
+                  {activeItem.date && (
+                    <span className="flex items-center gap-1 text-stone-400">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {activeItem.date}
+                    </span>
+                  )}
+                </div>
+
+                {activeItem.title && (
+                  <h3 className="text-base sm:text-lg font-serif font-bold text-white mt-1 truncate">
+                    {activeItem.title}
+                  </h3>
                 )}
-                {activeItem.badgeLabel && (
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md ${
-                      activeItem.badgeBg || 'bg-rose-500/30 border-rose-400/50 text-rose-200'
-                    }`}
-                  >
-                    {activeItem.badgeLabel}
-                  </span>
-                )}
-                {activeItem.locationName && (
-                  <span className="flex items-center gap-1 text-rose-300 font-medium">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {activeItem.locationName}
-                  </span>
-                )}
-                {activeItem.date && (
-                  <span className="flex items-center gap-1 text-stone-400">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {activeItem.date}
-                  </span>
+
+                {activeItem.description && (
+                  <p className="text-xs sm:text-sm text-stone-300 mt-0.5 line-clamp-2 leading-relaxed">
+                    {activeItem.description}
+                  </p>
                 )}
               </div>
 
-              {activeItem.title && (
-                <h3 className="text-base sm:text-lg font-serif font-bold text-white mt-1 truncate">
-                  {activeItem.title}
-                </h3>
-              )}
-
-              {activeItem.description && (
-                <p className="text-xs sm:text-sm text-stone-300 mt-0.5 line-clamp-2 leading-relaxed">
-                  {activeItem.description}
-                </p>
-              )}
-            </div>
-
-            {/* Action Buttons (Like, Edit, Delete) */}
-            <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
-              {activeItem.onLike && (
-                <button
-                  onClick={() => {
-                    triggerHeartConfetti();
-                    soundEffects.playHeartPulse();
-                    triggerVibration([40, 30, 40]);
-                    activeItem.onLike?.();
-                  }}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
-                    activeItem.isLiked
-                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                      : 'bg-white/10 hover:bg-white/20 text-rose-300'
-                  }`}
-                  title="Aimer ce souvenir"
-                >
-                  <Heart
-                    className={`w-4 h-4 ${
-                      activeItem.isLiked ? 'fill-white text-white' : 'fill-rose-400 text-rose-400'
+              {/* Action Buttons (Like, Edit, Delete) */}
+              <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
+                {activeItem.onLike && (
+                  <button
+                    onClick={() => {
+                      triggerHeartConfetti();
+                      soundEffects.playHeartPulse();
+                      triggerVibration([40, 30, 40]);
+                      activeItem.onLike?.();
+                    }}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
+                      activeItem.isLiked
+                        ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                        : 'bg-white/10 hover:bg-white/20 text-rose-300'
                     }`}
-                  />
-                  <span>{activeItem.likeCount ?? 0}</span>
-                </button>
-              )}
+                    title="Aimer ce souvenir"
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${
+                        activeItem.isLiked ? 'fill-white text-white' : 'fill-rose-400 text-rose-400'
+                      }`}
+                    />
+                    <span>{activeItem.likeCount ?? 0}</span>
+                  </button>
+                )}
 
-              {activeItem.onEdit && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    activeItem.onEdit?.();
-                  }}
-                  className="px-3 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
-                  title="Modifier ce souvenir"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Modifier</span>
-                </button>
-              )}
+                {activeItem.onEdit && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      activeItem.onEdit?.();
+                    }}
+                    className="px-3 py-2 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Modifier ce souvenir"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Modifier</span>
+                  </button>
+                )}
 
-              {activeItem.onRemovePhotoOnly && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    activeItem.onRemovePhotoOnly?.();
-                  }}
-                  className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
-                  title="Retirer uniquement cette photo"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Retirer photo</span>
-                </button>
-              )}
+                {activeItem.onRemovePhotoOnly && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      activeItem.onRemovePhotoOnly?.();
+                    }}
+                    className="px-3 py-2 bg-amber-600/80 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Retirer uniquement cette photo"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Retirer photo</span>
+                  </button>
+                )}
 
-              {activeItem.onDelete && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    activeItem.onDelete?.();
-                  }}
-                  className="px-3 py-2 bg-rose-600/90 hover:bg-rose-600 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-                  title="Supprimer ce média"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Supprimer</span>
-                </button>
-              )}
+                {activeItem.onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      activeItem.onDelete?.();
+                    }}
+                    className="px-3 py-2 bg-rose-600/90 hover:bg-rose-600 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                    title="Supprimer ce média"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Supprimer</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* =========================================================
+            4. THE REQUESTED "..." VIDEO OPTIONS MENU
+           ========================================================= */}
+        <AnimatePresence>
+          {showOptionsMenu && isCurrentItemVideo && (
+            <>
+              {/* Invisible touch backdrop to close menu */}
+              <div
+                onClick={() => setShowOptionsMenu(false)}
+                className="fixed inset-0 z-55 bg-black/40 backdrop-blur-2xs"
+              />
+
+              {/* Elegant Dropdown Card positioned top-right */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.94, y: -10 }}
+                transition={{ duration: 0.16 }}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute top-16 right-3 sm:right-6 z-60 w-72 max-w-[calc(100vw-24px)] rounded-2xl bg-stone-900/95 backdrop-blur-xl border border-white/15 p-3 shadow-2xl text-white space-y-3"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-[11px] font-semibold text-white/70 uppercase tracking-wider">
+                    Options vidéo
+                  </span>
+                  <button
+                    onClick={() => setShowOptionsMenu(false)}
+                    className="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* View Details Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOptionsMenu(false);
+                    setShowDetailsModal(true);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-98 transition-all text-left text-xs font-medium cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Info className="w-4 h-4 text-rose-400" />
+                    <span>Détails & description</span>
+                  </span>
+                  <span className="text-[10px] text-rose-300 font-semibold">Afficher</span>
+                </button>
+
+                {/* Playback Speed Control */}
+                <div className="px-1 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-white/80 font-medium">
+                    <span className="flex items-center gap-2">
+                      <Sliders className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Vitesse de lecture</span>
+                    </span>
+                    <span className="font-mono text-rose-300 font-bold text-xs">{videoPlaybackRate}x</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1 pt-0.5">
+                    {[0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setVideoPlaybackRate(rate)}
+                        className={`py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+                          videoPlaybackRate === rate
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'bg-white/5 text-white/70 hover:bg-white/10'
+                        }`}
+                      >
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Loop Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsVideoLooping((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-98 transition-all text-xs font-medium cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Repeat className="w-4 h-4 text-rose-400" />
+                    <span>Lecture en boucle</span>
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      isVideoLooping
+                        ? 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                        : 'bg-white/10 text-white/40'
+                    }`}
+                  >
+                    {isVideoLooping ? 'Activée' : 'Désactivée'}
+                  </span>
+                </button>
+
+                {/* Direct Download */}
+                <a
+                  href={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                  download={`souvenir-video-${currentIndex + 1}.mp4`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setShowOptionsMenu(false)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-98 transition-all text-xs font-medium text-white cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-rose-400" />
+                  <span>Télécharger la vidéo</span>
+                </a>
+
+                {/* Actions: Like, Edit, Delete */}
+                {(activeItem.onLike || activeItem.onEdit || activeItem.onDelete) && (
+                  <div className="pt-2 border-t border-white/10 flex flex-col gap-1.5">
+                    {activeItem.onLike && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHeartConfetti();
+                          soundEffects.playHeartPulse();
+                          triggerVibration([40, 30, 40]);
+                          activeItem.onLike?.();
+                          setShowOptionsMenu(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                          activeItem.isLiked
+                            ? 'bg-rose-600/30 text-rose-300 border border-rose-500/40'
+                            : 'bg-white/5 hover:bg-white/10 text-rose-300'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <Heart
+                            className={`w-4 h-4 ${
+                              activeItem.isLiked ? 'fill-rose-400 text-rose-400' : 'text-rose-400'
+                            }`}
+                          />
+                          <span>{activeItem.isLiked ? 'Aimé de tout cœur' : 'Aimer ce souvenir'}</span>
+                        </span>
+                        <span>{activeItem.likeCount ?? 0}</span>
+                      </button>
+                    )}
+
+                    {activeItem.onEdit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOptionsMenu(false);
+                          onClose();
+                          activeItem.onEdit?.();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-white transition-all cursor-pointer"
+                      >
+                        <Pencil className="w-4 h-4 text-stone-400" />
+                        <span>Modifier ce souvenir</span>
+                      </button>
+                    )}
+
+                    {activeItem.onDelete && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOptionsMenu(false);
+                          onClose();
+                          activeItem.onDelete?.();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-semibold transition-all cursor-pointer border border-rose-500/20"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-400" />
+                        <span>Supprimer la vidéo</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* =========================================================
+            5. DETAILS MODAL FOR VIDEO SOUVENIR
+           ========================================================= */}
+        <AnimatePresence>
+          {showDetailsModal && activeItem && (
+            <div className="fixed inset-0 z-65 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md rounded-2xl bg-stone-900 border border-white/15 p-5 shadow-2xl text-white space-y-4"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <h4 className="text-base font-serif font-bold text-white flex items-center gap-2">
+                    <Video className="w-4 h-4 text-purple-400" />
+                    <span>Détails du souvenir</span>
+                  </h4>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs text-stone-300">
+                  {activeItem.title && (
+                    <div>
+                      <span className="text-[10px] text-white/40 uppercase tracking-wider block">Titre</span>
+                      <p className="text-sm font-semibold text-white mt-0.5">{activeItem.title}</p>
+                    </div>
+                  )}
+
+                  {activeItem.description && (
+                    <div>
+                      <span className="text-[10px] text-white/40 uppercase tracking-wider block">Note d'amour</span>
+                      <p className="text-xs text-stone-200 mt-0.5 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
+                        {activeItem.description}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-1 flex-wrap text-stone-300">
+                    {activeItem.date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{activeItem.date}</span>
+                      </span>
+                    )}
+                    {activeItem.locationName && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{activeItem.locationName}</span>
+                      </span>
+                    )}
+                    {activeItem.author && (
+                      <span className="flex items-center gap-1.5">
+                        <PartnerAvatar partnerId={activeItem.author} size="xs" />
+                        <span>Partagé par {activeItem.author === 'partner1' ? 'Moi' : 'Mon amour'}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowDetailsModal(false)}
+                    className="px-4 py-2 rounded-xl bg-white/15 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer transition-all"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );
