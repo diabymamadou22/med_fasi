@@ -120,17 +120,27 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   useEffect(() => {
     if (isOpen) {
       const safeItems = items || [];
-      if (safeItems.length === 0) {
-        setCurrentIndex(0);
-      } else {
+      let targetIndex = 0;
+      if (safeItems.length > 0) {
         const safeInit = typeof initialIndex === 'number' ? initialIndex : 0;
-        setCurrentIndex(Math.max(0, Math.min(safeInit, safeItems.length - 1)));
+        targetIndex = Math.max(0, Math.min(safeInit, safeItems.length - 1));
+        setCurrentIndex(targetIndex);
+      } else {
+        setCurrentIndex(0);
       }
       setScale(1);
       setPan({ x: 0, y: 0 });
       setSwipeOffset(0);
       setPullDownOffset(0);
-      setShowUiChrome(true);
+
+      // If opening directly on a video, hide all buttons so the video takes full screen
+      const active = safeItems[targetIndex];
+      const isVideo = Boolean(
+        active &&
+          (active.mediaType === 'video' ||
+            isVideoMediaType(active.videoUrl || active.photoUrl, active.mediaType))
+      );
+      setShowUiChrome(!isVideo);
     }
   }, [isOpen, initialIndex, items]);
 
@@ -167,6 +177,28 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const [captureFeedback, setCaptureFeedback] = useState<boolean>(false);
   const [showVisionOverlay, setShowVisionOverlay] = useState<boolean>(false);
 
+  // When switching to a video: hide all buttons so the video takes full screen
+  useEffect(() => {
+    if (isCurrentItemVideo) {
+      setShowUiChrome(false);
+      setShowOptionsMenu(false);
+      setShowVisionOverlay(false);
+    }
+  }, [currentIndex, isCurrentItemVideo]);
+
+  // Auto-hide UI controls when video is playing and user has been idle for 3.5s
+  useEffect(() => {
+    if (!isCurrentItemVideo || !isVideoPlaying || !showUiChrome) return;
+
+    const timer = setTimeout(() => {
+      setShowUiChrome(false);
+      setShowOptionsMenu(false);
+      setShowVisionOverlay(false);
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [isCurrentItemVideo, isVideoPlaying, showUiChrome]);
+
   // Toggle UI Chrome (appear on 1st click, disappear on 2nd click)
   const toggleUiChrome = useCallback(() => {
     soundEffects.playSoftTap();
@@ -186,7 +218,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     const el = videoElRef.current;
     if (!el) return;
     if (el.paused || el.ended) {
-      el.play().then(() => setIsVideoPlaying(true)).catch(() => {});
+      el.play()
+        .then(() => {
+          setIsVideoPlaying(true);
+          // When resuming playback, hide all buttons so the video takes full screen
+          setShowUiChrome(false);
+          setShowOptionsMenu(false);
+          setShowVisionOverlay(false);
+        })
+        .catch(() => {});
     } else {
       el.pause();
       setIsVideoPlaying(false);
@@ -568,7 +608,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.22 }}
-        className="fixed inset-0 z-50 flex flex-col justify-between bg-black/95 select-none overflow-hidden touch-none"
+        className="fixed inset-0 z-50 bg-black select-none overflow-hidden touch-none"
         style={{
           transform: pullDownOffset > 0 ? `translateY(${pullDownOffset}px)` : undefined,
           opacity: pullDownOffset > 0 ? Math.max(0.2, 1 - pullDownOffset / 300) : 1,
@@ -578,9 +618,10 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             1. SAMSUNG ONE UI TOP BAR (BACK, CAPSULE & QUICK ACTIONS)
            ========================================================= */}
         <div
-          className={`relative z-50 flex items-center justify-between px-3 sm:px-6 py-3 bg-gradient-to-b from-black/90 via-black/50 to-transparent transition-opacity duration-300 ${
-            showUiChrome ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          className={`absolute top-0 inset-x-0 z-50 flex items-center justify-between px-3 sm:px-6 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-4 bg-gradient-to-b from-black/90 via-black/50 to-transparent transition-all duration-300 ${
+            showUiChrome ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'
           }`}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Back button & Samsung Memory Capsule */}
           <div className="flex items-center gap-2.5 min-w-0">
@@ -730,7 +771,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             }
             toggleUiChrome();
           }}
-          className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
+          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
         >
           {/* Navigation Arrows (Desktop / Tablet) */}
           {items.length > 1 && (
@@ -820,7 +861,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                       setVideoDuration(el.duration || 0);
                     }
                   }}
-                  onPlayingChange={(playing) => setIsVideoPlaying(playing)}
+                  onPlayingChange={(playing) => {
+                    setIsVideoPlaying(playing);
+                    if (playing) {
+                      // Hide buttons during video playback so the video takes the entire screen
+                      setShowUiChrome(false);
+                      setShowOptionsMenu(false);
+                      setShowVisionOverlay(false);
+                    }
+                  }}
                   onTimeUpdate={(cur, dur) => {
                     if (!isScrubbing) {
                       setVideoCurrentTime(cur);
@@ -874,8 +923,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             3. SAMSUNG ONE UI CONTROLS & BOTTOM FLOATING DOCK
            ========================================================= */}
         <div
-          className={`relative z-50 bg-gradient-to-t from-black/95 via-stone-950/85 to-transparent pt-2 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 transition-opacity duration-300 flex flex-col gap-2.5 ${
-            showUiChrome ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          className={`absolute bottom-0 inset-x-0 z-50 bg-gradient-to-t from-black/95 via-stone-950/85 to-transparent pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 transition-all duration-300 flex flex-col gap-2.5 ${
+            showUiChrome ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
           }`}
           onClick={(e) => e.stopPropagation()}
         >

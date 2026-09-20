@@ -252,6 +252,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   // - If video is paused: tap resumes playback (and buttons/text auto-hide)
   // - Double tap on left/right side skips -5s / +5s
   const handleStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
     // If clicking directly on controls bar, buttons, links, or sliders, do not toggle
     const target = e.target as HTMLElement;
     if (
@@ -297,10 +298,11 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       } else {
         setShowControls((prev) => !prev);
       }
-    }, 200);
+    }, 180);
   };
 
   const handleMouseMove = () => {
+    if (hideDefaultControls) return;
     if (isPlaying) {
       if (!showControls) {
         setShowControls(true);
@@ -474,7 +476,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
               )}
             </div>
           </motion.div>
-        ) : !isPlaying && !isLoading && !hasError && !isEnded ? (
+        ) : !isPlaying && !isLoading && !hasError && !isEnded && !hideDefaultControls ? (
           <motion.div
             key="center-paused-state"
             initial={{ opacity: 0, scale: 0.8 }}
