@@ -42,6 +42,7 @@ import {
 } from '../lib/videoUtils';
 import { SleekLoveVideoPlayer } from './SleekLoveVideoPlayer';
 import { useBackHandler } from '../lib/backNavigation';
+import { useGesture, usePinch } from 'react-use-gesture';
 
 export interface PhotoViewerItem {
   id: string;
@@ -93,26 +94,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const [isInteracting, setIsInteracting] = useState(false);
 
   // Gesture refs
-  const touchStartRef = useRef<{
-    x: number;
-    y: number;
-    time: number;
-    scale: number;
-    pan: { x: number; y: number };
-    initialDistance: number;
-    initialCenter: { x: number; y: number };
-  }>({
-    x: 0,
-    y: 0,
-    time: 0,
-    scale: 1,
-    pan: { x: 0, y: 0 },
-    initialDistance: 0,
-    initialCenter: { x: 0, y: 0 },
-  });
-
+  const gestureStateRef = useRef<{ wasGesture: boolean }>({ wasGesture: false });
   const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
-  const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
 
@@ -426,177 +409,200 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     }
   };
 
-  // Touch handlers
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isCurrentItemVideo) {
-      // For videos, let SleekLoveVideoPlayer handle direct touches and screen clicks without interference
+  // Helper to re-clamp pan bounds when zoom level changes
+  const clampPanToBounds = useCallback((currentScale: number) => {
+    if (currentScale <= 1.05) {
+      setPan({ x: 0, y: 0 });
       return;
     }
-    setIsInteracting(true);
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const now = Date.now();
+    const maxPanX = (currentScale - 1) * 260;
+    const maxPanY = (currentScale - 1) * 360;
+    setPan((prev) => ({
+      x: Math.max(-maxPanX, Math.min(maxPanX, prev.x)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, prev.y)),
+    }));
+  }, []);
 
-      // Check double tap
-      if (
-        now - lastTapRef.current.time < 300 &&
-        Math.hypot(touch.clientX - lastTapRef.current.x, touch.clientY - lastTapRef.current.y) < 35
-      ) {
-        handleDoubleTap(touch.clientX, touch.clientY);
-        lastTapRef.current = { time: 0, x: 0, y: 0 };
-        return;
-      }
-      lastTapRef.current = { time: now, x: touch.clientX, y: touch.clientY };
+  // React-Use-Gesture Engine: Native pinch-to-zoom, pan, swipe & dismiss
+  const bindGesture = (useGesture as any)(
+    {
+      onPinch: ({ first, last, active, da: [distance], origin: [ox, oy], memo, event }) => {
+        if (isCurrentItemVideo) return memo;
+        event?.preventDefault?.();
+        gestureStateRef.current.wasGesture = true;
 
-      touchStartRef.current = {
-        x: touch.clientX,
-        y: touch.clientY,
-        time: now,
-        scale,
-        pan: { ...pan },
-        initialDistance: 0,
-        initialCenter: { x: touch.clientX, y: touch.clientY },
-      };
-      isDraggingRef.current = true;
-    } else if (e.touches.length === 2) {
-      // Pinch start
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      const center = {
-        x: (touch1.clientX + touch2.clientX) / 2,
-        y: (touch1.clientY + touch2.clientY) / 2,
-      };
-      touchStartRef.current = {
-        x: center.x,
-        y: center.y,
-        time: Date.now(),
-        scale,
-        pan: { ...pan },
-        initialDistance: distance,
-        initialCenter: center,
-      };
-      isDraggingRef.current = true;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (isCurrentItemVideo || !isDraggingRef.current) return;
-
-    // Two finger pinch to zoom
-    if (e.touches.length === 2 && touchStartRef.current.initialDistance > 0) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const currentDistance = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
-      const ratio = currentDistance / touchStartRef.current.initialDistance;
-
-      // Elastic zoom limits (min 0.7x, max 5.0x during pinch)
-      const targetScale = touchStartRef.current.scale * ratio;
-      const newScale = Math.max(0.7, Math.min(5.0, targetScale));
-      setScale(Number(newScale.toFixed(2)));
-
-      // Simultaneous two-finger pan tracking
-      const currentCenter = {
-        x: (touch1.clientX + touch2.clientX) / 2,
-        y: (touch1.clientY + touch2.clientY) / 2,
-      };
-      const deltaCenterX = currentCenter.x - touchStartRef.current.initialCenter.x;
-      const deltaCenterY = currentCenter.y - touchStartRef.current.initialCenter.y;
-
-      setPan({
-        x: touchStartRef.current.pan.x + deltaCenterX,
-        y: touchStartRef.current.pan.y + deltaCenterY,
-      });
-      return;
-    }
-
-    // Single finger interaction
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const deltaX = touch.clientX - touchStartRef.current.x;
-      const deltaY = touch.clientY - touchStartRef.current.y;
-
-      if (scale > 1.05) {
-        // Pan image smoothly when zoomed in
-        const maxPanX = (scale - 1) * 260;
-        const maxPanY = (scale - 1) * 360;
-        setPan({
-          x: Math.max(-maxPanX, Math.min(maxPanX, touchStartRef.current.pan.x + deltaX)),
-          y: Math.max(-maxPanY, Math.min(maxPanY, touchStartRef.current.pan.y + deltaY)),
-        });
-      } else {
-        // At 1x: Swipe horizontal (change photo) or pull down (dismiss)
-        if (Math.abs(deltaY) > Math.abs(deltaX) * 1.4 && deltaY > 0) {
-          // Pulling down to dismiss
-          setPullDownOffset(deltaY);
-          setSwipeOffset(0);
-        } else {
-          // Swiping left/right
-          setSwipeOffset(deltaX);
-          setPullDownOffset(0);
+        if (first) {
+          setIsInteracting(true);
+          return {
+            initialScale: scale,
+            initialPan: { ...pan },
+            initialDistance: Math.max(10, distance || 0),
+            initialOrigin: [ox, oy],
+          };
         }
-      }
+
+        if (active && memo && memo.initialDistance > 0) {
+          const ratio = distance / memo.initialDistance;
+          // Elastic zoom limits (0.75x to 5.0x) during active pinch
+          const rawScale = memo.initialScale * ratio;
+          const targetScale = Math.max(0.75, Math.min(5.0, rawScale));
+          setScale(Number(targetScale.toFixed(3)));
+
+          // Native focal point zoom: keeps the point between fingers anchored
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const originDeltaX = ox - centerX;
+            const originDeltaY = oy - centerY;
+
+            const dragDeltaX = ox - memo.initialOrigin[0];
+            const dragDeltaY = oy - memo.initialOrigin[1];
+
+            const scaleRatio = targetScale / (memo.initialScale || 1);
+            const zoomFocalShiftX = (originDeltaX - memo.initialPan.x) * (1 - scaleRatio);
+            const zoomFocalShiftY = (originDeltaY - memo.initialPan.y) * (1 - scaleRatio);
+
+            const nextPanX = memo.initialPan.x + dragDeltaX + zoomFocalShiftX;
+            const nextPanY = memo.initialPan.y + dragDeltaY + zoomFocalShiftY;
+
+            setPan({ x: nextPanX, y: nextPanY });
+          }
+        }
+
+        if (last) {
+          setIsInteracting(false);
+          if (scale < 1.05) {
+            resetZoom();
+            triggerVibration([20]);
+          } else if (scale > 4.0) {
+            setScale(4.0);
+            clampPanToBounds(4.0);
+          } else {
+            clampPanToBounds(scale);
+          }
+        }
+
+        return memo;
+      },
+
+      onDrag: ({ first, last, active, movement: [mx, my], velocities: [vx, vy], memo, pinching, tap }) => {
+        if (isCurrentItemVideo || pinching) return memo;
+
+        if (tap) {
+          return memo;
+        }
+
+        if (first) {
+          setIsInteracting(true);
+          return {
+            initialPan: { ...pan },
+            initialScale: scale,
+          };
+        }
+
+        if (active && memo) {
+          if (Math.hypot(mx, my) > 6) {
+            gestureStateRef.current.wasGesture = true;
+          }
+
+          if (memo.initialScale > 1.05) {
+            // Pan image smoothly when zoomed in
+            const nextX = memo.initialPan.x + mx;
+            const nextY = memo.initialPan.y + my;
+            const maxPanX = (memo.initialScale - 1) * 260 + 60;
+            const maxPanY = (memo.initialScale - 1) * 360 + 60;
+            setPan({
+              x: Math.max(-maxPanX, Math.min(maxPanX, nextX)),
+              y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
+            });
+          } else {
+            // At 1x: Swipe horizontal (change photo) or pull down (dismiss)
+            if (Math.abs(my) > Math.abs(mx) * 1.3 && my > 0) {
+              setPullDownOffset(my);
+              setSwipeOffset(0);
+            } else {
+              setSwipeOffset(mx);
+              setPullDownOffset(0);
+            }
+          }
+        }
+
+        if (last) {
+          setIsInteracting(false);
+
+          // Pull down dismiss threshold or high downward velocity
+          if (pullDownOffset > 85 || (vy > 0.6 && pullDownOffset > 30)) {
+            soundEffects.playSoftTap();
+            triggerVibration([25]);
+            onClose();
+            return memo;
+          }
+          setPullDownOffset(0);
+
+          // Swipe horizontal threshold or fast swipe velocity
+          if (scale <= 1.05) {
+            if (swipeOffset < -55 || (vx < -0.5 && swipeOffset < -20)) {
+              goNext();
+            } else if (swipeOffset > 55 || (vx > 0.5 && swipeOffset > 20)) {
+              goPrev();
+            }
+          }
+          setSwipeOffset(0);
+
+          if (scale > 1.05) {
+            clampPanToBounds(scale);
+          } else if (scale < 1.02) {
+            resetZoom();
+          }
+        }
+
+        return memo;
+      },
+
+      onWheel: ({ delta: [, dy], event }) => {
+        if (isCurrentItemVideo) return;
+        event?.stopPropagation?.();
+        if (dy < 0) {
+          setScale((prev) => Math.min(4, Number((prev + 0.2).toFixed(1))));
+        } else {
+          setScale((prev) => {
+            const next = Math.max(1, Number((prev - 0.2).toFixed(1)));
+            if (next === 1) setPan({ x: 0, y: 0 });
+            return next;
+          });
+        }
+      },
+    },
+    {
+      enabled: isOpen && !isCurrentItemVideo,
+      drag: {
+        filterTaps: true,
+      },
     }
-  };
+  );
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (isCurrentItemVideo) return;
-    isDraggingRef.current = false;
-    setIsInteracting(false);
-
-    // Handle pull down to dismiss
-    if (pullDownOffset > 90) {
-      soundEffects.playSoftTap();
-      triggerVibration([20]);
-      onClose();
+  const handleStageClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('a')) {
       return;
     }
-    setPullDownOffset(0);
-
-    // Handle swipe left / right
-    if (scale <= 1.05 && Math.abs(swipeOffset) > 55) {
-      if (swipeOffset < 0) {
-        goNext();
-      } else {
-        goPrev();
-      }
+    if (gestureStateRef.current.wasGesture) {
+      gestureStateRef.current.wasGesture = false;
+      return;
     }
-    setSwipeOffset(0);
-
-    // Snap scale with spring physics if out of bounds
-    if (scale < 1.02) {
-      resetZoom();
-    } else if (scale > 4) {
-      setScale(4);
-      const maxPanX = 3 * 220;
-      const maxPanY = 3 * 320;
-      setPan((prev) => ({
-        x: Math.max(-maxPanX, Math.min(maxPanX, prev.x)),
-        y: Math.max(-maxPanY, Math.min(maxPanY, prev.y)),
-      }));
-    } else {
-      // Re-bound pan so the photo remains centered and visible
-      const maxPanX = (scale - 1) * 220;
-      const maxPanY = (scale - 1) * 320;
-      setPan((prev) => ({
-        x: Math.max(-maxPanX, Math.min(maxPanX, prev.x)),
-        y: Math.max(-maxPanY, Math.min(maxPanY, prev.y)),
-      }));
+    const now = Date.now();
+    if (
+      now - lastTapRef.current.time < 300 &&
+      Math.hypot(e.clientX - lastTapRef.current.x, e.clientY - lastTapRef.current.y) < 40
+    ) {
+      handleDoubleTap(e.clientX, e.clientY);
+      lastTapRef.current = { time: 0, x: 0, y: 0 };
+      return;
     }
-  };
-
-  // Mouse wheel zoom support for desktop
-  const handleWheel = (e: React.WheelEvent) => {
-    e.stopPropagation();
-    if (e.deltaY < 0) {
-      setScale((prev) => Math.min(4, Number((prev + 0.2).toFixed(1))));
-    } else {
-      setScale((prev) => {
-        const next = Math.max(1, Number((prev - 0.2).toFixed(1)));
-        if (next === 1) setPan({ x: 0, y: 0 });
-        return next;
-      });
-    }
+    lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+    toggleUiChrome();
   };
 
   if (!isOpen || !activeItem) return null;
@@ -760,18 +766,10 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
            ========================================================= */}
         <div
           ref={containerRef}
-          onWheel={handleWheel}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onClick={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('button') || target.closest('input') || target.closest('a')) {
-              return;
-            }
-            toggleUiChrome();
-          }}
-          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
+          {...(!isCurrentItemVideo ? bindGesture() : {})}
+          onClick={handleStageClick}
+          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden touch-none cursor-grab active:cursor-grabbing"
+          style={{ touchAction: 'none' }}
         >
           {/* Navigation Arrows (Desktop / Tablet) */}
           {items.length > 1 && (
