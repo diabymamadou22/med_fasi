@@ -54,6 +54,7 @@ import {
   extractVideoThumbnail,
   storeMediaBlob,
   formatVideoDuration,
+  isVideoMediaType,
 } from '../../lib/videoUtils';
 import {
   groupGalleryItemsByDate,
@@ -1909,7 +1910,10 @@ const SamsungPhotoItem: React.FC<{
   onClick: () => void;
   autoplayVideo?: boolean;
 }> = ({ item, index, onClick, autoplayVideo = false }) => {
-  const isVideo = item.mediaType === 'video';
+  const isVideo =
+    item.mediaType === 'video' ||
+    Boolean(item.videoUrl) ||
+    isVideoMediaType(item.videoUrl || item.photoUrl, item.mediaType);
   const [videoError, setVideoError] = useState(false);
 
   return (
@@ -1922,17 +1926,20 @@ const SamsungPhotoItem: React.FC<{
       className="group relative aspect-square overflow-hidden bg-stone-100 dark:bg-stone-800 cursor-pointer select-none"
     >
       {isVideo && autoplayVideo && !videoError ? (
-        <video
-          src={item.videoUrl || item.photoUrl}
-          poster={item.photoUrl}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          onError={() => setVideoError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-        />
+        <div className="w-full h-full bg-black flex items-center justify-center overflow-hidden">
+          <video
+            src={item.videoUrl || item.photoUrl}
+            poster={item.photoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            onError={() => setVideoError(true)}
+            className="w-full h-full object-contain mx-auto my-auto block"
+            style={{ objectFit: 'contain', objectPosition: 'center' }}
+          />
+        </div>
       ) : (
         <img
           src={item.photoUrl}

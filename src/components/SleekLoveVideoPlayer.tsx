@@ -302,6 +302,11 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
 
   // Dedicated touch events for mobile / iPhone iOS Safari
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 1) {
+      // Multi-finger pinch detected: cancel single-tap detection
+      touchStartPosRef.current = { x: 0, y: 0, time: 0 };
+      return;
+    }
     if (e.touches.length === 1) {
       touchStartPosRef.current = {
         x: e.touches[0].clientX,
@@ -312,6 +317,11 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    // If another touch is still active, ignore
+    if (e.touches.length > 0) {
+      touchStartPosRef.current = { x: 0, y: 0, time: 0 };
+      return;
+    }
     const start = touchStartPosRef.current;
     if (!start.time) return;
     const touch = e.changedTouches[0];
@@ -321,11 +331,12 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
     const deltaY = Math.abs(touch.clientY - start.y);
     const deltaTime = Date.now() - start.time;
 
-    // Genuine tap: minimal travel (< 18px) and quick duration (< 450ms)
+    // Genuine single tap: minimal travel (< 18px) and quick duration (< 450ms)
     if (deltaX < 18 && deltaY < 18 && deltaTime < 450) {
       lastProcessedTouchTimeRef.current = Date.now();
       executeStageTap(touch.clientX);
     }
+    touchStartPosRef.current = { x: 0, y: 0, time: 0 };
   };
 
   // Screen click handler (for desktop mouse / synthetic clicks)
@@ -423,7 +434,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onClick={handleStageClick}
-      className={`relative select-none overflow-hidden bg-black flex items-center justify-center group/player ${className}`}
+      className={`relative select-none overflow-hidden bg-black flex items-center justify-center group/player max-w-full max-h-full w-full h-full ${className}`}
       style={{ touchAction: 'manipulation' }}
     >
       {/* Video Element */}
@@ -486,7 +497,17 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
             if (onPlayingChange) onPlayingChange(true);
             resetHideTimer(1000);
           }}
-          className="w-full h-full object-contain cursor-pointer"
+          className="w-full h-full max-w-full max-h-full object-contain cursor-pointer mx-auto my-auto block"
+          style={{
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            margin: 'auto',
+            display: 'block',
+          }}
         />
       )}
 

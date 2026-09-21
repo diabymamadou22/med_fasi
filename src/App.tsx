@@ -116,6 +116,7 @@ import {
   COLLECTIONS,
   sortChatMessagesChronologically,
   extractMessageTimestampMs,
+  isQuotaOrResourceError,
 } from './lib/firestoreService';
 
 const STORAGE_KEYS = {
@@ -580,7 +581,8 @@ export default function App() {
         if (Array.isArray(remoteCapsules)) {
           setCapsules(remoteCapsules);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubLocations = subscribeCollection<MemoryLocation>(
@@ -589,7 +591,8 @@ export default function App() {
         if (Array.isArray(remoteLocations)) {
           setLocations(remoteLocations);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubNotes = subscribeCollection<SweetNote>(
@@ -600,7 +603,8 @@ export default function App() {
           const sorted = [...remoteNotes].sort((a, b) => b.id.localeCompare(a.id));
           setNotes(sorted);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubGratitudes = subscribeCollection<DailyGratitude>(
@@ -610,7 +614,8 @@ export default function App() {
           const sorted = [...remoteGratitudes].sort((a, b) => b.id.localeCompare(a.id));
           setGratitudes(sorted);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubVouchers = subscribeCollection<LoveVoucher>(
@@ -619,7 +624,8 @@ export default function App() {
         if (Array.isArray(remoteVouchers)) {
           setVouchers(remoteVouchers);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubBucket = subscribeCollection<BucketItem>(
@@ -628,7 +634,8 @@ export default function App() {
         if (Array.isArray(remoteBucket)) {
           setBucketList(remoteBucket);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubQuizzes = subscribeCollection<QuizQuestion>(
@@ -637,7 +644,8 @@ export default function App() {
         if (Array.isArray(remoteQuizzes)) {
           setQuizzes(remoteQuizzes);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubDates = subscribeCollection<DateIdea>(
@@ -646,7 +654,8 @@ export default function App() {
         if (Array.isArray(remoteDates)) {
           setDateIdeas(remoteDates);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubChallenges = subscribeCollection<CoupleChallenge>(
@@ -655,7 +664,8 @@ export default function App() {
         if (Array.isArray(remoteChallenges)) {
           setChallenges(remoteChallenges);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubLexicon = subscribeCollection<EnglishLexiconItem>(
@@ -664,7 +674,8 @@ export default function App() {
         if (Array.isArray(remoteLexicon) && remoteLexicon.length > 0) {
           setLexicon(remoteLexicon);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubWeeklyChallenges = subscribeWeeklyLearningChallenges(
@@ -672,7 +683,8 @@ export default function App() {
         if (Array.isArray(remoteChallenges) && remoteChallenges.length > 0) {
           setWeeklyChallenges(remoteChallenges);
         }
-      }
+      },
+      () => setIsCloudSynced(false)
     );
 
     const unsubSettings = subscribeSettings(
@@ -1100,7 +1112,9 @@ export default function App() {
         targetPartnerId,
       }).catch((err) => console.warn('Push dispatch error:', err));
     } catch (err) {
-      console.error('Erreur sauvegarde message WhatsApp:', err);
+      if (!isQuotaOrResourceError(err)) {
+        console.warn('Sauvegarde distante message différée:', err);
+      }
     }
   };
 
@@ -1111,7 +1125,9 @@ export default function App() {
     try {
       await deleteMultipleChatMessagesFromDb(messageIds);
     } catch (err) {
-      console.error('Erreur suppression messages WhatsApp:', err);
+      if (!isQuotaOrResourceError(err)) {
+        console.warn('Suppression distante messages différée:', err);
+      }
     }
   };
 
@@ -1200,7 +1216,9 @@ export default function App() {
     try {
       await editChatMessageContent(messageId, newContent);
     } catch (err) {
-      console.error('Erreur modification message WhatsApp:', err);
+      if (!isQuotaOrResourceError(err)) {
+        console.warn('Modification distante message différée:', err);
+      }
     }
   };
 

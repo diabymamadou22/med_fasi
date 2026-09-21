@@ -1,5 +1,10 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 
 // Default configuration from provisioned Firebase project
 const DEFAULT_FIREBASE_CONFIG = {
@@ -25,10 +30,25 @@ export const firebaseConfig = {
 // Initialisation de Firebase
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Base de données Firestore avec l'ID spécifique si configuré
+// Base de données Firestore avec cache local persistant (IndexedDB multi-onglets)
 const databaseId = (import.meta as any).env?.VITE_FIREBASE_DATABASE_ID || DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId;
 
-export const db = databaseId && databaseId !== '(default)' 
-  ? getFirestore(app, databaseId) 
-  : getFirestore(app);
+let firestoreInstance: any = null;
+try {
+  firestoreInstance = initializeFirestore(
+    app,
+    {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    },
+    databaseId && databaseId !== '(default)' ? databaseId : undefined
+  );
+} catch {
+  firestoreInstance = databaseId && databaseId !== '(default)'
+    ? getFirestore(app, databaseId)
+    : getFirestore(app);
+}
+
+export const db = firestoreInstance;
 

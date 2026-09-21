@@ -172,9 +172,23 @@ export function isVideoMediaType(fileOrUrl?: File | string | null, mediaType?: s
     return fileOrUrl.type.startsWith('video/');
   }
 
-  const clean = fileOrUrl.toLowerCase();
-  if (clean.startsWith('data:video/')) return true;
-  if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v') || clean.endsWith('.ogv')) {
+  const clean = fileOrUrl.toLowerCase().trim();
+  if (clean.startsWith('data:video/') || clean.startsWith('blob:')) return true;
+
+  // Strip query parameters and hashes to test actual filename extension
+  const urlWithoutQuery = clean.split('?')[0].split('#')[0];
+  if (/\.(mp4|webm|mov|m4v|ogv|ogg|3gp|mkv)$/i.test(urlWithoutQuery)) {
+    return true;
+  }
+
+  // Check storage or path patterns
+  if (
+    clean.includes('/videos%2f') ||
+    clean.includes('/video%2f') ||
+    clean.includes('/videos/') ||
+    clean.includes('/video/') ||
+    clean.includes('video_')
+  ) {
     return true;
   }
 

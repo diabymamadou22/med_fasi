@@ -121,6 +121,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
       const isVideo = Boolean(
         active &&
           (active.mediaType === 'video' ||
+            Boolean(active.videoUrl) ||
             isVideoMediaType(active.videoUrl || active.photoUrl, active.mediaType))
       );
       setShowUiChrome(!isVideo);
@@ -141,6 +142,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const isCurrentItemVideo = Boolean(
     activeItem &&
       (activeItem.mediaType === 'video' ||
+        Boolean(activeItem.videoUrl) ||
         isVideoMediaType(activeItem.videoUrl || activeItem.photoUrl, activeItem.mediaType))
   );
 
@@ -169,6 +171,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
       setScale(1);
       setPan({ x: 0, y: 0 });
       setSwipeOffset(0);
+      setPullDownOffset(0);
       setIsInteracting(false);
     }
   }, [currentIndex, isCurrentItemVideo]);
@@ -394,7 +397,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     });
   };
 
-  // Double tap / double click to toggle zoom (1x <-> 2.5x) - photos only
+  // Double tap / double click to toggle zoom (1x <-> 2.5x)
   const handleDoubleTap = (clientX: number, clientY: number) => {
     if (isCurrentItemVideo) return;
     triggerVibration([30]);
@@ -497,7 +500,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
       },
 
       onDrag: ({ first, last, active, movement: [mx, my], velocities: [vx, vy], memo, pinching, tap }) => {
-        if (isCurrentItemVideo || pinching) return memo;
+        if (isCurrentItemVideo) return memo;
+        if (pinching) return memo;
 
         if (tap) {
           return memo;
@@ -517,7 +521,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           }
 
           if (memo.initialScale > 1.05) {
-            // Pan image smoothly when zoomed in
+            // Pan image / video smoothly when zoomed in
             const nextX = memo.initialPan.x + mx;
             const nextY = memo.initialPan.y + my;
             const maxPanX = (memo.initialScale - 1) * 260 + 60;
@@ -526,8 +530,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               x: Math.max(-maxPanX, Math.min(maxPanX, nextX)),
               y: Math.max(-maxPanY, Math.min(maxPanY, nextY)),
             });
-          } else {
-            // At 1x: Swipe horizontal (change photo) or pull down (dismiss)
+          } else if (!isCurrentItemVideo) {
+            // At 1x FOR PHOTOS ONLY: Swipe horizontal (change photo) or pull down (dismiss)
+            // Videos stay completely centered and NEVER swipe horizontally!
             if (Math.abs(my) > Math.abs(mx) * 1.3 && my > 0) {
               setPullDownOffset(my);
               setSwipeOffset(0);
@@ -541,24 +546,26 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         if (last) {
           setIsInteracting(false);
 
-          // Pull down dismiss threshold or high downward velocity
-          if (pullDownOffset > 85 || (vy > 0.6 && pullDownOffset > 30)) {
-            soundEffects.playSoftTap();
-            triggerVibration([25]);
-            onClose();
-            return memo;
-          }
-          setPullDownOffset(0);
-
-          // Swipe horizontal threshold or fast swipe velocity
-          if (scale <= 1.05) {
-            if (swipeOffset < -55 || (vx < -0.5 && swipeOffset < -20)) {
-              goNext();
-            } else if (swipeOffset > 55 || (vx > 0.5 && swipeOffset > 20)) {
-              goPrev();
+          if (!isCurrentItemVideo) {
+            // Pull down dismiss threshold or high downward velocity (photos only)
+            if (pullDownOffset > 85 || (vy > 0.6 && pullDownOffset > 30)) {
+              soundEffects.playSoftTap();
+              triggerVibration([25]);
+              onClose();
+              return memo;
             }
+            setPullDownOffset(0);
+
+            // Swipe horizontal threshold or fast swipe velocity (photos only)
+            if (scale <= 1.05) {
+              if (swipeOffset < -55 || (vx < -0.5 && swipeOffset < -20)) {
+                goNext();
+              } else if (swipeOffset > 55 || (vx > 0.5 && swipeOffset > 20)) {
+                goPrev();
+              }
+            }
+            setSwipeOffset(0);
           }
-          setSwipeOffset(0);
 
           if (scale > 1.05) {
             clampPanToBounds(scale);
@@ -601,12 +608,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
       gestureStateRef.current.wasGesture = false;
       return;
     }
-    if (isCurrentItemVideo) {
-      toggleUiChrome();
-      return;
-    }
     const now = Date.now();
     if (
+      !isCurrentItemVideo &&
       now - lastTapRef.current.time < 300 &&
       Math.hypot(e.clientX - lastTapRef.current.x, e.clientY - lastTapRef.current.y) < 40
     ) {
@@ -629,8 +633,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         transition={{ duration: 0.22 }}
         className="fixed inset-0 z-50 bg-black select-none overflow-hidden touch-none"
         style={{
-          transform: pullDownOffset > 0 ? `translateY(${pullDownOffset}px)` : undefined,
-          opacity: pullDownOffset > 0 ? Math.max(0.2, 1 - pullDownOffset / 300) : 1,
+          transform: !isCurrentItemVideo && pullDownOffset > 0 ? `translateY(${pullDownOffset}px)` : undefined,
+          opacity: !isCurrentItemVideo && pullDownOffset > 0 ? Math.max(0.2, 1 - pullDownOffset / 300) : 1,
         }}
       >
         {/* =========================================================
@@ -779,11 +783,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
            ========================================================= */}
         <div
           ref={containerRef}
-          {...(!isCurrentItemVideo ? bindGesture() : {})}
+          {...(isCurrentItemVideo ? {} : bindGesture())}
           onClick={handleStageClick}
-          className={`absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden ${
-            isCurrentItemVideo ? 'cursor-pointer select-none' : 'touch-none cursor-grab active:cursor-grabbing'
-          }`}
+          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-pointer"
           style={{ touchAction: isCurrentItemVideo ? 'manipulation' : 'none' }}
         >
           {/* Navigation Arrows (Desktop / Tablet) */}
@@ -819,115 +821,121 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             </>
           )}
 
-          {/* Render Active Image / Video with smooth Pan/Zoom & Swipe translation (Videos are locked perfectly fixed) */}
-          <motion.div
-            key={activeItem.id}
-            initial={isCurrentItemVideo ? { opacity: 0 } : { opacity: 0, x: direction * 40 }}
-            animate={{
-              opacity: 1,
-              x: isCurrentItemVideo ? 0 : swipeOffset,
-              scale: isCurrentItemVideo ? 1 : scale,
-            }}
-            transition={
-              isCurrentItemVideo
-                ? { duration: 0.15 }
-                : isInteracting
-                ? { duration: 0 }
-                : {
-                    type: 'spring',
-                    stiffness: 350,
-                    damping: 30,
+          {/* Render Active Video (Completely Fixed, Centered, No CSS Transforms or Gestures) OR Active Photo (Pan/Zoom/Swipe) */}
+          {isCurrentItemVideo ? (
+            <div
+              key={activeItem.id}
+              className="absolute inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none m-auto pointer-events-auto"
+              style={{
+                transform: 'none',
+                WebkitTransform: 'none',
+              }}
+            >
+              <SleekLoveVideoPlayer
+                key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                src={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                poster={activeItem.photoUrl}
+                title={activeItem.title}
+                autoPlay={true}
+                compact={false}
+                isMuted={isVideoMuted}
+                onToggleMute={handleToggleVideoMute}
+                isLooping={isVideoLooping}
+                onToggleLoop={handleToggleVideoLoop}
+                playbackRate={videoPlaybackRate}
+                onPlaybackRateChange={setVideoPlaybackRate}
+                hideExtraMenu={true}
+                hideDefaultControls={true}
+                onVideoRefReady={(el) => {
+                  videoElRef.current = el;
+                  if (el) {
+                    setIsVideoPlaying(!el.paused);
+                    setVideoCurrentTime(el.currentTime);
+                    setVideoDuration(el.duration || 0);
                   }
-            }
-            style={
-              isCurrentItemVideo
-                ? { transform: 'none' }
-                : {
-                    translateX: pan.x,
-                    translateY: pan.y,
+                }}
+                onPlayingChange={handleVideoPlayingChange}
+                onTimeUpdate={(cur, dur) => {
+                  if (!isScrubbing) {
+                    setVideoCurrentTime(cur);
+                    setVideoDuration(dur);
                   }
-            }
-            className={
-              isCurrentItemVideo
-                ? 'absolute inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none'
-                : 'relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6'
-            }
-          >
-            {isCurrentItemVideo ? (
-              <div
-                className="w-full h-full flex items-center justify-center bg-black overflow-hidden select-none"
-              >
-                <SleekLoveVideoPlayer
-                  key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
-                  src={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
-                  poster={activeItem.photoUrl}
-                  title={activeItem.title}
-                  autoPlay={true}
-                  compact={false}
-                  isMuted={isVideoMuted}
-                  onToggleMute={handleToggleVideoMute}
-                  isLooping={isVideoLooping}
-                  onToggleLoop={handleToggleVideoLoop}
-                  playbackRate={videoPlaybackRate}
-                  onPlaybackRateChange={setVideoPlaybackRate}
-                  hideExtraMenu={true}
-                  hideDefaultControls={true}
-                  onVideoRefReady={(el) => {
-                    videoElRef.current = el;
-                    if (el) {
-                      setIsVideoPlaying(!el.paused);
-                      setVideoCurrentTime(el.currentTime);
-                      setVideoDuration(el.duration || 0);
+                }}
+                onStageClick={toggleUiChrome}
+                className="w-full h-full max-w-full max-h-full"
+              />
+            </div>
+          ) : (
+            <motion.div
+              key={activeItem.id}
+              initial={{ opacity: 0, x: direction * 40 }}
+              animate={{
+                opacity: 1,
+                x: swipeOffset,
+                scale: scale,
+              }}
+              transition={
+                isInteracting
+                  ? { duration: 0 }
+                  : {
+                      type: 'spring',
+                      stiffness: 350,
+                      damping: 30,
                     }
-                  }}
-                  onPlayingChange={handleVideoPlayingChange}
-                  onTimeUpdate={(cur, dur) => {
-                    if (!isScrubbing) {
-                      setVideoCurrentTime(cur);
-                      setVideoDuration(dur);
-                    }
-                  }}
-                  onStageClick={toggleUiChrome}
-                  className="w-full h-full"
-                />
-              </div>
-            ) : (
+              }
+              style={{
+                translateX: pan.x,
+                translateY: pan.y,
+              }}
+              className="relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6"
+            >
               <img
                 src={activeItem.photoUrl}
                 alt={activeItem.title || 'Photo complice'}
                 draggable={false}
                 className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto object-contain rounded-xl sm:rounded-2xl shadow-2xl select-none"
               />
-            )}
-          </motion.div>
+            </motion.div>
+          )}
 
           {/* Dynamic Pinch & Zoom HUD Badge */}
           <AnimatePresence>
-            {scale > 1.05 && (
-              <motion.div
+            {!isCurrentItemVideo && scale > 1.05 && (
+              <motion.button
+                key="zoom-badge-hud"
                 initial={{ opacity: 0, y: -10, scale: 0.85 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.85 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-16 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-white font-mono text-xs shadow-xl flex items-center gap-1.5 pointer-events-none"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  resetZoom();
+                  triggerVibration([20]);
+                }}
+                className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-black/80 hover:bg-black/95 active:scale-95 backdrop-blur-md border border-white/20 text-white font-mono text-xs shadow-xl flex items-center gap-2 cursor-pointer pointer-events-auto transition-transform"
+                title="Cliquer pour réinitialiser le zoom (1x)"
               >
                 <ZoomIn className="w-3.5 h-3.5 text-rose-400" />
                 <span className="font-semibold">{Math.round(scale * 100)}%</span>
-                <span className="text-white/50">({scale.toFixed(1)}x)</span>
-              </motion.div>
+                <span className="text-white/60">({scale.toFixed(1)}x)</span>
+                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white/90">
+                  1x
+                </span>
+              </motion.button>
             )}
           </AnimatePresence>
 
-          {/* Quick hint on mobile (only shown for photos) */}
-          {!isCurrentItemVideo && (
-            <div
-              className={`absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white/70 text-[11px] font-medium pointer-events-none transition-opacity duration-300 sm:hidden ${
-                showUiChrome && scale <= 1 ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              Pincer pour zoomer • Glisser pour défiler
-            </div>
-          )}
+          {/* Quick hint on mobile */}
+          <div
+            className={`absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md text-white/70 text-[11px] font-medium pointer-events-none transition-opacity duration-300 sm:hidden ${
+              showUiChrome && scale <= 1 ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            {isCurrentItemVideo
+              ? 'Appuyez pour afficher ou masquer les commandes'
+              : 'Pincer pour zoomer • Glisser pour défiler'}
+          </div>
 
           {/* Central Play/Pause Button on Video tap for iPhone & Mobile */}
           <AnimatePresence>
