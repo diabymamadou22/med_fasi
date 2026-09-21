@@ -796,8 +796,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           ref={containerRef}
           {...(isCurrentItemVideo ? {} : bindGesture())}
           onClick={handleStageClick}
-          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-pointer"
-          style={{ touchAction: isCurrentItemVideo ? 'manipulation' : 'none' }}
+          className={`${isCurrentItemVideo ? 'fixed inset-0' : 'absolute inset-0'} w-full h-full flex items-center justify-center overflow-hidden select-none cursor-pointer`}
+          style={{
+            touchAction: isCurrentItemVideo ? 'manipulation' : 'none',
+            position: isCurrentItemVideo ? 'fixed' : 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+          }}
         >
           {/* Navigation Arrows (Desktop / Tablet) */}
           {items.length > 1 && (
@@ -836,8 +843,18 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           {isCurrentItemVideo ? (
             <div
               key={activeItem.id}
-              className="absolute inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none m-auto pointer-events-auto"
+              className="fixed inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none m-auto pointer-events-auto z-30"
               style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100vw',
+                height: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 transform: 'none',
                 WebkitTransform: 'none',
               }}

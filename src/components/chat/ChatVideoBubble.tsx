@@ -35,14 +35,23 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
   return (
     <div className="rounded-2xl overflow-hidden mb-2 relative group/video border border-white/20 shadow-md bg-black max-w-[290px] sm:max-w-[340px]">
       {/* Sleek Custom Video Player */}
-      <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+      <div
+        className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden cursor-pointer"
+        style={{ width: '100%', objectFit: 'contain' }}
+        onClick={(e) => {
+          if (onOpenFullscreen) {
+            e.stopPropagation();
+            onOpenFullscreen();
+          }
+        }}
+      >
         <SleekLoveVideoPlayer
           src={rawUrl}
           poster={message.videoThumbnail}
           compact={true}
           onOpenFullscreen={onOpenFullscreen}
           onControlsVisibilityChange={setShowOverlay}
-          className="w-full h-full"
+          className="w-full h-full object-contain"
         />
 
         {/* Top Badges (Duration & Video type) */}

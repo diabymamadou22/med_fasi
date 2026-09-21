@@ -1601,16 +1601,23 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       {/* =========================================================
           FULLSCREEN MOBILE PHOTO & VIDEO VIEWER (Auto-Hides UI)
          ========================================================= */}
-      <MobilePhotoViewer
-        items={photoViewerItems}
-        initialIndex={activeLightboxIndex ?? 0}
-        isOpen={activeLightboxIndex !== null}
-        onClose={() => {
-          setActiveLightboxIndex(null);
-          setLightboxContextItems(null);
-        }}
-        onIndexChange={(newIndex) => setActiveLightboxIndex(newIndex)}
-      />
+      {activeLightboxIndex !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto bg-black overflow-hidden"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <MobilePhotoViewer
+            items={photoViewerItems}
+            initialIndex={activeLightboxIndex ?? 0}
+            isOpen={activeLightboxIndex !== null}
+            onClose={() => {
+              setActiveLightboxIndex(null);
+              setLightboxContextItems(null);
+            }}
+            onIndexChange={(newIndex) => setActiveLightboxIndex(newIndex)}
+          />
+        </div>
+      )}
 
       {/* Live Direct Camera Modal */}
       <CameraCaptureModal
@@ -1940,8 +1947,8 @@ const SamsungPhotoItem: React.FC<{
             playsInline
             preload="metadata"
             onError={() => setVideoError(true)}
-            className="w-full h-full object-cover pointer-events-none block"
-            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+            className="w-full h-full object-contain pointer-events-none block"
+            style={{ objectFit: 'contain', objectPosition: 'center', width: '100%', height: '100%' }}
           />
         </div>
       ) : (
