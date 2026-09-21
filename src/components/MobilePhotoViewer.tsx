@@ -318,6 +318,17 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     resolveMediaUrl(mediaToResolve).then((url) => {
       setResolvedVideoUrl(url);
     });
+
+    const handleMigrated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ oldKey: string; newUrl: string }>;
+      if (customEvent.detail?.oldKey === mediaToResolve) {
+        setResolvedVideoUrl(customEvent.detail.newUrl);
+      }
+    };
+    window.addEventListener('nid:media_migrated', handleMigrated);
+    return () => {
+      window.removeEventListener('nid:media_migrated', handleMigrated);
+    };
   }, [activeItem, isCurrentItemVideo]);
 
   // Reset zoom and pan
@@ -832,8 +843,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               }}
             >
               <SleekLoveVideoPlayer
-                key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
-                src={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                key={activeItem.id}
+                src={activeItem.videoUrl || activeItem.photoUrl}
                 poster={activeItem.photoUrl}
                 title={activeItem.title}
                 autoPlay={true}

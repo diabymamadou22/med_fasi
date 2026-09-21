@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Maximize2, Download, Video } from 'lucide-react';
 import { ChatMessage } from '../../types';
-import { formatVideoDuration } from '../../lib/videoUtils';
+import { formatVideoDuration, resolveMediaUrl } from '../../lib/videoUtils';
 import { SleekLoveVideoPlayer } from '../SleekLoveVideoPlayer';
 
 interface ChatVideoBubbleProps {
@@ -18,7 +18,15 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
   chatTheme,
 }) => {
   const [showOverlay, setShowOverlay] = useState(true);
+  const [downloadHref, setDownloadHref] = useState<string>('');
   const rawUrl = message.videoUrl || message.mediaUrl || '';
+
+  useEffect(() => {
+    if (!rawUrl) return;
+    resolveMediaUrl(rawUrl).then((resolved) => {
+      if (resolved) setDownloadHref(resolved);
+    });
+  }, [rawUrl]);
 
   const formattedDuration = message.videoDuration
     ? formatVideoDuration(message.videoDuration)
@@ -70,9 +78,9 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
             </button>
           )}
 
-          {rawUrl && (
+          {(downloadHref || rawUrl) && (
             <a
-              href={rawUrl}
+              href={downloadHref || rawUrl}
               download="video-souvenir.mp4"
               target="_blank"
               rel="noreferrer"

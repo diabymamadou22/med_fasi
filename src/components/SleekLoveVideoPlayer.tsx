@@ -14,6 +14,8 @@ import {
   Sliders,
   RotateCcw,
   RotateCw,
+  Clock,
+  RefreshCw,
 } from 'lucide-react';
 import { resolveMediaUrl, formatVideoDuration } from '../lib/videoUtils';
 import { useBackHandler } from '../lib/backNavigation';
@@ -82,6 +84,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   const [resolvedSrc, setResolvedSrc] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
+  const [isWaitingPartnerSync, setIsWaitingPartnerSync] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [internalIsMuted, setInternalIsMuted] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -133,15 +136,28 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
     if (!src) {
       setIsLoading(false);
       setHasError(true);
+      setIsWaitingPartnerSync(false);
       return;
     }
 
     setIsLoading(true);
     setHasError(false);
+    setIsWaitingPartnerSync(false);
 
     resolveMediaUrl(src)
       .then((url) => {
         if (isMounted) {
+          if (!url) {
+            // Local blob not found on this device (partner device waiting for uploader sync)
+            if (src.startsWith('idb:')) {
+              setIsWaitingPartnerSync(true);
+            } else {
+              setHasError(true);
+            }
+            setIsLoading(false);
+            return;
+          }
+          setIsWaitingPartnerSync(false);
           setResolvedSrc(url);
           setIsLoading(false);
         }
@@ -149,13 +165,32 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       .catch((err) => {
         console.error('Erreur de chargement de la vidéo:', err);
         if (isMounted) {
-          setHasError(true);
+          if (src.startsWith('idb:')) {
+            setIsWaitingPartnerSync(true);
+          } else {
+            setHasError(true);
+          }
           setIsLoading(false);
         }
       });
 
+    // Listen to real-time auto-migration events from background sync
+    const handleMigrated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ oldKey: string; newUrl: string }>;
+      if (customEvent.detail?.oldKey === src) {
+        if (isMounted) {
+          setResolvedSrc(customEvent.detail.newUrl);
+          setIsWaitingPartnerSync(false);
+          setHasError(false);
+          setIsLoading(false);
+        }
+      }
+    };
+    window.addEventListener('nid:media_migrated', handleMigrated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('nid:media_migrated', handleMigrated);
     };
   }, [src]);
 
@@ -438,7 +473,35 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       style={{ touchAction: 'manipulation' }}
     >
       {/* Video Element */}
-      {hasError ? (
+      {isWaitingPartnerSync ? (
+        <div className="p-6 text-center text-amber-200 text-xs sm:text-sm flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+          <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 animate-pulse">
+            <Clock className="w-6 h-6" />
+          </div>
+          <span className="font-semibold text-white text-sm">Vidéo en attente de synchronisation</span>
+          <span className="text-amber-200/80 text-xs leading-relaxed">
+            Cette vidéo a été importée depuis l’appareil de votre partenaire. Dès que son application sera ouverte, elle apparaîtra directement ici !
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsLoading(true);
+              resolveMediaUrl(src).then((url) => {
+                if (url) {
+                  setResolvedSrc(url);
+                  setIsWaitingPartnerSync(false);
+                }
+                setIsLoading(false);
+              });
+            }}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Vérifier</span>
+          </button>
+        </div>
+      ) : hasError ? (
         <div className="p-6 text-center text-rose-300 text-xs sm:text-sm flex flex-col items-center justify-center gap-2">
           <AlertCircle className="w-6 h-6 text-rose-400" />
           <span>Vidéo indisponible ou introuvable</span>
