@@ -1,0 +1,180 @@
+import { ChatMessage, MissYouPulse } from '../types';
+
+export interface ChatPresenceInfo {
+  partnerId: string;
+  isTyping: boolean;
+  isOnline: boolean;
+  lastSeen: string;
+  updatedAt: string;
+}
+
+export type ChatPresenceState = Record<string, ChatPresenceInfo>;
+
+/**
+ * Envoie un message au relais direct du serveur Express
+ * (stocké immédiatement, diffusé en SSE et pushé vers l'appareil de l'autre partenaire)
+ */
+export async function sendChatMessageViaRelay(
+  message: ChatMessage,
+  senderName?: string
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, senderName }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Chat Relay] Erreur envoi message:', err);
+    return false;
+  }
+}
+
+/**
+ * Récupère tous les messages sauvegardés sur le serveur
+ */
+export async function fetchChatMessagesFromRelay(): Promise<ChatMessage[]> {
+  try {
+    const res = await fetch('/api/chat/messages');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.messages) ? data.messages : [];
+  } catch (err) {
+    console.warn('[Chat Relay] Erreur récupération messages:', err);
+    return [];
+  }
+}
+
+/**
+ * Synchronise les messages locaux avec le serveur
+ */
+export async function syncLocalMessagesWithRelay(
+  localMessages: ChatMessage[]
+): Promise<ChatMessage[]> {
+  try {
+    const res = await fetch('/api/chat/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localMessages }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.messages) ? data.messages : [];
+  } catch (err) {
+    console.warn('[Chat Relay] Erreur synchronisation messages:', err);
+    return [];
+  }
+}
+
+/**
+ * Diffuse l'état de frappe via le serveur
+ */
+export async function sendTypingViaRelay(
+  partnerId: string,
+  isTyping: boolean
+): Promise<void> {
+  try {
+    await fetch('/api/chat/typing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partnerId, isTyping }),
+    });
+  } catch {}
+}
+
+/**
+ * Diffuse la présence en ligne via le serveur
+ */
+export async function sendPresenceViaRelay(
+  partnerId: string,
+  isOnline: boolean
+): Promise<void> {
+  try {
+    await fetch('/api/chat/presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partnerId, isOnline }),
+    });
+  } catch {}
+}
+
+/**
+ * Diffuse une impulsion de manque via le serveur
+ */
+export async function sendPulseViaRelay(
+  pulse: MissYouPulse,
+  senderName?: string
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/chat/pulse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pulse, senderName }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Écoute en temps réel via Server-Sent Events (SSE)
+ */
+export function connectChatEvents(options: {
+  partnerId: string;
+  onNewMessage?: (msg: ChatMessage) => void;
+  onPresence?: (presence: ChatPresenceState) => void;
+  onPulse?: (pulse: MissYouPulse) => void;
+}): () => void {
+  let eventSource: EventSource | null = null;
+  let isClosed = false;
+  let reconnectTimeout: any = null;
+
+  function connect() {
+    if (isClosed) return;
+    try {
+      eventSource = new EventSource(`/api/chat/events?partnerId=${encodeURIComponent(options.partnerId)}`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'new_message' && payload.message && options.onNewMessage) {
+            options.onNewMessage(payload.message);
+          } else if (payload.type === 'presence' && payload.presence && options.onPresence) {
+            options.onPresence(payload.presence);
+          } else if (payload.type === 'handshake' && payload.presence && options.onPresence) {
+            options.onPresence(payload.presence);
+          } else if (payload.type === 'pulse' && payload.pulse && options.onPulse) {
+            options.onPulse(payload.pulse);
+          }
+        } catch {}
+      };
+
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        if (!isClosed) {
+          reconnectTimeout = setTimeout(connect, 3000);
+        }
+      };
+    } catch {
+      if (!isClosed) {
+        reconnectTimeout = setTimeout(connect, 4000);
+      }
+    }
+  }
+
+  connect();
+
+  return () => {
+    isClosed = true;
+    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+  };
+}

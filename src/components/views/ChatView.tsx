@@ -86,6 +86,11 @@ import {
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
 import { processPhotoWithoutCropping, compressImageWithStats, formatBytes } from '../../lib/imageUtils';
+import {
+  sendTypingViaRelay,
+  sendPresenceViaRelay,
+  connectChatEvents,
+} from '../../lib/chatRelayService';
 
 export interface ChatViewProps {
   profile: CoupleProfile;
@@ -662,46 +667,81 @@ export const ChatView: React.FC<ChatViewProps> = ({
     soundEffects.playMessageSent();
   };
 
-  // Subscribe to real-time presence and typing status
+  // Subscribe to real-time presence and typing status (Firestore + SSE direct relay)
   useEffect(() => {
     const unsubTyping = subscribeChatTypingStatus((map) => {
-      setPresenceMap(map);
+      setPresenceMap((prev) => ({ ...prev, ...map }));
     });
+
+    const disconnectSse = connectChatEvents({
+      partnerId: activePartnerId,
+      onPresence: (remoteMap) => {
+        if (remoteMap) {
+          setPresenceMap((prev) => {
+            const next = { ...prev };
+            Object.entries(remoteMap).forEach(([pid, info]) => {
+              next[pid] = {
+                partnerId: info.partnerId as any,
+                isTyping: info.isTyping,
+                isOnline: info.isOnline,
+                lastSeen: info.lastSeen,
+                updatedAt: info.updatedAt,
+              };
+            });
+            return next;
+          });
+        }
+      },
+    });
+
     return () => {
       unsubTyping();
+      disconnectSse();
     };
-  }, []);
+  }, [activePartnerId]);
 
   // Presence heartbeat & disconnect detection
   useEffect(() => {
-    // Initial online notification (only if quota is healthy)
+    sendPresenceViaRelay(activePartnerId, true);
     if (!isQuotaExhausted()) {
       updatePartnerPresence(activePartnerId, true);
     }
 
-    // Heartbeat every 90 seconds (conserves Firestore write quota)
+    // Heartbeat every 45 seconds (direct relay) and Firestore when quota permits
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible' && !isQuotaExhausted()) {
-        updatePartnerPresence(activePartnerId, true);
+      if (document.visibilityState === 'visible') {
+        sendPresenceViaRelay(activePartnerId, true);
+        if (!isQuotaExhausted()) {
+          updatePartnerPresence(activePartnerId, true);
+        }
       }
-    }, 90000);
+    }, 45000);
 
     // Immediate visibility change detection (tab hidden/active)
     const handleVisibilityChange = () => {
-      if (isQuotaExhausted()) return;
       if (document.visibilityState === 'hidden') {
-        setChatTypingStatus(activePartnerId, false);
-        updatePartnerPresence(activePartnerId, false);
+        sendTypingViaRelay(activePartnerId, false);
+        sendPresenceViaRelay(activePartnerId, false);
+        if (!isQuotaExhausted()) {
+          setChatTypingStatus(activePartnerId, false);
+          updatePartnerPresence(activePartnerId, false);
+        }
       } else {
-        updatePartnerPresence(activePartnerId, true);
+        sendPresenceViaRelay(activePartnerId, true);
+        if (!isQuotaExhausted()) {
+          updatePartnerPresence(activePartnerId, true);
+        }
       }
     };
 
     // Before unload / pagehide: immediate offline broadcast
     const handleDisconnect = () => {
-      if (isQuotaExhausted()) return;
-      setChatTypingStatus(activePartnerId, false);
-      updatePartnerPresence(activePartnerId, false);
+      sendTypingViaRelay(activePartnerId, false);
+      sendPresenceViaRelay(activePartnerId, false);
+      if (!isQuotaExhausted()) {
+        setChatTypingStatus(activePartnerId, false);
+        updatePartnerPresence(activePartnerId, false);
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -713,6 +753,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleDisconnect);
       window.removeEventListener('pagehide', handleDisconnect);
+      sendTypingViaRelay(activePartnerId, false);
+      sendPresenceViaRelay(activePartnerId, false);
       if (!isQuotaExhausted()) {
         setChatTypingStatus(activePartnerId, false);
         updatePartnerPresence(activePartnerId, false);
@@ -935,21 +977,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
       textareaRef.current.style.height = `${newHeight}px`;
     }
 
-    // Throttled typing broadcast (at most once every 4 seconds) to conserve Firestore write quota
-    if (!isQuotaExhausted()) {
-      const now = Date.now();
-      if (!lastTypingBroadcastRef.current || now - lastTypingBroadcastRef.current > 4000) {
-        lastTypingBroadcastRef.current = now;
+    // Broadcast instantané via relais Express (SSE rapide) et Firestore si quota disponible
+    const now = Date.now();
+    if (!lastTypingBroadcastRef.current || now - lastTypingBroadcastRef.current > 3000) {
+      lastTypingBroadcastRef.current = now;
+      sendTypingViaRelay(activePartnerId, true);
+      if (!isQuotaExhausted()) {
         setChatTypingStatus(activePartnerId, true);
       }
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        lastTypingBroadcastRef.current = 0;
-        if (!isQuotaExhausted()) {
-          setChatTypingStatus(activePartnerId, false);
-        }
-      }, 3000);
     }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      lastTypingBroadcastRef.current = 0;
+      sendTypingViaRelay(activePartnerId, false);
+      if (!isQuotaExhausted()) {
+        setChatTypingStatus(activePartnerId, false);
+      }
+    }, 3000);
   };
 
   // Send message handler
@@ -980,7 +1024,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
     setReplyingTo(null);
     setShowEmojiPicker(false);
-    setChatTypingStatus(activePartnerId, false);
+    sendTypingViaRelay(activePartnerId, false);
+    if (!isQuotaExhausted()) {
+      setChatTypingStatus(activePartnerId, false);
+    }
   };
 
   // Voice recording controls optimized for iOS Safari, Android Chrome & Desktop

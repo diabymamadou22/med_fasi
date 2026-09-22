@@ -60,6 +60,132 @@ function savePushSubscriptions(records: PushSubscriptionRecord[]) {
 
 let pushSubscriptions: PushSubscriptionRecord[] = loadPushSubscriptions();
 
+// Chat Messages Store pour synchronisation directe & haute disponibilité
+const CHAT_MESSAGES_FILE = path.join(process.cwd(), "chat_messages_store.json");
+
+function loadServerChatMessages(): any[] {
+  try {
+    if (fs.existsSync(CHAT_MESSAGES_FILE)) {
+      const data = fs.readFileSync(CHAT_MESSAGES_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn("Erreur lecture chat_messages_store.json:", err);
+  }
+  return [];
+}
+
+function saveServerChatMessages(messages: any[]) {
+  try {
+    fs.writeFileSync(CHAT_MESSAGES_FILE, JSON.stringify(messages, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Erreur écriture chat_messages_store.json:", err);
+  }
+}
+
+let serverChatMessages: any[] = loadServerChatMessages();
+
+// Server-Sent Events (SSE) pour communication instantanée sans latence
+let sseClients: { id: string; partnerId: string; res: express.Response }[] = [];
+
+function broadcastChatMessage(msg: any) {
+  const data = JSON.stringify({ type: "new_message", message: msg });
+  sseClients.forEach((client) => {
+    try {
+      client.res.write(`data: ${data}\n\n`);
+    } catch {}
+  });
+}
+
+const presenceState: Record<string, { partnerId: string; isTyping: boolean; isOnline: boolean; lastSeen: string; updatedAt: string }> = {
+  p1: { partnerId: "p1", isTyping: false, isOnline: false, lastSeen: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  p2: { partnerId: "p2", isTyping: false, isOnline: false, lastSeen: new Date().toISOString(), updatedAt: new Date().toISOString() },
+};
+
+function broadcastPresence() {
+  const data = JSON.stringify({ type: "presence", presence: presenceState });
+  sseClients.forEach((client) => {
+    try {
+      client.res.write(`data: ${data}\n\n`);
+    } catch {}
+  });
+}
+
+async function sendPushToPartner(
+  senderId: string,
+  senderName: string,
+  content: string,
+  mediaType?: string
+): Promise<number> {
+  const targetId = senderId === "p1" ? "p2" : "p1";
+  const targets = pushSubscriptions.filter((s) => s.partnerId === targetId);
+
+  if (targets.length === 0) return 0;
+
+  let previewText = content || "Nouveau mot doux de votre amour !";
+  if (mediaType === "image") {
+    previewText = "📷 Vous a envoyé une nouvelle photo dans le chat";
+  } else if (mediaType === "audio") {
+    previewText = "🎵 Vous a envoyé une note vocale d'amour";
+  } else if (mediaType === "video") {
+    previewText = "🎬 Vous a envoyé une vidéo";
+  }
+
+  if (previewText.length > 140) {
+    previewText = previewText.substring(0, 137) + "...";
+  }
+
+  const payload = JSON.stringify({
+    title: `${senderName || "Votre amour"} ❤️`,
+    body: previewText,
+    icon: "/pwa-192x192.png",
+    badge: "/favicon.png",
+    tag: `nid-damour-msg-${Date.now()}`,
+    timestamp: Date.now(),
+    data: {
+      url: "/?tab=chat",
+      tab: "chat",
+      senderId,
+    },
+  });
+
+  let sentCount = 0;
+  const deadEndpoints: string[] = [];
+
+  await Promise.all(
+    targets.map(async (record) => {
+      try {
+        await webpush.sendNotification(record.subscription, payload);
+        sentCount++;
+        record.lastActiveAt = new Date().toISOString();
+      } catch (err: any) {
+        if (err?.statusCode === 404 || err?.statusCode === 410) {
+          deadEndpoints.push(record.subscription.endpoint);
+        }
+      }
+    })
+  );
+
+  if (deadEndpoints.length > 0) {
+    pushSubscriptions = pushSubscriptions.filter(
+      (s) => !deadEndpoints.includes(s.subscription.endpoint)
+    );
+    savePushSubscriptions(pushSubscriptions);
+  }
+  return sentCount;
+}
+
+// Heartbeat SSE pour maintenir les connexions mobiles ouvertes
+setInterval(() => {
+  const ping = `data: ${JSON.stringify({ type: "ping", time: Date.now() })}\n\n`;
+  sseClients.forEach((client) => {
+    try {
+      client.res.write(ping);
+    } catch {}
+  });
+}, 20000);
+
 let aiInstance: GoogleGenAI | null = null;
 function getAI(): GoogleGenAI | null {
   if (!aiInstance && process.env.GEMINI_API_KEY) {
@@ -262,6 +388,185 @@ async function startServer() {
       );
 
       return res.json({ success: sent > 0, sentCount: sent });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // DIRECT CHAT RELAY & REAL-TIME EVENT STREAM
+  // ==========================================
+
+  // Récupérer l'ensemble des messages persistés sur le serveur
+  app.get("/api/chat/messages", (_req, res) => {
+    res.json({
+      success: true,
+      messages: serverChatMessages,
+      count: serverChatMessages.length,
+    });
+  });
+
+  // Envoyer un message (stockage immédiat, broadcast SSE instantané, et push vers le partenaire)
+  app.post("/api/chat/send", async (req, res) => {
+    try {
+      const { message, senderName } = req.body;
+      if (!message || !message.id) {
+        return res.status(400).json({ error: "Message invalide" });
+      }
+
+      // Upsert
+      const existingIdx = serverChatMessages.findIndex((m) => m.id === message.id);
+      if (existingIdx >= 0) {
+        serverChatMessages[existingIdx] = { ...serverChatMessages[existingIdx], ...message };
+      } else {
+        serverChatMessages.push(message);
+      }
+
+      // Conserver les 600 messages les plus récents
+      if (serverChatMessages.length > 600) {
+        serverChatMessages = serverChatMessages.slice(-600);
+      }
+      saveServerChatMessages(serverChatMessages);
+
+      // Diffusion instantanée vers tous les clients SSE connectés (0ms de latence)
+      broadcastChatMessage(message);
+
+      // Déclencher la notification Push vers l'autre partenaire en tâche de fond
+      sendPushToPartner(
+        message.senderId,
+        senderName || (message.senderId === "p1" ? "Med" : "Safi"),
+        message.content,
+        message.mediaType
+      ).catch(() => {});
+
+      return res.json({ success: true, message });
+    } catch (err: any) {
+      console.error("Erreur /api/chat/send:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Synchronisation bidirectionnelle des messages locaux et distants
+  app.post("/api/chat/sync", (req, res) => {
+    try {
+      const { localMessages } = req.body;
+      if (Array.isArray(localMessages) && localMessages.length > 0) {
+        let modified = false;
+        const idMap = new Map<string, any>();
+        serverChatMessages.forEach((m) => idMap.set(m.id, m));
+
+        localMessages.forEach((m) => {
+          if (m && m.id && !idMap.has(m.id)) {
+            idMap.set(m.id, m);
+            serverChatMessages.push(m);
+            modified = true;
+          }
+        });
+
+        if (modified) {
+          serverChatMessages.sort((a, b) => {
+            const tA = a.timestampMs || new Date(a.timestamp || 0).getTime();
+            const tB = b.timestampMs || new Date(b.timestamp || 0).getTime();
+            return tA - tB;
+          });
+          if (serverChatMessages.length > 600) {
+            serverChatMessages = serverChatMessages.slice(-600);
+          }
+          saveServerChatMessages(serverChatMessages);
+        }
+      }
+
+      return res.json({
+        success: true,
+        messages: serverChatMessages,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Flux temps-réel Server-Sent Events (SSE)
+  app.get("/api/chat/events", (req, res) => {
+    const partnerId = (req.query.partnerId as string) || "p1";
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    });
+    res.flushHeaders?.();
+
+    const client = { id: clientId, partnerId, res };
+    sseClients.push(client);
+
+    // Poignée de main initiale avec l'état de présence
+    res.write(`data: ${JSON.stringify({ type: "handshake", presence: presenceState })}\n\n`);
+
+    req.on("close", () => {
+      sseClients = sseClients.filter((c) => c.id !== clientId);
+    });
+  });
+
+  // Indicateur de frappe
+  app.post("/api/chat/typing", (req, res) => {
+    const { partnerId, isTyping } = req.body;
+    if (partnerId === "p1" || partnerId === "p2") {
+      const now = new Date().toISOString();
+      presenceState[partnerId] = {
+        ...presenceState[partnerId],
+        isTyping: Boolean(isTyping),
+        isOnline: true,
+        lastSeen: now,
+        updatedAt: now,
+      };
+      broadcastPresence();
+    }
+    res.json({ success: true, presence: presenceState });
+  });
+
+  // Statut en ligne
+  app.post("/api/chat/presence", (req, res) => {
+    const { partnerId, isOnline } = req.body;
+    if (partnerId === "p1" || partnerId === "p2") {
+      const now = new Date().toISOString();
+      presenceState[partnerId] = {
+        ...presenceState[partnerId],
+        isOnline: Boolean(isOnline),
+        isTyping: isOnline ? presenceState[partnerId]?.isTyping : false,
+        lastSeen: now,
+        updatedAt: now,
+      };
+      broadcastPresence();
+    }
+    res.json({ success: true, presence: presenceState });
+  });
+
+  // Impulsion de manque (Pulse)
+  app.post("/api/chat/pulse", (req, res) => {
+    try {
+      const { pulse, senderName } = req.body;
+      if (!pulse || !pulse.senderId) {
+        return res.status(400).json({ error: "Impulsion invalide" });
+      }
+
+      // Diffusion instantanée vers les clients connectés
+      const data = JSON.stringify({ type: "pulse", pulse });
+      sseClients.forEach((client) => {
+        try {
+          client.res.write(`data: ${data}\n\n`);
+        } catch {}
+      });
+
+      // Notification Push
+      sendPushToPartner(
+        pulse.senderId,
+        senderName || (pulse.senderId === "p1" ? "Med" : "Safi"),
+        pulse.message || "Tu me manques tellement ! 💓",
+        "pulse"
+      ).catch(() => {});
+
+      return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

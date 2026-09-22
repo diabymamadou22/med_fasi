@@ -5,7 +5,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
   setLogLevel,
-  disableNetwork,
+  enableNetwork,
 } from 'firebase/firestore';
 
 // Silence internal Firestore SDK retry and quota logs
@@ -70,17 +70,10 @@ try {
 
 export const db = firestoreInstance;
 
-// Si le quota quotidien Firestore est atteint pour ce projet, couper immédiatement les requêtes réseau
-// pour éviter le spam 429 et les boucles de backoff du SDK Firebase.
-const QUOTA_STORAGE_KEY = 'nid_firestore_quota_exhausted_timestamp';
+// S'assurer que le réseau Firestore est actif pour la réception des données en temps réel
 if (typeof window !== 'undefined' && db) {
   try {
-    const raw = localStorage.getItem(QUOTA_STORAGE_KEY);
-    const isExhausted = raw ? Date.now() - parseInt(raw, 10) < 4 * 60 * 60 * 1000 : true;
-    if (isExhausted) {
-      localStorage.setItem(QUOTA_STORAGE_KEY, String(Date.now()));
-      disableNetwork(db).catch(() => {});
-    }
+    enableNetwork(db).catch(() => {});
   } catch {}
 }
 

@@ -266,8 +266,6 @@ export function markQuotaExhausted() {
       localStorage.setItem(QUOTA_STORAGE_KEY, String(Date.now()));
     } catch {}
   }
-  // Couper immédiatement les tentatives réseau de Firestore pour éviter les 429 et boucles d'erreur
-  pauseFirestoreNetwork().catch(() => {});
 }
 
 export function resetQuotaExhausted() {
@@ -279,10 +277,10 @@ export function resetQuotaExhausted() {
   }
 }
 
-// Couper le réseau Firestore dès l'initialisation si le quota est actuellement marqué épuisé
-if (typeof window !== 'undefined' && isQuotaExhausted()) {
+// Assurer la reprise du réseau dès le démarrage
+if (typeof window !== 'undefined') {
   setTimeout(() => {
-    pauseFirestoreNetwork().catch(() => {});
+    resumeFirestoreNetwork().catch(() => {});
   }, 100);
 }
 
@@ -319,12 +317,11 @@ export function logFirestoreSyncIssue(context: string, err: any) {
 }
 
 async function safeFirestoreOperation<T>(action: () => Promise<T>, context: string): Promise<T | void> {
-  // Disjoncteur de quota : si le quota gratuit Firebase est atteint, éviter de saturer le réseau avec des réessais en boucle
-  if (isQuotaExhausted()) {
-    return;
-  }
   try {
-    return await action();
+    const result = await action();
+    // Si une opération réussit, le quota est opérationnel
+    resetQuotaExhausted();
+    return result;
   } catch (err) {
     logFirestoreSyncIssue(context, err);
   }
