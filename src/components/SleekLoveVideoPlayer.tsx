@@ -14,8 +14,6 @@ import {
   Sliders,
   RotateCcw,
   RotateCw,
-  Clock,
-  RefreshCw,
 } from 'lucide-react';
 import { resolveMediaUrl, formatVideoDuration } from '../lib/videoUtils';
 import { useBackHandler } from '../lib/backNavigation';
@@ -84,7 +82,6 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   const [resolvedSrc, setResolvedSrc] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
-  const [isWaitingPartnerSync, setIsWaitingPartnerSync] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [internalIsMuted, setInternalIsMuted] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -97,6 +94,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
   const [isScrubbing, setIsScrubbing] = useState<boolean>(false);
   const [showStandaloneMenu, setShowStandaloneMenu] = useState<boolean>(false);
   const [skipFeedback, setSkipFeedback] = useState<{ type: 'rewind' | 'forward'; id: number } | null>(null);
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
 
   const isMuted = externalIsMuted !== undefined ? externalIsMuted : internalIsMuted;
   const isLooping = externalIsLooping !== undefined ? externalIsLooping : internalIsLooping;
@@ -136,28 +134,15 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
     if (!src) {
       setIsLoading(false);
       setHasError(true);
-      setIsWaitingPartnerSync(false);
       return;
     }
 
     setIsLoading(true);
     setHasError(false);
-    setIsWaitingPartnerSync(false);
 
     resolveMediaUrl(src)
       .then((url) => {
         if (isMounted) {
-          if (!url) {
-            // Local blob not found on this device (partner device waiting for uploader sync)
-            if (src.startsWith('idb:')) {
-              setIsWaitingPartnerSync(true);
-            } else {
-              setHasError(true);
-            }
-            setIsLoading(false);
-            return;
-          }
-          setIsWaitingPartnerSync(false);
           setResolvedSrc(url);
           setIsLoading(false);
         }
@@ -165,32 +150,13 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       .catch((err) => {
         console.error('Erreur de chargement de la vidéo:', err);
         if (isMounted) {
-          if (src.startsWith('idb:')) {
-            setIsWaitingPartnerSync(true);
-          } else {
-            setHasError(true);
-          }
+          setHasError(true);
           setIsLoading(false);
         }
       });
 
-    // Listen to real-time auto-migration events from background sync
-    const handleMigrated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ oldKey: string; newUrl: string }>;
-      if (customEvent.detail?.oldKey === src) {
-        if (isMounted) {
-          setResolvedSrc(customEvent.detail.newUrl);
-          setIsWaitingPartnerSync(false);
-          setHasError(false);
-          setIsLoading(false);
-        }
-      }
-    };
-    window.addEventListener('nid:media_migrated', handleMigrated);
-
     return () => {
       isMounted = false;
-      window.removeEventListener('nid:media_migrated', handleMigrated);
     };
   }, [src]);
 
@@ -473,35 +439,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
       style={{ touchAction: 'manipulation' }}
     >
       {/* Video Element */}
-      {isWaitingPartnerSync ? (
-        <div className="p-6 text-center text-amber-200 text-xs sm:text-sm flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-          <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 animate-pulse">
-            <Clock className="w-6 h-6" />
-          </div>
-          <span className="font-semibold text-white text-sm">Vidéo en attente de synchronisation</span>
-          <span className="text-amber-200/80 text-xs leading-relaxed">
-            Cette vidéo a été importée depuis l’appareil de votre partenaire. Dès que son application sera ouverte, elle apparaîtra directement ici !
-          </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsLoading(true);
-              resolveMediaUrl(src).then((url) => {
-                if (url) {
-                  setResolvedSrc(url);
-                  setIsWaitingPartnerSync(false);
-                }
-                setIsLoading(false);
-              });
-            }}
-            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-colors cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Vérifier</span>
-          </button>
-        </div>
-      ) : hasError ? (
+      {hasError ? (
         <div className="p-6 text-center text-rose-300 text-xs sm:text-sm flex flex-col items-center justify-center gap-2">
           <AlertCircle className="w-6 h-6 text-rose-400" />
           <span>Vidéo indisponible ou introuvable</span>
@@ -523,6 +461,11 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
               setDuration(d);
               if (onTimeUpdateProp) {
                 onTimeUpdateProp(videoRef.current.currentTime || 0, d);
+              }
+              const vw = videoRef.current.videoWidth;
+              const vh = videoRef.current.videoHeight;
+              if (vw && vh && vw > 0 && vh > 0) {
+                setVideoAspect(vw / vh);
               }
             }
           }}
@@ -560,14 +503,15 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
             if (onPlayingChange) onPlayingChange(true);
             resetHideTimer(1000);
           }}
-          className="w-full h-full max-w-full max-h-full object-contain cursor-pointer mx-auto my-auto block"
+          className="max-w-full max-h-full cursor-pointer m-auto block pointer-events-auto"
           style={{
             maxWidth: '100%',
             maxHeight: '100%',
-            width: '100%',
-            height: '100%',
+            width: videoAspect ? undefined : 'auto',
+            height: videoAspect ? undefined : 'auto',
+            aspectRatio: videoAspect ? `${videoAspect}` : undefined,
             objectFit: 'contain',
-            objectPosition: 'center',
+            objectPosition: '50% 50%',
             margin: 'auto',
             display: 'block',
           }}
@@ -600,9 +544,9 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
         </div>
       )}
 
-      {/* Center Icon Flash (Play / Pause feedback) and Paused State Indicator */}
+      {/* Center Icon Flash (Play / Pause feedback) */}
       <AnimatePresence>
-        {centerAnimation ? (
+        {centerAnimation && (
           <motion.div
             key={centerAnimation}
             initial={{ opacity: 0, scale: 0.6 }}
@@ -619,20 +563,7 @@ export const SleekLoveVideoPlayer: React.FC<SleekLoveVideoPlayerProps> = ({
               )}
             </div>
           </motion.div>
-        ) : !isPlaying && !isLoading && !hasError && !isEnded && !hideDefaultControls ? (
-          <motion.div
-            key="center-paused-state"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-          >
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/55 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white shadow-xl">
-              <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white text-white ml-1" />
-            </div>
-          </motion.div>
-        ) : null}
+        )}
       </AnimatePresence>
 
       {/* Double Tap Skip Feedback (-5s / +5s) */}

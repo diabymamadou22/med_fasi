@@ -318,17 +318,6 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
     resolveMediaUrl(mediaToResolve).then((url) => {
       setResolvedVideoUrl(url);
     });
-
-    const handleMigrated = (e: Event) => {
-      const customEvent = e as CustomEvent<{ oldKey: string; newUrl: string }>;
-      if (customEvent.detail?.oldKey === mediaToResolve) {
-        setResolvedVideoUrl(customEvent.detail.newUrl);
-      }
-    };
-    window.addEventListener('nid:media_migrated', handleMigrated);
-    return () => {
-      window.removeEventListener('nid:media_migrated', handleMigrated);
-    };
   }, [activeItem, isCurrentItemVideo]);
 
   // Reset zoom and pan
@@ -796,15 +785,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           ref={containerRef}
           {...(isCurrentItemVideo ? {} : bindGesture())}
           onClick={handleStageClick}
-          className={`${isCurrentItemVideo ? 'fixed inset-0' : 'absolute inset-0'} w-full h-full flex items-center justify-center overflow-hidden select-none cursor-pointer`}
-          style={{
-            touchAction: isCurrentItemVideo ? 'manipulation' : 'none',
-            position: isCurrentItemVideo ? 'fixed' : 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
+          className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-pointer"
+          style={{ touchAction: isCurrentItemVideo ? 'manipulation' : 'none' }}
         >
           {/* Navigation Arrows (Desktop / Tablet) */}
           {items.length > 1 && (
@@ -843,25 +825,15 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           {isCurrentItemVideo ? (
             <div
               key={activeItem.id}
-              className="fixed inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none m-auto pointer-events-auto z-30"
+              className="absolute inset-0 w-full h-full flex items-center justify-center bg-black overflow-hidden select-none m-auto pointer-events-auto"
               style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                width: '100vw',
-                height: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 transform: 'none',
                 WebkitTransform: 'none',
               }}
             >
               <SleekLoveVideoPlayer
-                key={activeItem.id}
-                src={activeItem.videoUrl || activeItem.photoUrl}
+                key={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
+                src={resolvedVideoUrl || activeItem.videoUrl || activeItem.photoUrl}
                 poster={activeItem.photoUrl}
                 title={activeItem.title}
                 autoPlay={true}
@@ -968,24 +940,26 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           {/* Central Play/Pause Button on Video tap for iPhone & Mobile */}
           <AnimatePresence>
             {isCurrentItemVideo && (showUiChrome || !isVideoPlaying) && (
-              <motion.button
-                key="central-video-play-btn"
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.18 }}
-                type="button"
-                onClick={handleTogglePlayVideo}
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/65 hover:bg-black/85 active:scale-90 text-white flex items-center justify-center backdrop-blur-xl border border-white/25 shadow-2xl transition-transform cursor-pointer pointer-events-auto select-none"
-                title={isVideoPlaying ? 'Mettre en pause' : 'Lire la vidéo'}
-                aria-label={isVideoPlaying ? 'Pause' : 'Lecture'}
-              >
-                {isVideoPlaying ? (
-                  <Pause className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white" />
-                ) : (
-                  <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white ml-1" />
-                )}
-              </motion.button>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                <motion.button
+                  key="central-video-play-btn"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.18 }}
+                  type="button"
+                  onClick={handleTogglePlayVideo}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/65 hover:bg-black/85 active:scale-90 text-white flex items-center justify-center backdrop-blur-xl border border-white/25 shadow-2xl transition-transform cursor-pointer pointer-events-auto select-none"
+                  title={isVideoPlaying ? 'Mettre en pause' : 'Lire la vidéo'}
+                  aria-label={isVideoPlaying ? 'Pause' : 'Lecture'}
+                >
+                  {isVideoPlaying ? (
+                    <Pause className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white" />
+                  ) : (
+                    <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white ml-1" />
+                  )}
+                </motion.button>
+              </div>
             )}
           </AnimatePresence>
         </div>

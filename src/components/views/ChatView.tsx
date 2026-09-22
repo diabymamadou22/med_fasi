@@ -3216,22 +3216,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* ================================================================= */}
-      {/* 8. FULLSCREEN PHOTO & VIDEO VIEWER (FIXED CENTERED MODAL) */}
+      {/* 8. FULLSCREEN PHOTO VIEWER (SWIPE & PINCH-TO-ZOOM LIKE PHONE) */}
       {/* ================================================================= */}
-      {activeChatPhotoIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto bg-black overflow-hidden"
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-        >
-          <MobilePhotoViewer
-            items={chatPhotoItems}
-            initialIndex={activeChatPhotoIndex ?? 0}
-            isOpen={activeChatPhotoIndex !== null}
-            onClose={() => setActiveChatPhotoIndex(null)}
-            onIndexChange={(newIdx) => setActiveChatPhotoIndex(newIdx)}
-          />
-        </div>
-      )}
+      <MobilePhotoViewer
+        items={chatPhotoItems}
+        initialIndex={activeChatPhotoIndex ?? 0}
+        isOpen={activeChatPhotoIndex !== null}
+        onClose={() => setActiveChatPhotoIndex(null)}
+        onIndexChange={(newIdx) => setActiveChatPhotoIndex(newIdx)}
+      />
 
       {/* ================================================================= */}
       {/* 8.5. LONG-PRESS / OPTIONS ACTION SHEET (MOBILE & IPHONE FIRST) */}

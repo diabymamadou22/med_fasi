@@ -41,89 +41,31 @@ function openMediaDb(): Promise<IDBDatabase> {
 }
 
 /**
- * Upload a media Blob or File to the server for persistent, cross-partner playback
- */
-export async function uploadMediaToServer(
-  blobOrFile: Blob | File,
-  suggestedFilename?: string
-): Promise<{ url: string; filename: string; size: number }> {
-  const originalName =
-    suggestedFilename ||
-    (blobOrFile instanceof File ? blobOrFile.name : `video_${Date.now()}.mp4`);
-
-  const uploadEndpoint = `/api/media/upload?filename=${encodeURIComponent(originalName)}`;
-
-  const response = await fetch(uploadEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': blobOrFile.type || 'video/mp4',
-      'X-Filename': originalName,
-    },
-    body: blobOrFile,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Erreur serveur HTTP ${response.status} lors de l'upload du média`);
-  }
-
-  const result = await response.json();
-  if (!result || !result.url) {
-    throw new Error("Réponse d'upload média invalide du serveur");
-  }
-
-  return {
-    url: result.url,
-    filename: result.filename || originalName,
-    size: result.size || blobOrFile.size,
-  };
-}
-
-/**
- * Save a video Blob or File to IndexedDB for local zero-latency caching,
- * and upload to the server so that the partner can play it seamlessly across devices.
- * Returns the server URL `/api/media/xxx.mp4` when uploaded, or `idb:xxx` as offline fallback.
+ * Save a video Blob or File to IndexedDB and return an `idb:` reference key
  */
 export async function storeMediaBlob(key: string, blob: Blob): Promise<string> {
-  const originalName = blob instanceof File ? blob.name : `${key}.mp4`;
-
-  // 1. Immediately store in local IndexedDB so local playback never fails even if offline
   try {
     const db = await openMediaDb();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    store.put(blob, key);
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(blob, key);
+
+      req.onsuccess = () => {
+        // Cache the object URL for immediate fast access
+        const objUrl = URL.createObjectURL(blob);
+        objectUrlCache.set(key, objUrl);
+        resolve(`idb:${key}`);
+      };
+
+      req.onerror = () => {
+        reject(req.error || new Error('Erreur de sauvegarde média dans IndexedDB.'));
+      };
+    });
   } catch (err) {
-    console.warn('IndexedDB write warning:', err);
+    console.warn('Fallback: impossible de stocker dans IndexedDB, conversion en DataURL...', err);
+    return blobToDataUrl(blob);
   }
-
-  // Pre-cache object URL for instant zero-latency preview on uploader's device
-  const localObjUrl = URL.createObjectURL(blob);
-  objectUrlCache.set(key, localObjUrl);
-
-  // 2. Upload to the shared server so partner can play it across devices
-  try {
-    const uploadRes = await uploadMediaToServer(blob, originalName);
-    if (uploadRes && uploadRes.url) {
-      // Also cache local object URL under the server URL so the uploader doesn't re-download it!
-      objectUrlCache.set(uploadRes.url, localObjUrl);
-
-      // Also save in local IndexedDB under the server URL for offline support
-      try {
-        const db = await openMediaDb();
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.put(blob, uploadRes.url);
-      } catch {}
-
-      console.log(`[Media Stored & Uploaded] Accessible pour les 2 partenaires: ${uploadRes.url}`);
-      return uploadRes.url;
-    }
-  } catch (uploadErr) {
-    console.warn("[Media Upload Fallback] Impossible d'uploader vers le serveur pour le moment:", uploadErr);
-  }
-
-  // If network upload failed or was offline, return idb key as fallback
-  return `idb:${key}`;
 }
 
 /**
@@ -154,29 +96,21 @@ export async function getMediaBlob(key: string): Promise<Blob | null> {
 
 /**
  * Resolves a media URL.
- * If it is already a server URL (`/api/media/...`), web URL (`http`, `https`), or `data:` / `blob:`, returns it directly.
- * If it is an IndexedDB ref (`idb:xxx`):
- *   - If available locally, returns the local blob URL and triggers background migration to the server.
- *   - If NOT available locally (e.g. partner's phone before sync), returns '' to avoid broken scheme errors.
+ * If it is an IndexedDB ref (`idb:xxx`), loads the Blob and returns a working `blob:` URL.
+ * If it is already a `data:`, `blob:`, or `http:` URL, returns it directly.
  */
 export async function resolveMediaUrl(urlOrKey?: string): Promise<string> {
   if (!urlOrKey) return '';
 
-  // 1. Direct server endpoint, web URL or data/blob
   if (
-    urlOrKey.startsWith('/api/') ||
     urlOrKey.startsWith('data:') ||
     urlOrKey.startsWith('blob:') ||
     urlOrKey.startsWith('http://') ||
     urlOrKey.startsWith('https://')
   ) {
-    if (objectUrlCache.has(urlOrKey)) {
-      return objectUrlCache.get(urlOrKey)!;
-    }
     return urlOrKey;
   }
 
-  // 2. IndexedDB reference (`idb:xxx` or raw key)
   const rawKey = urlOrKey.startsWith('idb:') ? urlOrKey.replace(/^idb:/, '') : urlOrKey;
 
   // Check cache first
@@ -188,29 +122,10 @@ export async function resolveMediaUrl(urlOrKey?: string): Promise<string> {
   if (blob) {
     const objUrl = URL.createObjectURL(blob);
     objectUrlCache.set(rawKey, objUrl);
-
-    // Auto-migrate this legacy local blob to the shared server in background
-    uploadMediaToServer(blob, `${rawKey}.mp4`)
-      .then((uploadRes) => {
-        if (uploadRes?.url) {
-          objectUrlCache.set(uploadRes.url, objUrl);
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(
-              new CustomEvent('nid:media_migrated', {
-                detail: { oldKey: urlOrKey, newUrl: uploadRes.url },
-              })
-            );
-          }
-        }
-      })
-      .catch((err) => console.warn('[Auto-Migrate] Background migration warning:', err));
-
     return objUrl;
   }
 
-  // 3. Not found locally: this device is the partner's and the video is still pending sync from the uploader
-  console.warn(`[resolveMediaUrl] Média local introuvable sur cet appareil (en attente de synchronisation): ${urlOrKey}`);
-  return '';
+  return urlOrKey;
 }
 
 /**
@@ -219,15 +134,11 @@ export async function resolveMediaUrl(urlOrKey?: string): Promise<string> {
 export function getCachedMediaUrl(urlOrKey?: string): string {
   if (!urlOrKey) return '';
   if (
-    urlOrKey.startsWith('/api/') ||
     urlOrKey.startsWith('data:') ||
     urlOrKey.startsWith('blob:') ||
     urlOrKey.startsWith('http://') ||
     urlOrKey.startsWith('https://')
   ) {
-    if (objectUrlCache.has(urlOrKey)) {
-      return objectUrlCache.get(urlOrKey)!;
-    }
     return urlOrKey;
   }
 
@@ -263,7 +174,6 @@ export function isVideoMediaType(fileOrUrl?: File | string | null, mediaType?: s
 
   const clean = fileOrUrl.toLowerCase().trim();
   if (clean.startsWith('data:video/') || clean.startsWith('blob:')) return true;
-  if (clean.startsWith('idb:') || clean.includes('/api/media/')) return true;
 
   // Strip query parameters and hashes to test actual filename extension
   const urlWithoutQuery = clean.split('?')[0].split('#')[0];

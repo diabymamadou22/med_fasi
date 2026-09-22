@@ -35,7 +35,6 @@ import {
 } from './lib/notificationService';
 import { onPwaNavigate } from './lib/pwaService';
 import { useBackHandler, backNavigation } from './lib/backNavigation';
-import { getMediaBlob, uploadMediaToServer } from './lib/videoUtils';
 import { WifiOff } from 'lucide-react';
 import {
   CoupleProfile,
@@ -873,75 +872,6 @@ export default function App() {
     if (!isInitialRemoteLoaded) return;
     localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
   }, [messages, isInitialRemoteLoaded]);
-
-  // Auto-migration of legacy local IndexedDB videos (idb: references) to the shared server
-  // Ensures that videos uploaded locally on one device become playable for the partner!
-  useEffect(() => {
-    if (!isInitialRemoteLoaded) return;
-
-    let isCancelled = false;
-
-    const migrateMemories = async () => {
-      for (const mem of memories) {
-        if (isCancelled) break;
-        if (mem.videoUrl && mem.videoUrl.startsWith('idb:')) {
-          const rawKey = mem.videoUrl.replace(/^idb:/, '');
-          const blob = await getMediaBlob(rawKey);
-          if (blob) {
-            try {
-              console.log(`[Auto-Migration] Téléversement pour le partenaire de "${mem.title}"...`);
-              const uploadRes = await uploadMediaToServer(blob, `vid_mem_${mem.id}.mp4`);
-              if (uploadRes?.url && !isCancelled) {
-                const updatedMem = { ...mem, videoUrl: uploadRes.url };
-                await saveMemory(updatedMem);
-                console.log(`[Auto-Migration] "${mem.title}" désormais partagée avec le partenaire: ${uploadRes.url}`);
-              }
-            } catch (err) {
-              console.warn('[Auto-Migration] Erreur synchronisation vidéo:', err);
-            }
-          }
-        }
-      }
-    };
-
-    const migrateChatVideos = async () => {
-      for (const msg of messages) {
-        if (isCancelled) break;
-        const vUrl = msg.videoUrl || (msg.mediaType === 'video' ? msg.mediaUrl : null);
-        if (vUrl && vUrl.startsWith('idb:')) {
-          const rawKey = vUrl.replace(/^idb:/, '');
-          const blob = await getMediaBlob(rawKey);
-          if (blob) {
-            try {
-              console.log(`[Auto-Migration Chat] Téléversement vidéo message ${msg.id}...`);
-              const uploadRes = await uploadMediaToServer(blob, `vid_chat_${msg.id}.mp4`);
-              if (uploadRes?.url && !isCancelled) {
-                const updatedMsg = {
-                  ...msg,
-                  mediaUrl: uploadRes.url,
-                  videoUrl: uploadRes.url,
-                };
-                await saveChatMessage(updatedMsg);
-                console.log(`[Auto-Migration Chat] Message ${msg.id} partagé: ${uploadRes.url}`);
-              }
-            } catch (err) {
-              console.warn('[Auto-Migration Chat] Erreur synchronisation vidéo message:', err);
-            }
-          }
-        }
-      }
-    };
-
-    const timer = setTimeout(() => {
-      migrateMemories();
-      migrateChatVideos();
-    }, 2500);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timer);
-    };
-  }, [isInitialRemoteLoaded, memories.length, messages.length]);
 
   // Update PWA Home Screen App Badge for unread chat messages
   useEffect(() => {

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Maximize2, Download, Video } from 'lucide-react';
 import { ChatMessage } from '../../types';
-import { formatVideoDuration, resolveMediaUrl } from '../../lib/videoUtils';
+import { formatVideoDuration } from '../../lib/videoUtils';
 import { SleekLoveVideoPlayer } from '../SleekLoveVideoPlayer';
 
 interface ChatVideoBubbleProps {
@@ -18,15 +18,7 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
   chatTheme,
 }) => {
   const [showOverlay, setShowOverlay] = useState(true);
-  const [downloadHref, setDownloadHref] = useState<string>('');
   const rawUrl = message.videoUrl || message.mediaUrl || '';
-
-  useEffect(() => {
-    if (!rawUrl) return;
-    resolveMediaUrl(rawUrl).then((resolved) => {
-      if (resolved) setDownloadHref(resolved);
-    });
-  }, [rawUrl]);
 
   const formattedDuration = message.videoDuration
     ? formatVideoDuration(message.videoDuration)
@@ -35,23 +27,14 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
   return (
     <div className="rounded-2xl overflow-hidden mb-2 relative group/video border border-white/20 shadow-md bg-black max-w-[290px] sm:max-w-[340px]">
       {/* Sleek Custom Video Player */}
-      <div
-        className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden cursor-pointer"
-        style={{ width: '100%', objectFit: 'contain' }}
-        onClick={(e) => {
-          if (onOpenFullscreen) {
-            e.stopPropagation();
-            onOpenFullscreen();
-          }
-        }}
-      >
+      <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
         <SleekLoveVideoPlayer
           src={rawUrl}
           poster={message.videoThumbnail}
           compact={true}
           onOpenFullscreen={onOpenFullscreen}
           onControlsVisibilityChange={setShowOverlay}
-          className="w-full h-full object-contain"
+          className="w-full h-full"
         />
 
         {/* Top Badges (Duration & Video type) */}
@@ -87,9 +70,9 @@ export const ChatVideoBubble: React.FC<ChatVideoBubbleProps> = ({
             </button>
           )}
 
-          {(downloadHref || rawUrl) && (
+          {rawUrl && (
             <a
-              href={downloadHref || rawUrl}
+              href={rawUrl}
               download="video-souvenir.mp4"
               target="_blank"
               rel="noreferrer"

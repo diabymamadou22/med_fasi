@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Images,
@@ -55,7 +55,6 @@ import {
   storeMediaBlob,
   formatVideoDuration,
   isVideoMediaType,
-  resolveMediaUrl,
 } from '../../lib/videoUtils';
 import {
   groupGalleryItemsByDate,
@@ -1601,23 +1600,16 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       {/* =========================================================
           FULLSCREEN MOBILE PHOTO & VIDEO VIEWER (Auto-Hides UI)
          ========================================================= */}
-      {activeLightboxIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto bg-black overflow-hidden"
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-        >
-          <MobilePhotoViewer
-            items={photoViewerItems}
-            initialIndex={activeLightboxIndex ?? 0}
-            isOpen={activeLightboxIndex !== null}
-            onClose={() => {
-              setActiveLightboxIndex(null);
-              setLightboxContextItems(null);
-            }}
-            onIndexChange={(newIndex) => setActiveLightboxIndex(newIndex)}
-          />
-        </div>
-      )}
+      <MobilePhotoViewer
+        items={photoViewerItems}
+        initialIndex={activeLightboxIndex ?? 0}
+        isOpen={activeLightboxIndex !== null}
+        onClose={() => {
+          setActiveLightboxIndex(null);
+          setLightboxContextItems(null);
+        }}
+        onIndexChange={(newIndex) => setActiveLightboxIndex(newIndex)}
+      />
 
       {/* Live Direct Camera Modal */}
       <CameraCaptureModal
@@ -1785,6 +1777,7 @@ const SamsungAlbumCard: React.FC<{
     // STACKED CARD VARIANT (For "Recent" and "Favourites" as in screenshot)
     return (
       <motion.div
+        layout
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.25) }}
@@ -1823,6 +1816,7 @@ const SamsungAlbumCard: React.FC<{
     // PASTEL VARIANT (For "Quick Share" as in screenshot)
     return (
       <motion.div
+        layout
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.25) }}
@@ -1859,6 +1853,7 @@ const SamsungAlbumCard: React.FC<{
   // STANDARD PHOTO BACKGROUND CARD VARIANT (For Camera, Screenshots, Download, SS24, etc.)
   return (
     <motion.div
+      layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.25) }}
@@ -1920,26 +1915,20 @@ const SamsungPhotoItem: React.FC<{
     Boolean(item.videoUrl) ||
     isVideoMediaType(item.videoUrl || item.photoUrl, item.mediaType);
   const [videoError, setVideoError] = useState(false);
-  const [resolvedVideoSrc, setResolvedVideoSrc] = useState<string>('');
-
-  useEffect(() => {
-    if (!isVideo) return;
-    const raw = item.videoUrl || item.photoUrl;
-    if (!raw) return;
-    resolveMediaUrl(raw).then((url) => {
-      if (url) setResolvedVideoSrc(url);
-    });
-  }, [isVideo, item.videoUrl, item.photoUrl]);
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.12, delay: Math.min(index * 0.01, 0.2) }}
       onClick={onClick}
       className="group relative aspect-square overflow-hidden bg-stone-100 dark:bg-stone-800 cursor-pointer select-none"
     >
       {isVideo && autoplayVideo && !videoError ? (
         <div className="w-full h-full bg-black flex items-center justify-center overflow-hidden">
           <video
-            src={resolvedVideoSrc || item.videoUrl || item.photoUrl}
+            src={item.videoUrl || item.photoUrl}
             poster={item.photoUrl}
             autoPlay
             loop
@@ -1947,8 +1936,8 @@ const SamsungPhotoItem: React.FC<{
             playsInline
             preload="metadata"
             onError={() => setVideoError(true)}
-            className="w-full h-full object-contain pointer-events-none block"
-            style={{ objectFit: 'contain', objectPosition: 'center', width: '100%', height: '100%' }}
+            className="max-w-full max-h-full object-contain mx-auto my-auto block"
+            style={{ objectFit: 'contain', objectPosition: '50% 50%' }}
           />
         </div>
       ) : (
@@ -1978,7 +1967,7 @@ const SamsungPhotoItem: React.FC<{
           <Heart className="w-3 h-3 fill-rose-500 text-rose-500" />
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
