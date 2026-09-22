@@ -1,8 +1,13 @@
 /**
- * Video processing, thumbnail generation, and IndexedDB storage utilities for NID.
+ * Video processing, thumbnail generation, and IndexedDB/Firestore storage utilities for NID.
  * Enables seamless video importing for Chat and Shared Gallery with client-side persistence,
- * video thumbnail generation, and responsive playback across mobile and desktop.
+ * cloud sync between partners, video thumbnail generation, and responsive playback across mobile and desktop.
  */
+
+import {
+  saveMediaBlobToFirestore,
+  getMediaBlobFromFirestore,
+} from './firestoreMediaSync';
 
 const DB_NAME = 'nid_media_db';
 const DB_VERSION = 1;
@@ -96,7 +101,8 @@ export async function getMediaBlob(key: string): Promise<Blob | null> {
 
 /**
  * Resolves a media URL.
- * If it is an IndexedDB ref (`idb:xxx`), loads the Blob and returns a working `blob:` URL.
+ * If it is an IndexedDB ref (`idb:xxx`) or Firestore ref (`firestore:xxx`),
+ * loads the Blob and returns a working `blob:` URL.
  * If it is already a `data:`, `blob:`, or `http:` URL, returns it directly.
  */
 export async function resolveMediaUrl(urlOrKey?: string): Promise<string> {
@@ -111,18 +117,39 @@ export async function resolveMediaUrl(urlOrKey?: string): Promise<string> {
     return urlOrKey;
   }
 
-  const rawKey = urlOrKey.startsWith('idb:') ? urlOrKey.replace(/^idb:/, '') : urlOrKey;
+  const cleanKey = urlOrKey
+    .replace(/^firestore:/, '')
+    .replace(/^idb:/, '');
 
   // Check cache first
-  if (objectUrlCache.has(rawKey)) {
-    return objectUrlCache.get(rawKey)!;
+  if (objectUrlCache.has(cleanKey)) {
+    return objectUrlCache.get(cleanKey)!;
   }
 
-  const blob = await getMediaBlob(rawKey);
-  if (blob) {
-    const objUrl = URL.createObjectURL(blob);
-    objectUrlCache.set(rawKey, objUrl);
-    return objUrl;
+  // 1. Try local IndexedDB
+  try {
+    const idbBlob = await getMediaBlob(cleanKey);
+    if (idbBlob) {
+      const objUrl = URL.createObjectURL(idbBlob);
+      objectUrlCache.set(cleanKey, objUrl);
+      return objUrl;
+    }
+  } catch (err) {
+    // Continue to Firestore
+  }
+
+  // 2. Try Firestore cloud storage
+  try {
+    const firestoreBlob = await getMediaBlobFromFirestore(cleanKey);
+    if (firestoreBlob) {
+      // Also cache in local IndexedDB for future instant/offline loads
+      storeMediaBlob(cleanKey, firestoreBlob).catch(() => {});
+      const objUrl = URL.createObjectURL(firestoreBlob);
+      objectUrlCache.set(cleanKey, objUrl);
+      return objUrl;
+    }
+  } catch (fsErr) {
+    console.warn(`[videoUtils] Impossible de résoudre le média "${cleanKey}":`, fsErr);
   }
 
   return urlOrKey;
@@ -142,9 +169,12 @@ export function getCachedMediaUrl(urlOrKey?: string): string {
     return urlOrKey;
   }
 
-  const rawKey = urlOrKey.startsWith('idb:') ? urlOrKey.replace(/^idb:/, '') : urlOrKey;
-  if (objectUrlCache.has(rawKey)) {
-    return objectUrlCache.get(rawKey)!;
+  const cleanKey = urlOrKey
+    .replace(/^firestore:/, '')
+    .replace(/^idb:/, '');
+
+  if (objectUrlCache.has(cleanKey)) {
+    return objectUrlCache.get(cleanKey)!;
   }
   return urlOrKey;
 }
@@ -316,4 +346,89 @@ export function formatMediaSize(bytes?: number): string {
   const sizes = ['o', 'Ko', 'Mo', 'Go'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+export interface UploadAndPersistResult {
+  serverUrl: string;
+  localBlobUrl: string;
+  thumbnailDataUrl: string;
+  duration?: number;
+  formattedDuration: string;
+  width?: number;
+  height?: number;
+  sizeBytes: number;
+}
+
+/**
+ * Universal media upload and persistence engine.
+ * 1. Generates an instant, optimized video thumbnail and metadata.
+ * 2. Caches media in IndexedDB and generates a blob URL for instant zero-lag playback.
+ * 3. Chunks and synchronizes media to Firestore cloud storage so both partners can view it across any device.
+ */
+export async function uploadAndPersistMedia(
+  file: File | Blob,
+  keyPrefix = 'vid',
+  onProgress?: (status: string) => void
+): Promise<UploadAndPersistResult> {
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  const mediaKey = `${keyPrefix}_${timestamp}_${randomSuffix}`;
+  const fileSize = file.size || 0;
+
+  onProgress?.('Extraction de la miniature...');
+  let thumbnailDataUrl = '';
+  let duration: number | undefined;
+  let formattedDuration = '0:00';
+  let width = 640;
+  let height = 360;
+
+  try {
+    const meta = await extractVideoThumbnail(file);
+    thumbnailDataUrl = meta.thumbnailDataUrl;
+    duration = meta.duration;
+    formattedDuration = meta.formattedDuration;
+    width = meta.width;
+    height = meta.height;
+  } catch (err) {
+    console.warn('[videoUtils] Miniature non disponible, utilisation du repli par défaut:', err);
+  }
+
+  // 1. Local caching in IndexedDB for immediate playback
+  onProgress?.('Mise en cache locale...');
+  const idbKey = await storeMediaBlob(mediaKey, file);
+  const localBlobUrl = URL.createObjectURL(file);
+  objectUrlCache.set(mediaKey, localBlobUrl);
+  objectUrlCache.set(idbKey.replace(/^idb:/, ''), localBlobUrl);
+
+  // 2. Persist to Firestore for cloud sync between both partners
+  let serverUrl = idbKey;
+  try {
+    onProgress?.('Synchronisation cloud avec votre partenaire (0%)...');
+    const fileName = file instanceof File ? file.name : `${mediaKey}.mp4`;
+    const firestoreUrl = await saveMediaBlobToFirestore(
+      mediaKey,
+      file,
+      fileName,
+      (percent) => {
+        onProgress?.(`Synchronisation cloud (${percent}%)...`);
+      }
+    );
+    if (firestoreUrl) {
+      serverUrl = firestoreUrl;
+      objectUrlCache.set(firestoreUrl.replace(/^firestore:/, ''), localBlobUrl);
+    }
+  } catch (syncErr) {
+    console.warn('[videoUtils] Synchronisation cloud Firestore en repli IDB:', syncErr);
+  }
+
+  return {
+    serverUrl,
+    localBlobUrl,
+    thumbnailDataUrl,
+    duration,
+    formattedDuration,
+    width,
+    height,
+    sizeBytes: fileSize,
+  };
 }
