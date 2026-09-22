@@ -19,6 +19,7 @@ import { processPhotoWithoutCropping } from '../../lib/imageUtils';
 import {
   extractVideoThumbnail,
   storeMediaBlob,
+  uploadAndPersistMedia,
   formatVideoDuration,
   resolveMediaUrl,
 } from '../../lib/videoUtils';
@@ -104,19 +105,21 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
 
   const handleVideoFile = async (file: File) => {
     setIsProcessingMedia(true);
-    setProcessingStatusText('Préparation de la vidéo...');
+    setProcessingStatusText('Préparation et téléversement de la vidéo pour votre partenaire...');
     try {
-      const meta = await extractVideoThumbnail(file);
-      const mediaKey = `vid_mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const idbRef = await storeMediaBlob(mediaKey, file);
+      const uploadResult = await uploadAndPersistMedia(file, 'vid_mem', (status) => {
+        setProcessingStatusText(status);
+      });
 
-      setPhotoUrl(meta.thumbnailDataUrl);
-      setVideoUrl(idbRef);
+      setPhotoUrl(uploadResult.thumbnailDataUrl);
+      setVideoUrl(uploadResult.serverUrl);
+      setResolvedVideoSrc(uploadResult.localBlobUrl || uploadResult.serverUrl);
       setMediaType('video');
-      setVideoDuration(meta.duration);
+      setVideoDuration(uploadResult.duration);
 
       if (!caption.trim()) {
-        setCaption('Notre vidéo complice');
+        const fileBase = file.name.replace(/\.[^/.]+$/, '').trim();
+        setCaption(fileBase && fileBase.length > 1 ? fileBase : 'Notre vidéo complice');
       }
 
       soundEffects.playSuccessSparkle();

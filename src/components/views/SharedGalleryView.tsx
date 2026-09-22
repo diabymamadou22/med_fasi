@@ -53,6 +53,7 @@ import { processPhotoWithoutCropping } from '../../lib/imageUtils';
 import {
   extractVideoThumbnail,
   storeMediaBlob,
+  uploadAndPersistMedia,
   formatVideoDuration,
   isVideoMediaType,
 } from '../../lib/videoUtils';
@@ -651,19 +652,19 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
 
   // Video processor helper
   const processSingleVideo = async (file: File) => {
-    const meta = await extractVideoThumbnail(file);
-    const mediaKey = `vid_mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const idbRef = await storeMediaBlob(mediaKey, file);
+    const uploadResult = await uploadAndPersistMedia(file, 'vid_mem', (status) => {
+      setUploadStatus(status);
+    });
     const fileName = file.name.replace(/\.[^/.]+$/, '').trim();
     const title = fileName && fileName.length > 1 ? fileName : 'Vidéo souvenir';
 
     if (onAddMemory) {
       onAddMemory({
         title,
-        photoUrl: meta.thumbnailDataUrl,
-        videoUrl: idbRef,
+        photoUrl: uploadResult.thumbnailDataUrl,
+        videoUrl: uploadResult.serverUrl,
         mediaType: 'video',
-        videoDuration: meta.duration ? formatVideoDuration(meta.duration) : undefined,
+        videoDuration: uploadResult.duration ? formatVideoDuration(uploadResult.duration) : undefined,
         date: new Date().toISOString().split('T')[0],
         category: 'souvenir',
         description: 'Vidéo importée dans notre galerie',

@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Heart,
-  Sparkles,
   Settings,
-  ArrowLeftRight,
   Camera,
-  MapPin,
   Lock,
   Cloud,
-  CloudCheck,
-  Download,
-  Smartphone,
   Bell,
   BellRing,
+  MoreVertical,
+  Download,
+  Check,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
@@ -50,8 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNotifications,
   isNotificationsActive = false,
 }) => {
-  const [showPulseMenu, setShowPulseMenu] = useState(false);
-  const [pulseSending, setPulseSending] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [pulseSending, setPulseSending] = useState<string | null>(null);
 
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -65,362 +64,380 @@ export const Header: React.FC<HeaderProps> = ({
     )
   );
 
+  // Close menu on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMenuOpen(false);
+    };
+    if (isMenuOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMenuOpen]);
+
   const handleQuickMissYou = (vibe: MissYouPulse['vibe'], msg: string) => {
-    setPulseSending(true);
+    setPulseSending(vibe);
     soundEffects.playHeartPulse();
     onSendMissYou(vibe, msg);
     setTimeout(() => {
-      setPulseSending(false);
-      setShowPulseMenu(false);
+      setPulseSending(null);
+      setIsMenuOpen(false);
     }, 600);
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[#FAF7F5]/95 backdrop-blur-md border-b border-rose-100/80 px-3 sm:px-6 pt-[max(0.6rem,env(safe-area-inset-top,0px))] pb-2 sm:pb-3 pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] transition-all">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
-        {/* Top / Left: Couple Brand & Days counter & Photos */}
-        <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-4">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative group flex items-center shrink-0">
-              <div className="flex items-center -space-x-2.5 sm:-space-x-3">
-                {/* Partner 1 Avatar with quick photo change */}
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenPhotoPicker ? onOpenPhotoPicker('p1') : onOpenSettings();
-                  }}
-                  className="relative group/p1 cursor-pointer"
-                  title={`Profil de ${profile.partner1.name}`}
-                >
-                  <PartnerAvatar
-                    name={profile.partner1.name}
-                    avatar={profile.partner1.avatar}
-                    partnerId="p1"
-                    size="md"
-                    className="border-2 border-white shadow-xs ring-2 ring-rose-400/60 group-hover/p1:ring-rose-500 transition-all"
-                  />
-                  <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/p1:opacity-100 transition-opacity text-white">
-                    <Camera className="w-3 h-3" />
-                  </span>
-                </div>
-
-                {/* Partner 2 Avatar with quick photo change */}
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenPhotoPicker ? onOpenPhotoPicker('p2') : onOpenSettings();
-                  }}
-                  className="relative group/p2 cursor-pointer"
-                  title={`Profil de ${profile.partner2.name}`}
-                >
-                  <PartnerAvatar
-                    name={profile.partner2.name}
-                    avatar={profile.partner2.avatar}
-                    partnerId="p2"
-                    size="md"
-                    className="border-2 border-white shadow-xs ring-2 ring-sky-400/60 group-hover/p2:ring-sky-500 transition-all"
-                  />
-                  <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/p2:opacity-100 transition-opacity text-white">
-                    <Camera className="w-3 h-3" />
-                  </span>
-                </div>
-              </div>
-              <span className="absolute -bottom-1 left-3 sm:left-4 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-rose-500 rounded-full flex items-center justify-center text-[8px] sm:text-[9px] text-white shadow-xs">
-                ❤️
-              </span>
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <h1 className="font-serif-romantic text-base sm:text-xl font-bold tracking-tight text-stone-800 truncate">
-                  {profile.relationshipTitle}
-                </h1>
-                <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
-                    isFirebaseConnected
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200/70'
-                      : 'bg-stone-100 text-stone-600 border border-stone-200'
-                  }`}
-                  title={
-                    isFirebaseConnected
-                      ? 'Firebase Cloud Firestore synchronisé en temps réel'
-                      : 'Mode Hors-ligne (LocalStorage local)'
-                  }
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isFirebaseConnected ? 'bg-amber-500 animate-pulse' : 'bg-stone-400'
-                    }`}
-                  />
-                  <Cloud className="w-3 h-3 text-amber-600 hidden xs:inline" />
-                  <span className="hidden sm:inline">
-                    {isFirebaseConnected ? 'Cloud Sync' : 'Local'}
-                  </span>
+    <header className="sticky top-0 z-30 bg-[#FAF7F5]/95 backdrop-blur-md border-b border-rose-100/70 px-3 sm:px-5 py-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] transition-all">
+      <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+        {/* Left: Couple Brand & Days counter & Photos */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="relative group flex items-center shrink-0">
+            <div className="flex items-center -space-x-2 sm:-space-x-2.5">
+              {/* Partner 1 Avatar */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPhotoPicker ? onOpenPhotoPicker('p1') : onOpenSettings();
+                }}
+                className="relative group/p1 cursor-pointer"
+                title={`Profil de ${profile.partner1.name} (cliquer pour modifier)`}
+              >
+                <PartnerAvatar
+                  name={profile.partner1.name}
+                  avatar={profile.partner1.avatar}
+                  partnerId="p1"
+                  size="sm"
+                  className="border-2 border-white shadow-2xs ring-1.5 ring-rose-400/80 group-hover/p1:ring-rose-500 transition-all"
+                />
+                <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/p1:opacity-100 transition-opacity text-white">
+                  <Camera className="w-2.5 h-2.5" />
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-stone-500 flex items-center gap-1 sm:gap-1.5 font-medium truncate">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                <span>{daysTogether} jours d'amour</span>
-                <span className="hidden sm:inline text-rose-300">•</span>
-                <span className="hidden sm:inline text-stone-500 text-[11px]">
-                  Chaque jour à tes côtés
+
+              {/* Partner 2 Avatar */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPhotoPicker ? onOpenPhotoPicker('p2') : onOpenSettings();
+                }}
+                className="relative group/p2 cursor-pointer"
+                title={`Profil de ${profile.partner2.name} (cliquer pour modifier)`}
+              >
+                <PartnerAvatar
+                  name={profile.partner2.name}
+                  avatar={profile.partner2.avatar}
+                  partnerId="p2"
+                  size="sm"
+                  className="border-2 border-white shadow-2xs ring-1.5 ring-sky-400/80 group-hover/p2:ring-sky-500 transition-all"
+                />
+                <span className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover/p2:opacity-100 transition-opacity text-white">
+                  <Camera className="w-2.5 h-2.5" />
                 </span>
-                <span className="hidden md:inline text-rose-300">•</span>
-                <span className="hidden md:inline text-rose-600/80 font-handwriting text-sm">
-                  Toujours plus complices
-                </span>
-              </p>
+              </div>
             </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-rose-500 rounded-full flex items-center justify-center text-[8px] text-white shadow-2xs">
+              ❤️
+            </span>
           </div>
 
-          {/* Quick action buttons on mobile */}
-          <div className="flex items-center gap-1 sm:hidden">
-            {onOpenNotifications && (
-              <button
-                onClick={onOpenNotifications}
-                className="relative text-stone-500 hover:text-rose-600 p-2 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
-                title="Alertes de messages & notifications"
-                id="btn-notifications-mobile"
-              >
-                {isNotificationsActive ? (
-                  <>
-                    <BellRing className="w-4 h-4 text-rose-500 animate-pulse" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full ring-1 ring-white" />
-                  </>
-                ) : (
-                  <>
-                    <Bell className="w-4 h-4 text-stone-500" />
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-400 rounded-full ring-1 ring-white animate-ping" />
-                  </>
-                )}
-              </button>
-            )}
-
-            {isPinEnabled && onLockApp && (
-              <button
-                onClick={onLockApp}
-                className="text-stone-500 hover:text-amber-600 p-2 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
-                title="Verrouiller l'espace"
-                id="btn-quick-lock-mobile"
-              >
-                <Lock className="w-4 h-4" />
-              </button>
-            )}
-
-            {onOpenInstallModal && (
-              <button
-                onClick={onOpenInstallModal}
-                className="text-stone-500 hover:text-rose-600 p-1.5 rounded-full hover:bg-rose-50 transition-colors cursor-pointer flex items-center gap-1"
-                title="Installer l'application sur votre téléphone"
-                id="btn-install-app-mobile"
-              >
-                <img
-                  src="/app-icon.png"
-                  alt="App Icon"
-                  className="w-5 h-5 rounded-md object-cover shadow-xs ring-1 ring-rose-300"
-                />
-              </button>
-            )}
-
-            <button
-              onClick={onOpenSettings}
-              className="text-stone-500 hover:text-rose-600 p-2 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
-              title="Paramètres"
-              id="btn-settings-mobile"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+          <div className="min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h1 className="font-serif-romantic text-sm sm:text-base font-bold tracking-tight text-stone-800 truncate leading-tight">
+                {profile.relationshipTitle}
+              </h1>
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  isFirebaseConnected ? 'bg-emerald-500 shadow-2xs' : 'bg-stone-400'
+                }`}
+                title={
+                  isFirebaseConnected
+                    ? 'Cloud Firestore synchronisé en direct'
+                    : 'Mode Hors-ligne local'
+                }
+              />
+            </div>
+            <p className="text-[11px] text-stone-500 font-medium flex items-center gap-1 leading-tight truncate">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+              <span>{daysTogether} j</span>
+              <span className="hidden sm:inline">d'amour</span>
+              <span className="hidden md:inline text-rose-300">•</span>
+              <span className="hidden md:inline text-stone-400 text-[11px] font-normal">
+                Chaque jour à tes côtés
+              </span>
+            </p>
           </div>
         </div>
 
-        {/* Right: Partner Switcher & 'Tu me manques' Quick Action */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-rose-100/60">
-          {/* Desktop utility buttons */}
-          <div className="hidden sm:flex items-center gap-1">
-            {onOpenNotifications && (
-              <button
-                onClick={onOpenNotifications}
-                className="relative text-stone-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer flex items-center gap-1"
-                title="Alertes de messages en arrière-plan (Web Push)"
-                id="btn-notifications-desktop"
-              >
-                {isNotificationsActive ? (
-                  <>
-                    <BellRing className="w-4 h-4 text-rose-500" />
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full" />
-                  </>
-                ) : (
-                  <>
-                    <Bell className="w-4 h-4 text-stone-400" />
-                    <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-                  </>
-                )}
-              </button>
+        {/* Right: Single Sleek Vertical 3-Dots Menu Button */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className={`w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+              isMenuOpen
+                ? 'bg-rose-500 text-white shadow-md scale-95'
+                : 'bg-white hover:bg-rose-50/80 text-stone-700 hover:text-rose-600 border border-stone-200/90 hover:border-rose-300 shadow-2xs active:scale-95'
+            }`}
+            title="Menu des options et paramètres"
+            aria-label="Options de l'en-tête"
+            id="btn-header-more-vertical"
+          >
+            <MoreVertical className="w-4.5 h-4.5" />
+            {/* Direct indicator dot if notifications are active */}
+            {isNotificationsActive && !isMenuOpen && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1.5 ring-white" />
             )}
-            {onOpenInstallModal && (
-              <button
-                onClick={onOpenInstallModal}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 border border-rose-200/80 text-rose-800 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer group"
-                title="Installer l'application sur votre téléphone"
-                id="btn-install-app-desktop"
-              >
-                <img
-                  src="/app-icon.png"
-                  alt="App Icon"
-                  className="w-4 h-4 rounded object-cover shadow-xs ring-1 ring-rose-300 group-hover:scale-105 transition-transform"
+          </button>
+
+          {/* Vertical Dropdown Menu */}
+          <AnimatePresence>
+            {isMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsMenuOpen(false)}
                 />
-                <span>Installer l'App</span>
-                <Download className="w-3 h-3 text-rose-500" />
-              </button>
-            )}
-            <button
-              onClick={onOpenSettings}
-              className="text-stone-400 hover:text-rose-600 transition-colors p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
-              title="Paramètres du couple & personnalisation"
-              id="btn-settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-            {isPinEnabled && onLockApp && (
-              <button
-                onClick={onLockApp}
-                className="text-stone-400 hover:text-amber-600 transition-colors p-1.5 rounded-lg hover:bg-amber-50 cursor-pointer"
-                title="Verrouiller l'espace (Code PIN)"
-                id="btn-quick-lock"
-              >
-                <Lock className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Quick "Tu me manques" pulse trigger */}
-          <div className="relative">
-            <button
-              onClick={() => setShowPulseMenu(!showPulseMenu)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all shadow-xs ${
-                pulseSending
-                  ? 'bg-rose-600 text-white scale-105 ring-4 ring-rose-200'
-                  : 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white hover:shadow-md'
-              }`}
-              id="btn-miss-you-quick"
-            >
-              <Heart className={`w-4 h-4 fill-white ${pulseSending ? 'animate-ping' : 'animate-heartbeat'}`} />
-              <span className="hidden xs:inline">Tu me manques</span>
-              <Sparkles className="w-3 h-3 text-amber-200 hidden sm:inline" />
-            </button>
-
-            {/* Pulse Dropdown Menu */}
-            <AnimatePresence>
-              {showPulseMenu && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-64 p-3 bg-white rounded-2xl shadow-xl border border-rose-100 z-50 text-stone-800"
+                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                  transition={{ duration: 0.16 }}
+                  className="absolute right-0 top-full mt-2 w-72 sm:w-80 p-3 bg-white/98 backdrop-blur-xl rounded-2xl shadow-2xl border border-rose-100/90 z-50 text-stone-800 space-y-3"
+                  id="header-vertical-dropdown"
                 >
-                  <div className="text-xs font-semibold text-rose-800 mb-2 flex items-center justify-between">
-                    <span>Envoyer une onde à {otherPartner.name}</span>
-                    <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                  {/* Menu Top: Relationship status */}
+                  <div className="flex items-center justify-between pb-2 border-b border-rose-100/70">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-stone-800 truncate">
+                        {profile.relationshipTitle}
+                      </p>
+                      <p className="text-[10px] text-stone-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span>Synchronisé • {daysTogether} jours d'amour</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsMenuOpen(false)}
+                      className="p-1 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-stone-100 transition-colors"
+                      title="Fermer le menu"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div className="grid grid-cols-1 gap-1.5">
+
+                  {/* Section 1: Active Partner Switcher */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
+                      Qui utilise l'application ?
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5 bg-stone-50 p-1.5 rounded-xl border border-stone-100">
+                      {/* Partner 1 Option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSwitchPartner('p1');
+                          setIsMenuOpen(false);
+                        }}
+                        className={`flex items-center gap-2 p-1.5 rounded-lg transition-all text-left cursor-pointer ${
+                          activePartnerId === 'p1'
+                            ? 'bg-rose-500 text-white shadow-xs font-semibold'
+                            : 'hover:bg-white text-stone-700'
+                        }`}
+                      >
+                        <PartnerAvatar
+                          name={profile.partner1.name}
+                          avatar={profile.partner1.avatar}
+                          partnerId="p1"
+                          size="xs"
+                          className="w-5 h-5 text-[9px] shrink-0"
+                        />
+                        <span className="truncate text-xs">{profile.partner1.name}</span>
+                        {activePartnerId === 'p1' && (
+                          <Check className="w-3.5 h-3.5 ml-auto text-white shrink-0" />
+                        )}
+                      </button>
+
+                      {/* Partner 2 Option */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSwitchPartner('p2');
+                          setIsMenuOpen(false);
+                        }}
+                        className={`flex items-center gap-2 p-1.5 rounded-lg transition-all text-left cursor-pointer ${
+                          activePartnerId === 'p2'
+                            ? 'bg-sky-500 text-white shadow-xs font-semibold'
+                            : 'hover:bg-white text-stone-700'
+                        }`}
+                      >
+                        <PartnerAvatar
+                          name={profile.partner2.name}
+                          avatar={profile.partner2.avatar}
+                          partnerId="p2"
+                          size="xs"
+                          className="w-5 h-5 text-[9px] shrink-0"
+                        />
+                        <span className="truncate text-xs">{profile.partner2.name}</span>
+                        {activePartnerId === 'p2' && (
+                          <Check className="w-3.5 h-3.5 ml-auto text-white shrink-0" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Section 2: "Tu me manques" Quick Vibes */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-rose-800 uppercase tracking-wider mb-1.5 px-0.5 flex items-center justify-between">
+                      <span>Onde à {otherPartner.name}</span>
+                      <Heart className="w-3 h-3 text-rose-500 fill-rose-500" />
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleQuickMissYou('hug', 'Gros câlin télépathique tout doux 🧸')
+                        }
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-rose-100 hover:border-rose-200 hover:bg-rose-50 transition-all text-left cursor-pointer ${
+                          pulseSending === 'hug' ? 'bg-rose-100 scale-95' : 'bg-white'
+                        }`}
+                      >
+                        <span className="text-sm">🧸</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-stone-800 truncate">Câlin</p>
+                          <p className="text-[9px] text-stone-400 truncate">Tout doux</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleQuickMissYou('kiss', 'Pluie de doux baisers sur tes joues 💋')
+                        }
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-rose-100 hover:border-rose-200 hover:bg-rose-50 transition-all text-left cursor-pointer ${
+                          pulseSending === 'kiss' ? 'bg-rose-100 scale-95' : 'bg-white'
+                        }`}
+                      >
+                        <span className="text-sm">💋</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-stone-800 truncate">Baisers</p>
+                          <p className="text-[9px] text-stone-400 truncate">Tendresse</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleQuickMissYou('thought', 'Une grosse pensée amoureuse pour toi ✨')
+                        }
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-rose-100 hover:border-rose-200 hover:bg-rose-50 transition-all text-left cursor-pointer ${
+                          pulseSending === 'thought' ? 'bg-rose-100 scale-95' : 'bg-white'
+                        }`}
+                      >
+                        <span className="text-sm">✨</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-stone-800 truncate">Pensée</p>
+                          <p className="text-[9px] text-stone-400 truncate">Magique</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleQuickMissYou('flame', "Petite flamme d'amour qui crépite 🔥")
+                        }
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-rose-100 hover:border-rose-200 hover:bg-rose-50 transition-all text-left cursor-pointer ${
+                          pulseSending === 'flame' ? 'bg-rose-100 scale-95' : 'bg-white'
+                        }`}
+                      >
+                        <span className="text-sm">🔥</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-stone-800 truncate">Flamme</p>
+                          <p className="text-[9px] text-stone-400 truncate">Passion</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Section 3: Utilities & Settings Actions */}
+                  <div className="space-y-1 pt-1 border-t border-rose-100/70">
+                    {onOpenNotifications && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          onOpenNotifications();
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-rose-50/80 text-stone-700 hover:text-rose-700 transition-colors text-xs font-medium cursor-pointer"
+                        id="menu-item-notifications"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {isNotificationsActive ? (
+                            <BellRing className="w-4 h-4 text-rose-500" />
+                          ) : (
+                            <Bell className="w-4 h-4 text-stone-500" />
+                          )}
+                          <span>Notifications & Alertes</span>
+                        </div>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                            isNotificationsActive
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {isNotificationsActive ? 'Actives' : 'À régler'}
+                        </span>
+                      </button>
+                    )}
+
+                    {isPinEnabled && onLockApp && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          onLockApp();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-amber-50 text-stone-700 hover:text-amber-800 transition-colors text-xs font-medium cursor-pointer"
+                        id="menu-item-lock"
+                      >
+                        <Lock className="w-4 h-4 text-amber-600" />
+                        <span>Verrouiller l'espace (PIN)</span>
+                      </button>
+                    )}
+
+                    {onOpenInstallModal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          onOpenInstallModal();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-rose-50/80 text-stone-700 hover:text-rose-700 transition-colors text-xs font-medium cursor-pointer"
+                        id="menu-item-install"
+                      >
+                        <Download className="w-4 h-4 text-rose-500" />
+                        <span>Installer sur mon écran</span>
+                      </button>
+                    )}
+
                     <button
-                      onClick={() =>
-                        handleQuickMissYou('hug', 'Gros câlin télépathique tout doux 🧸')
-                      }
-                      className="w-full text-left px-2.5 py-2 text-xs rounded-xl hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onOpenSettings();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-rose-50/80 text-stone-700 hover:text-rose-700 transition-colors text-xs font-medium cursor-pointer"
+                      id="menu-item-settings"
                     >
-                      <span className="text-base">🧸</span>
-                      <div>
-                        <p className="font-semibold text-stone-800">Câlin télépathique</p>
-                        <p className="text-[10px] text-stone-500">Une étreinte instantanée</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleQuickMissYou('kiss', 'Pluie de doux baisers sur tes joues 💋')
-                      }
-                      className="w-full text-left px-2.5 py-2 text-xs rounded-xl hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
-                    >
-                      <span className="text-base">💋</span>
-                      <div>
-                        <p className="font-semibold text-stone-800">Doux baisers</p>
-                        <p className="text-[10px] text-stone-500">Pour te faire sourire</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleQuickMissYou('thought', 'Une grosse pensée amoureuse pour toi ✨')
-                      }
-                      className="w-full text-left px-2.5 py-2 text-xs rounded-xl hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
-                    >
-                      <span className="text-base">✨</span>
-                      <div>
-                        <p className="font-semibold text-stone-800">Pensée magique</p>
-                        <p className="text-[10px] text-stone-500">Hâte de te retrouver</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleQuickMissYou('flame', 'Petite flamme d\'amour qui crépite 🔥')
-                      }
-                      className="w-full text-left px-2.5 py-2 text-xs rounded-xl hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
-                    >
-                      <span className="text-base">🔥</span>
-                      <div>
-                        <p className="font-semibold text-stone-800">Flamme complice</p>
-                        <p className="text-[10px] text-stone-500">Pensée passionnée</p>
-                      </div>
+                      <Settings className="w-4 h-4 text-stone-500" />
+                      <span>Paramètres du couple</span>
                     </button>
                   </div>
                 </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Active Partner Switcher Pill */}
-          <div className="flex items-center bg-white/80 border border-stone-200/80 rounded-full p-1 shadow-2xs">
-            <button
-              onClick={() => onSwitchPartner('p1')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
-                activePartnerId === 'p1'
-                  ? 'bg-rose-500 text-white shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-              id="switch-partner-p1"
-              title={`Basculer sur ${profile.partner1.name}`}
-            >
-              <PartnerAvatar
-                name={profile.partner1.name}
-                avatar={profile.partner1.avatar}
-                partnerId="p1"
-                size="xs"
-              />
-              <span>{profile.partner1.name}</span>
-            </button>
-            <div className="px-0.5 text-stone-300">
-              <ArrowLeftRight className="w-3 h-3" />
-            </div>
-            <button
-              onClick={() => onSwitchPartner('p2')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
-                activePartnerId === 'p2'
-                  ? 'bg-sky-600 text-white shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900'
-              }`}
-              id="switch-partner-p2"
-              title={`Basculer sur ${profile.partner2.name}`}
-            >
-              <PartnerAvatar
-                name={profile.partner2.name}
-                avatar={profile.partner2.avatar}
-                partnerId="p2"
-                size="xs"
-              />
-              <span>{profile.partner2.name}</span>
-            </button>
-          </div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </header>
   );
 };
+

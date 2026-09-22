@@ -52,7 +52,12 @@ import { ChatAudioBubble } from '../chat/ChatAudioBubble';
 import { RomanticStickerPicker } from '../chat/RomanticStickerPicker';
 import { RomanticSticker } from '../../lib/romanticStickers';
 import { getSupportedAudioMimeType, formatAudioTime, audioBlobToDataUrl } from '../../lib/audioRecorderUtils';
-import { extractVideoThumbnail, storeMediaBlob, formatVideoDuration } from '../../lib/videoUtils';
+import {
+  extractVideoThumbnail,
+  storeMediaBlob,
+  uploadAndPersistMedia,
+  formatVideoDuration,
+} from '../../lib/videoUtils';
 import {
   CoupleProfile,
   PartnerId,
@@ -1132,18 +1137,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         try {
           if (isVideo) {
-            const meta = await extractVideoThumbnail(file);
-            const mediaKey = `vid_chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-            const idbRef = await storeMediaBlob(mediaKey, file);
+            const uploadResult = await uploadAndPersistMedia(file, 'vid_chat', (status) => {
+              setCompressingStats((prev) => ({
+                ...(prev || {
+                  filename: file.name,
+                  originalSize: file.size,
+                }),
+                isCompressing: true,
+                customMessage: status,
+              }));
+            });
 
             onSendMessage({
               senderId: activePartnerId,
-              content: `🎬 Vidéo partagée (${meta.formattedDuration})`,
+              content: `🎬 Vidéo partagée (${uploadResult.formattedDuration})`,
               mediaType: 'video',
-              mediaUrl: idbRef,
-              videoUrl: idbRef,
-              videoThumbnail: meta.thumbnailDataUrl,
-              videoDuration: meta.duration,
+              mediaUrl: uploadResult.serverUrl,
+              videoUrl: uploadResult.serverUrl,
+              videoThumbnail: uploadResult.thumbnailDataUrl,
+              videoDuration: uploadResult.duration,
             });
           } else {
             const result = await compressImageWithStats(file, {
