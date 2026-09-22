@@ -10,6 +10,55 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="NID" />
 
+    <script>
+      (function() {
+        var _origError = console.error;
+        var _origWarn = console.warn;
+        function isQuotaError(args) {
+          if (!args) return false;
+          for (var i = 0; i < args.length; i++) {
+            var str = '';
+            try {
+              var a = args[i];
+              str = typeof a === 'object' ? (a && (a.message || a.stack) ? (a.message + ' ' + a.stack) : JSON.stringify(a)) : String(a || '');
+            } catch(e) {
+              str = String(args[i] || '');
+            }
+            var lower = (str || '').toLowerCase();
+            if (
+              lower.indexOf('resource-exhausted') !== -1 ||
+              lower.indexOf('quota limit exceeded') !== -1 ||
+              lower.indexOf('maximum backoff delay') !== -1 ||
+              (lower.indexOf('firestore') !== -1 && lower.indexOf('quota') !== -1)
+            ) {
+              return true;
+            }
+          }
+          return false;
+        }
+        console.error = function() {
+          if (isQuotaError(arguments)) return;
+          _origError.apply(console, arguments);
+        };
+        console.warn = function() {
+          if (isQuotaError(arguments)) return;
+          _origWarn.apply(console, arguments);
+        };
+        window.addEventListener('unhandledrejection', function(e) {
+          if (e && e.reason && isQuotaError([e.reason])) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+        window.addEventListener('error', function(e) {
+          if (e && (isQuotaError([e.message, e.error]))) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
+
     <!-- PWA Web App Manifest & App Icons for Mobile (Android & iOS) -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" href="/favicon.png" />

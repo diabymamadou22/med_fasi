@@ -7,6 +7,8 @@ import {
   onSnapshot,
   getDocs,
   writeBatch,
+  disableNetwork,
+  enableNetwork,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
@@ -99,7 +101,7 @@ export async function seedInitialDataIfEmpty(defaults: {
   lexicon?: EnglishLexiconItem[];
   weeklyChallenges?: WeeklyLearningChallenge[];
 }) {
-  if (isSeedChecked) return;
+  if (isSeedChecked || isQuotaExhausted()) return;
   isSeedChecked = true;
 
   try {
@@ -214,8 +216,75 @@ export async function seedInitialDataIfEmpty(defaults: {
 }
 
 // ---------------------------------------------------------------------------
-// Gestion résiliente des erreurs de quota et réseau Firestore
+// Gestion résiliente des erreurs de quota et réseau Firestore (Circuit Breaker)
 // ---------------------------------------------------------------------------
+
+const QUOTA_STORAGE_KEY = 'nid_firestore_quota_exhausted_timestamp';
+let quotaExhaustedInMemory = false;
+
+export function isQuotaExhausted(): boolean {
+  if (quotaExhaustedInMemory) return true;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = localStorage.getItem(QUOTA_STORAGE_KEY);
+      if (raw) {
+        const ts = parseInt(raw, 10);
+        // Réessai après 4 heures ou lendemain
+        if (Date.now() - ts < 4 * 60 * 60 * 1000) {
+          quotaExhaustedInMemory = true;
+          return true;
+        } else {
+          localStorage.removeItem(QUOTA_STORAGE_KEY);
+        }
+      }
+    } catch {}
+  }
+  return false;
+}
+
+export async function pauseFirestoreNetwork() {
+  try {
+    if (db) {
+      await disableNetwork(db);
+    }
+  } catch {}
+}
+
+export async function resumeFirestoreNetwork() {
+  try {
+    if (db) {
+      await enableNetwork(db);
+      resetQuotaExhausted();
+    }
+  } catch {}
+}
+
+export function markQuotaExhausted() {
+  quotaExhaustedInMemory = true;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(QUOTA_STORAGE_KEY, String(Date.now()));
+    } catch {}
+  }
+  // Couper immédiatement les tentatives réseau de Firestore pour éviter les 429 et boucles d'erreur
+  pauseFirestoreNetwork().catch(() => {});
+}
+
+export function resetQuotaExhausted() {
+  quotaExhaustedInMemory = false;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.removeItem(QUOTA_STORAGE_KEY);
+    } catch {}
+  }
+}
+
+// Couper le réseau Firestore dès l'initialisation si le quota est actuellement marqué épuisé
+if (typeof window !== 'undefined' && isQuotaExhausted()) {
+  setTimeout(() => {
+    pauseFirestoreNetwork().catch(() => {});
+  }, 100);
+}
 
 export function isQuotaOrResourceError(err: any): boolean {
   if (!err) return false;
@@ -237,6 +306,7 @@ let quotaExceededNotified = false;
 
 export function logFirestoreSyncIssue(context: string, err: any) {
   if (isQuotaOrResourceError(err)) {
+    markQuotaExhausted();
     if (!quotaExceededNotified) {
       quotaExceededNotified = true;
       console.warn(
@@ -249,6 +319,10 @@ export function logFirestoreSyncIssue(context: string, err: any) {
 }
 
 async function safeFirestoreOperation<T>(action: () => Promise<T>, context: string): Promise<T | void> {
+  // Disjoncteur de quota : si le quota gratuit Firebase est atteint, éviter de saturer le réseau avec des réessais en boucle
+  if (isQuotaExhausted()) {
+    return;
+  }
   try {
     return await action();
   } catch (err) {
@@ -691,6 +765,7 @@ export interface PartnerPresenceInfo {
 }
 
 export async function setChatTypingStatus(partnerId: string, isTyping: boolean) {
+  if (isQuotaExhausted()) return;
   return safeFirestoreOperation(async () => {
     const ref = doc(db, COLLECTIONS.CHAT_STATUS, partnerId);
     const now = new Date().toISOString();
@@ -709,6 +784,7 @@ export async function setChatTypingStatus(partnerId: string, isTyping: boolean) 
 }
 
 export async function updatePartnerPresence(partnerId: string, isOnline: boolean) {
+  if (isQuotaExhausted()) return;
   return safeFirestoreOperation(async () => {
     const ref = doc(db, COLLECTIONS.CHAT_STATUS, partnerId);
     const now = new Date().toISOString();

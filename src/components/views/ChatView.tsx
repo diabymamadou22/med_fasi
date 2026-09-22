@@ -76,6 +76,7 @@ import {
   updateMultipleChatMessagesReaction,
   updateMultipleChatMessagesReadStatus,
   PartnerPresenceInfo,
+  isQuotaExhausted,
 } from '../../lib/firestoreService';
 import {
   sortChatMessagesChronologically,
@@ -613,6 +614,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Real-time presence & typing status from Firestore
   const [presenceMap, setPresenceMap] = useState<Record<string, PartnerPresenceInfo>>({});
   const typingTimeoutRef = useRef<any>(null);
+  const lastTypingBroadcastRef = useRef<number>(0);
+  const markedAsReadRef = useRef<Set<string>>(new Set());
 
   // Floating hearts particles
   const [particles, setParticles] = useState<FloatingHeartParticle[]>([]);
@@ -671,18 +674,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   // Presence heartbeat & disconnect detection
   useEffect(() => {
-    // Initial online notification
-    updatePartnerPresence(activePartnerId, true);
+    // Initial online notification (only if quota is healthy)
+    if (!isQuotaExhausted()) {
+      updatePartnerPresence(activePartnerId, true);
+    }
 
-    // Heartbeat every 20 seconds
+    // Heartbeat every 90 seconds (conserves Firestore write quota)
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && !isQuotaExhausted()) {
         updatePartnerPresence(activePartnerId, true);
       }
-    }, 20000);
+    }, 90000);
 
     // Immediate visibility change detection (tab hidden/active)
     const handleVisibilityChange = () => {
+      if (isQuotaExhausted()) return;
       if (document.visibilityState === 'hidden') {
         setChatTypingStatus(activePartnerId, false);
         updatePartnerPresence(activePartnerId, false);
@@ -693,6 +699,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     // Before unload / pagehide: immediate offline broadcast
     const handleDisconnect = () => {
+      if (isQuotaExhausted()) return;
       setChatTypingStatus(activePartnerId, false);
       updatePartnerPresence(activePartnerId, false);
     };
@@ -706,8 +713,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleDisconnect);
       window.removeEventListener('pagehide', handleDisconnect);
-      setChatTypingStatus(activePartnerId, false);
-      updatePartnerPresence(activePartnerId, false);
+      if (!isQuotaExhausted()) {
+        setChatTypingStatus(activePartnerId, false);
+        updatePartnerPresence(activePartnerId, false);
+      }
     };
   }, [activePartnerId]);
 
@@ -771,15 +780,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   // Mark other partner's messages as read when viewing chat
   useEffect(() => {
+    if (isQuotaExhausted()) return;
+
+    const unreadIds: string[] = [];
     messages.forEach((msg) => {
+      if (markedAsReadRef.current.has(msg.id)) return;
       const isRead =
         msg.readStatus === 'read' ||
         msg.readStatus === true ||
         (!msg.readStatus && msg.status === 'read');
       if (msg.senderId === otherPartnerId && !isRead) {
-        updateChatMessageStatus(msg.id, 'read').catch(() => {});
+        unreadIds.push(msg.id);
+        markedAsReadRef.current.add(msg.id);
       }
     });
+
+    if (unreadIds.length > 0) {
+      updateMultipleChatMessagesReadStatus(unreadIds, 'read').catch(() => {});
+    }
   }, [messages, otherPartnerId]);
 
   // Auto-scroll on new messages & initial mount (WhatsApp behavior)
@@ -917,12 +935,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
       textareaRef.current.style.height = `${newHeight}px`;
     }
 
-    // Broadcast typing signal
-    setChatTypingStatus(activePartnerId, true);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      setChatTypingStatus(activePartnerId, false);
-    }, 2500);
+    // Throttled typing broadcast (at most once every 4 seconds) to conserve Firestore write quota
+    if (!isQuotaExhausted()) {
+      const now = Date.now();
+      if (!lastTypingBroadcastRef.current || now - lastTypingBroadcastRef.current > 4000) {
+        lastTypingBroadcastRef.current = now;
+        setChatTypingStatus(activePartnerId, true);
+      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        lastTypingBroadcastRef.current = 0;
+        if (!isQuotaExhausted()) {
+          setChatTypingStatus(activePartnerId, false);
+        }
+      }, 3000);
+    }
   };
 
   // Send message handler

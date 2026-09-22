@@ -1949,13 +1949,7 @@ export default function App() {
                 }}
                 notes={notes}
                 messages={messages}
-                vouchers={vouchers}
-                lexicon={lexicon}
-                weeklyChallenges={weeklyChallenges}
-                onOpenChatWithDraft={(prefill) => {
-                  setChatDraftText(prefill);
-                  handleSelectTab('chat');
-                }}
+                memories={memories}
                 onOpenProfileModal={(pId) => {
                   setProfileFocusPartner(pId);
                   setShowProfileModal(true);

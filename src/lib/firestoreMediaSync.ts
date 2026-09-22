@@ -9,6 +9,7 @@
 
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { isQuotaExhausted, markQuotaExhausted, isQuotaOrResourceError } from './firestoreService';
 
 const MEDIA_COLLECTION = 'couple_settings';
 // Firestore document limit is 1 MiB. We use 650 KiB base64 chunks (~480 KiB binary) for safety
@@ -85,63 +86,84 @@ export async function saveMediaBlobToFirestore(
   fileName = 'video.mp4',
   onProgress?: (percent: number) => void
 ): Promise<string> {
+  // If Firestore daily write quota is already exhausted, don't attempt chunking
+  if (isQuotaExhausted()) {
+    console.warn('[FirestoreMedia] Quota quotidien Firestore atteint. Utilisation exclusive du stockage local haute fidélité.');
+    return '';
+  }
+
   const cleanId = mediaId.replace(/^idb:/, '').replace(/[^\w.-]/g, '_');
   const mimeType = blob.type || 'video/mp4';
 
-  const fullBase64 = await blobToBase64(blob);
-  const totalLength = fullBase64.length;
-  const totalChunks = Math.ceil(totalLength / CHUNK_SIZE_BYTES);
+  try {
+    const fullBase64 = await blobToBase64(blob);
+    const totalLength = fullBase64.length;
+    const totalChunks = Math.ceil(totalLength / CHUNK_SIZE_BYTES);
 
-  console.log(`[FirestoreMedia] Début téléversement "${cleanId}": ${totalChunks} fragments (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`[FirestoreMedia] Début téléversement "${cleanId}": ${totalChunks} fragments (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
 
-  // 1. Upload all chunks in parallel batches of 3 to optimize speed without exceeding Firestore rate limits
-  const batchSize = 3;
-  for (let i = 0; i < totalChunks; i += batchSize) {
-    const sliceEnd = Math.min(i + batchSize, totalChunks);
-    const promises: Promise<void>[] = [];
+    // 1. Upload all chunks in parallel batches of 2 to conserve write throughput
+    const batchSize = 2;
+    for (let i = 0; i < totalChunks; i += batchSize) {
+      if (isQuotaExhausted()) {
+        console.warn('[FirestoreMedia] Quota atteint pendant le téléversement des fragments.');
+        return '';
+      }
 
-    for (let chunkIdx = i; chunkIdx < sliceEnd; chunkIdx++) {
-      const start = chunkIdx * CHUNK_SIZE_BYTES;
-      const end = Math.min(start + CHUNK_SIZE_BYTES, totalLength);
-      const chunkData = fullBase64.slice(start, end);
+      const sliceEnd = Math.min(i + batchSize, totalChunks);
+      const promises: Promise<void>[] = [];
 
-      const chunkDocId = `media_${cleanId}_chunk_${chunkIdx}`;
-      const chunkRef = doc(db, MEDIA_COLLECTION, chunkDocId);
+      for (let chunkIdx = i; chunkIdx < sliceEnd; chunkIdx++) {
+        const start = chunkIdx * CHUNK_SIZE_BYTES;
+        const end = Math.min(start + CHUNK_SIZE_BYTES, totalLength);
+        const chunkData = fullBase64.slice(start, end);
 
-      promises.push(
-        setDoc(chunkRef, {
-          id: chunkDocId,
-          isMediaChunk: true,
-          mediaId: cleanId,
-          chunkIndex: chunkIdx,
-          data: chunkData,
-          createdAt: Date.now(),
-        })
-      );
+        const chunkDocId = `media_${cleanId}_chunk_${chunkIdx}`;
+        const chunkRef = doc(db, MEDIA_COLLECTION, chunkDocId);
+
+        promises.push(
+          setDoc(chunkRef, {
+            id: chunkDocId,
+            isMediaChunk: true,
+            mediaId: cleanId,
+            chunkIndex: chunkIdx,
+            data: chunkData,
+            createdAt: Date.now(),
+          })
+        );
+      }
+
+      await Promise.all(promises);
+      const percent = Math.round((sliceEnd / totalChunks) * 100);
+      onProgress?.(percent);
     }
 
-    await Promise.all(promises);
-    const percent = Math.round((sliceEnd / totalChunks) * 100);
-    onProgress?.(percent);
+    // 2. Write the manifest document
+    const manifestDocId = `media_${cleanId}_manifest`;
+    const manifestRef = doc(db, MEDIA_COLLECTION, manifestDocId);
+    const manifest: FirestoreMediaManifest = {
+      id: manifestDocId,
+      isMediaManifest: true,
+      mediaId: cleanId,
+      totalChunks,
+      totalSize: blob.size,
+      mimeType,
+      fileName,
+      createdAt: Date.now(),
+    };
+
+    await setDoc(manifestRef, manifest);
+    console.log(`[FirestoreMedia] Téléversement réussi: ${manifestDocId}`);
+    return `firestore:${cleanId}`;
+  } catch (err) {
+    if (isQuotaOrResourceError(err)) {
+      markQuotaExhausted();
+      console.warn('[FirestoreMedia] Quota Firestore atteint pendant la synchronisation du média. Repli local sécurisé.');
+    } else {
+      console.warn('[FirestoreMedia] Erreur sauvegarde média dans Firestore, repli local:', err);
+    }
+    return '';
   }
-
-  // 2. Write the manifest document
-  const manifestDocId = `media_${cleanId}_manifest`;
-  const manifestRef = doc(db, MEDIA_COLLECTION, manifestDocId);
-  const manifest: FirestoreMediaManifest = {
-    id: manifestDocId,
-    isMediaManifest: true,
-    mediaId: cleanId,
-    totalChunks,
-    totalSize: blob.size,
-    mimeType,
-    fileName,
-    createdAt: Date.now(),
-  };
-
-  await setDoc(manifestRef, manifest);
-  console.log(`[FirestoreMedia] Téléversement réussi: ${manifestDocId}`);
-  return `firestore:${cleanId}`;
 }
 
 /**
