@@ -73,47 +73,6 @@ export async function storeMediaBlob(key: string, blob: Blob): Promise<string> {
   }
 }
 
-export interface UploadMediaResult {
-  serverUrl: string;
-  localBlobUrl: string;
-  thumbnailDataUrl: string;
-  duration?: number;
-  formattedDuration: string;
-  isOfflineFallback: boolean;
-}
-
-/**
- * All-in-one helper for adding videos:
- * 1. Generates thumbnail and duration
- * 2. Caches in local IndexedDB for playback
- * 3. Returns durable stored reference
- */
-export async function uploadAndPersistMedia(
-  file: File | Blob,
-  prefix = 'vid_mem',
-  onProgress?: (step: string) => void
-): Promise<UploadMediaResult> {
-  const mediaKey = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-  onProgress?.('Extraction de la miniature...');
-  const meta = await extractVideoThumbnail(file);
-
-  onProgress?.('Sauvegarde de la vidéo...');
-  const storedRef = await storeMediaBlob(mediaKey, file);
-
-  const localObjUrl = URL.createObjectURL(file);
-  objectUrlCache.set(mediaKey, localObjUrl);
-
-  return {
-    serverUrl: storedRef,
-    localBlobUrl: localObjUrl,
-    thumbnailDataUrl: meta.thumbnailDataUrl,
-    duration: meta.duration,
-    formattedDuration: meta.formattedDuration,
-    isOfflineFallback: false,
-  };
-}
-
 /**
  * Retrieve a Blob from IndexedDB
  */
@@ -398,7 +357,10 @@ export interface UploadAndPersistResult {
   width?: number;
   height?: number;
   sizeBytes: number;
+  isOfflineFallback?: boolean;
 }
+
+export type UploadMediaResult = UploadAndPersistResult;
 
 /**
  * Universal media upload and persistence engine.

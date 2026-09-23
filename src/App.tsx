@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Heart } from 'lucide-react';
 import { Header } from './components/Header';
@@ -103,6 +103,7 @@ import {
   saveSettings,
   sendMissYouPulse,
   subscribeChatMessages,
+  fetchFirestoreChatMessages,
   saveChatMessage,
   deleteMultipleChatMessagesFromDb,
   editChatMessageContent,
@@ -562,6 +563,140 @@ export default function App() {
     });
   }, []);
 
+  // Gestionnaire unifié de réception des messages avec alertes sonores et visuelles
+  const handleIncomingChatMessages = useCallback(
+    (incomingList: ChatMessage[], _source = 'unknown') => {
+      if (!Array.isArray(incomingList) || incomingList.length === 0) return;
+
+      setMessages((prev) => {
+        const prevIds = new Set(prev.map((m) => m.id));
+        const newFromPartner = incomingList.filter(
+          (m) => !prevIds.has(m.id) && m.senderId !== activePartnerIdRef.current
+        );
+
+        if (prev.length > 0 && newFromPartner.length > 0) {
+          const lastMsg = newFromPartner[newFromPartner.length - 1];
+          soundEffects.playMessageReceived();
+          triggerVibration([250, 100, 250, 100, 250]);
+
+          const curProf = profileRef.current;
+          const sender = lastMsg.senderId === 'p1' ? curProf.partner1 : curProf.partner2;
+          const bodyText =
+            lastMsg.mediaType === 'image'
+              ? '📷 Vous a envoyé une photo'
+              : lastMsg.mediaType === 'audio'
+              ? '🎵 Vous a envoyé une note vocale'
+              : lastMsg.mediaType === 'video'
+              ? '🎬 Vous a envoyé une vidéo'
+              : lastMsg.content;
+
+          startTabMessageAlert(sender.name || 'Votre amour', bodyText);
+
+          if (document.visibilityState === 'hidden' || activeTabRef.current !== 'chat') {
+            sendSystemNotification({
+              title: `${sender.name || 'Votre amour'} ❤️`,
+              body: bodyText,
+              icon: sender.avatar || '/app-icon.png',
+              tab: 'chat',
+              tag: `chat-${lastMsg.id}`,
+            });
+          }
+
+          if (activeTabRef.current !== 'chat') {
+            setFloatingAlert({
+              id: lastMsg.id,
+              senderId: lastMsg.senderId,
+              senderName: sender.name || 'Votre amour',
+              senderAvatar: sender.avatar,
+              content: lastMsg.content,
+              mediaType: lastMsg.mediaType,
+              timestamp: lastMsg.timestamp,
+            });
+          }
+        }
+
+        // Fusionner avec déduplication stricte pour ne jamais perdre de message
+        const idMap = new Map<string, ChatMessage>();
+        prev.forEach((m) => idMap.set(m.id, m));
+        incomingList.forEach((m) => {
+          if (m && m.id) {
+            const existing = idMap.get(m.id);
+            idMap.set(m.id, existing ? { ...existing, ...m } : m);
+          }
+        });
+        return sortChatMessagesChronologically(Array.from(idMap.values()));
+      });
+    },
+    []
+  );
+
+  // Fonction de synchronisation unifiée Firestore + Relais haute disponibilité
+  const runUnifiedChatSync = useCallback(async () => {
+    try {
+      const [firestoreMsgs, relayMsgs] = await Promise.all([
+        fetchFirestoreChatMessages().catch(() => [] as ChatMessage[]),
+        fetchChatMessagesFromRelay().catch(() => [] as ChatMessage[]),
+      ]);
+
+      const allIncoming: ChatMessage[] = [];
+      const seen = new Set<string>();
+
+      if (Array.isArray(firestoreMsgs)) {
+        firestoreMsgs.forEach((m) => {
+          if (m && m.id && !seen.has(m.id)) {
+            seen.add(m.id);
+            allIncoming.push(m);
+          }
+        });
+      }
+      if (Array.isArray(relayMsgs)) {
+        relayMsgs.forEach((m) => {
+          if (m && m.id && !seen.has(m.id)) {
+            seen.add(m.id);
+            allIncoming.push(m);
+          }
+        });
+      }
+
+      if (allIncoming.length > 0) {
+        handleIncomingChatMessages(allIncoming, 'polling-sync');
+      }
+    } catch (err) {
+      console.warn('Sync chat issue:', err);
+    }
+  }, [handleIncomingChatMessages]);
+
+  // Synchronisation périodique et sur reprise de focus
+  useEffect(() => {
+    runUnifiedChatSync();
+    const pollInterval = setInterval(runUnifiedChatSync, 3500);
+
+    const handleSyncOnVisible = () => {
+      if (document.visibilityState === 'visible') {
+        runUnifiedChatSync();
+      }
+    };
+    const handleSyncOnFocus = () => runUnifiedChatSync();
+
+    document.addEventListener('visibilitychange', handleSyncOnVisible);
+    window.addEventListener('focus', handleSyncOnFocus);
+    window.addEventListener('online', handleSyncOnFocus);
+
+    return () => {
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleSyncOnVisible);
+      window.removeEventListener('focus', handleSyncOnFocus);
+      window.removeEventListener('online', handleSyncOnFocus);
+    };
+  }, [runUnifiedChatSync]);
+
+  // Synchronisation immédiate lors du passage sur l'onglet de discussion
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      runUnifiedChatSync();
+    }
+  }, [activeTab, runUnifiedChatSync]);
+
   // Real-time Firestore subscriptions
   useEffect(() => {
     const unsubProfile = subscribeProfile(
@@ -748,61 +883,7 @@ export default function App() {
 
     const unsubChat = subscribeChatMessages(
       (remoteMessages) => {
-        if (Array.isArray(remoteMessages)) {
-          setMessages((prev) => {
-            const prevIds = new Set(prev.map((m) => m.id));
-            const newFromPartner = remoteMessages.filter(
-              (m) => !prevIds.has(m.id) && m.senderId !== activePartnerIdRef.current
-            );
-
-            if (prev.length > 0 && newFromPartner.length > 0) {
-              const lastMsg = newFromPartner[newFromPartner.length - 1];
-              soundEffects.playMessageReceived();
-              triggerVibration([250, 100, 250, 100, 250]);
-
-              const curProf = profileRef.current;
-              const sender = lastMsg.senderId === 'p1' ? curProf.partner1 : curProf.partner2;
-              const bodyText =
-                lastMsg.mediaType === 'image'
-                  ? '📷 Vous a envoyé une photo'
-                  : lastMsg.mediaType === 'audio'
-                  ? '🎵 Vous a envoyé une note vocale'
-                  : lastMsg.mediaType === 'video'
-                  ? '🎬 Vous a envoyé une vidéo'
-                  : lastMsg.content;
-
-              startTabMessageAlert(sender.name || 'Votre amour', bodyText);
-
-              if (document.visibilityState === 'hidden' || activeTabRef.current !== 'chat') {
-                sendSystemNotification({
-                  title: `${sender.name || 'Votre amour'} ❤️`,
-                  body: bodyText,
-                  icon: sender.avatar || '/app-icon.png',
-                  tab: 'chat',
-                  tag: `chat-${lastMsg.id}`,
-                });
-              }
-
-              if (activeTabRef.current !== 'chat') {
-                setFloatingAlert({
-                  id: lastMsg.id,
-                  senderId: lastMsg.senderId,
-                  senderName: sender.name || 'Votre amour',
-                  senderAvatar: sender.avatar,
-                  content: lastMsg.content,
-                  mediaType: lastMsg.mediaType,
-                  timestamp: lastMsg.timestamp,
-                });
-              }
-            }
-
-            // Fusionner avec déduplication stricte pour ne jamais perdre de message
-            const idMap = new Map<string, ChatMessage>();
-            prev.forEach((m) => idMap.set(m.id, m));
-            remoteMessages.forEach((m) => idMap.set(m.id, m));
-            return sortChatMessagesChronologically(Array.from(idMap.values()));
-          });
-        }
+        handleIncomingChatMessages(remoteMessages, 'firestore-stream');
       },
       () => setIsCloudSynced(false)
     );
@@ -825,25 +906,10 @@ export default function App() {
       unsubPulse();
       unsubChat();
     };
-  }, []);
+  }, [handleIncomingChatMessages]);
 
-  // Synchronisation directe haute disponibilité avec le serveur relais Express (SSE + polling)
+  // Synchronisation continue des événements en direct (SSE) pour réception instantanée des messages et coeurs
   useEffect(() => {
-    // 1. Synchronisation initiale immédiate avec le serveur relais
-    fetchChatMessagesFromRelay().then((relayMsgs) => {
-      if (relayMsgs && relayMsgs.length > 0) {
-        setMessages((prev) => {
-          const idMap = new Map<string, ChatMessage>();
-          prev.forEach((m) => idMap.set(m.id, m));
-          relayMsgs.forEach((m) => {
-            if (!idMap.has(m.id)) idMap.set(m.id, m);
-          });
-          return sortChatMessagesChronologically(Array.from(idMap.values()));
-        });
-      }
-    });
-
-    // 2. Connexion Server-Sent Events (SSE) pour réception instantanée des messages et des coeurs
     const disconnectSse = connectChatEvents({
       partnerId: activePartnerId,
       onNewMessage: (newMsg) => {
@@ -854,11 +920,12 @@ export default function App() {
           }
           const updated = sortChatMessagesChronologically([...prev, newMsg]);
 
-          if (newMsg.senderId !== activePartnerId) {
+          if (newMsg.senderId !== activePartnerIdRef.current) {
             soundEffects.playMessageReceived();
             triggerVibration([250, 100, 250, 100, 250]);
 
-            const sender = newMsg.senderId === 'p1' ? profile.partner1 : profile.partner2;
+            const curProf = profileRef.current;
+            const sender = newMsg.senderId === 'p1' ? curProf.partner1 : curProf.partner2;
             const bodyText =
               newMsg.mediaType === 'image'
                 ? '📷 Vous a envoyé une photo'
@@ -870,7 +937,7 @@ export default function App() {
 
             startTabMessageAlert(sender.name || 'Votre amour', bodyText);
 
-            if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
+            if (document.visibilityState === 'hidden' || activeTabRef.current !== 'chat') {
               sendSystemNotification({
                 title: `${sender.name || 'Votre amour'} ❤️`,
                 body: bodyText,
@@ -880,7 +947,7 @@ export default function App() {
               });
             }
 
-            if (activeTab !== 'chat') {
+            if (activeTabRef.current !== 'chat') {
               setFloatingAlert({
                 id: newMsg.id,
                 senderId: newMsg.senderId,
@@ -897,13 +964,14 @@ export default function App() {
         });
       },
       onPulse: (pulse) => {
-        if (pulse && pulse.senderId !== activePartnerId) {
+        if (pulse && pulse.senderId !== activePartnerIdRef.current) {
           setActiveMissYouPulse(pulse);
           soundEffects.playHeartPulse();
           triggerVibration([100, 50, 150]);
 
-          if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
-            const sender = pulse.senderId === 'p1' ? profile.partner1 : profile.partner2;
+          if (document.visibilityState === 'hidden' || activeTabRef.current !== 'chat') {
+            const curProf = profileRef.current;
+            const sender = pulse.senderId === 'p1' ? curProf.partner1 : curProf.partner2;
             sendSystemNotification({
               title: `Tu me manques ! 💓`,
               body: `${sender.name || 'Votre amour'} vous envoie une impulsion de cœur !`,
@@ -916,34 +984,10 @@ export default function App() {
       },
     });
 
-    // 3. Polling de secours régulier (toutes les 4 secondes) pour garantir qu'aucun message n'est manqué
-    const pollInterval = setInterval(() => {
-      fetchChatMessagesFromRelay().then((relayMsgs) => {
-        if (relayMsgs && relayMsgs.length > 0) {
-          setMessages((prev) => {
-            const knownIds = new Set(prev.map((m) => m.id));
-            const newOnes = relayMsgs.filter((m) => !knownIds.has(m.id));
-            if (newOnes.length > 0) {
-              newOnes.forEach((m) => {
-                if (m.senderId !== activePartnerId) {
-                  soundEffects.playMessageReceived();
-                  triggerVibration([250, 100, 250]);
-                }
-              });
-              const merged = [...prev, ...newOnes];
-              return sortChatMessagesChronologically(merged);
-            }
-            return prev;
-          });
-        }
-      });
-    }, 4000);
-
     return () => {
       disconnectSse();
-      clearInterval(pollInterval);
     };
-  }, [activePartnerId, activeTab, profile.partner1, profile.partner2]);
+  }, [activePartnerId]);
 
   // Sync state to localStorage as offline fallback (uniquement après chargement initial)
   useEffect(() => {
@@ -1266,6 +1310,8 @@ export default function App() {
     // 2. Persistance Firestore
     try {
       await saveChatMessage(newMsg);
+      // Synchronisation immédiate en arrière-plan
+      runUnifiedChatSync();
       // Trigger Web Push alert to partner device asynchronously
       notifyPartnerViaPush({
         senderId: activePartnerId,
@@ -2090,6 +2136,7 @@ export default function App() {
                 draftText={chatDraftText}
                 onClearDraftText={() => setChatDraftText('')}
                 onOpenNotificationModal={() => setShowNotificationModal(true)}
+                onRefreshChat={runUnifiedChatSync}
               />
             </div>
           )}

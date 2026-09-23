@@ -216,60 +216,39 @@ export async function seedInitialDataIfEmpty(defaults: {
 }
 
 // ---------------------------------------------------------------------------
-// Gestion résiliente des erreurs de quota et réseau Firestore (Circuit Breaker)
+// Gestion résiliente du réseau et de la synchronisation Firestore
 // ---------------------------------------------------------------------------
 
 const QUOTA_STORAGE_KEY = 'nid_firestore_quota_exhausted_timestamp';
-let quotaExhaustedInMemory = false;
+
+// Nettoyer immédiatement tout verrou résiduel
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    localStorage.removeItem(QUOTA_STORAGE_KEY);
+  } catch {}
+}
 
 export function isQuotaExhausted(): boolean {
-  if (quotaExhaustedInMemory) return true;
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      const raw = localStorage.getItem(QUOTA_STORAGE_KEY);
-      if (raw) {
-        const ts = parseInt(raw, 10);
-        // Réessai après 4 heures ou lendemain
-        if (Date.now() - ts < 4 * 60 * 60 * 1000) {
-          quotaExhaustedInMemory = true;
-          return true;
-        } else {
-          localStorage.removeItem(QUOTA_STORAGE_KEY);
-        }
-      }
-    } catch {}
-  }
   return false;
 }
 
 export async function pauseFirestoreNetwork() {
-  try {
-    if (db) {
-      await disableNetwork(db);
-    }
-  } catch {}
+  // Pas d'interruption artificielle du réseau
 }
 
 export async function resumeFirestoreNetwork() {
   try {
     if (db) {
       await enableNetwork(db);
-      resetQuotaExhausted();
     }
   } catch {}
 }
 
 export function markQuotaExhausted() {
-  quotaExhaustedInMemory = true;
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      localStorage.setItem(QUOTA_STORAGE_KEY, String(Date.now()));
-    } catch {}
-  }
+  // Pas de blocage artificiel
 }
 
 export function resetQuotaExhausted() {
-  quotaExhaustedInMemory = false;
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       localStorage.removeItem(QUOTA_STORAGE_KEY);
@@ -277,7 +256,7 @@ export function resetQuotaExhausted() {
   }
 }
 
-// Assurer la reprise du réseau dès le démarrage
+// Assurer la disponibilité du réseau au démarrage
 if (typeof window !== 'undefined') {
   setTimeout(() => {
     resumeFirestoreNetwork().catch(() => {});
@@ -290,14 +269,8 @@ export function isQuotaOrResourceError(err: any): boolean {
   const code = (err?.code || '').toLowerCase();
   return (
     code === 'resource-exhausted' ||
-    code === 'failed-precondition' ||
-    code === 'unavailable' ||
-    msg.includes('quota') ||
-    msg.includes('resource exhausted') ||
-    msg.includes('limit exceeded') ||
-    msg.includes('client is offline') ||
-    msg.includes('network') ||
-    msg.includes('target id')
+    msg.includes('resource-exhausted') ||
+    msg.includes('quota exceeded')
   );
 }
 
@@ -305,20 +278,14 @@ let quotaExceededNotified = false;
 
 export function logFirestoreSyncIssue(context: string, err: any) {
   if (isQuotaOrResourceError(err)) {
-    const msg = (err?.message || String(err)).toLowerCase();
-    if (msg.includes('target id')) {
-      console.warn(`[Firestore Warning] Sync issue on ${context}:`, err?.message || err);
-      return;
-    }
-    markQuotaExhausted();
     if (!quotaExceededNotified) {
       quotaExceededNotified = true;
       console.warn(
-        `[Firestore Info] Le quota gratuit quotidien Firebase est atteint ou vous êtes hors-ligne (${context}). Mode local automatique actif (IndexedDB / localStorage) sans impact sur vos données.`
+        `[Firestore Info] Quota atteint (${context}). Tentative automatique de reconnexion en cours.`
       );
     }
   } else {
-    console.error(`[Firestore Error] ${context}:`, err);
+    console.warn(`[Firestore Status] ${context}:`, err?.message || err);
   }
 }
 
@@ -592,29 +559,59 @@ export async function sendMissYouPulse(pulse: MissYouPulse) {
 export function subscribeLatestPulse(
   onUpdate: (pulse: MissYouPulse) => void,
   onError?: (error: Error) => void
-) {
-  const colRef = collection(db, COLLECTIONS.PULSES);
+): () => void {
+  let isUnsubscribed = false;
+  let activeUnsubscribe: (() => void) | null = null;
+  let retryTimer: any = null;
   const listenerStartTime = Date.now();
-  return onSnapshot(
-    colRef,
-    (snap) => {
-      snap.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const data = change.doc.data() as MissYouPulse;
-          // Trigger only if pulse was generated within last 60 seconds
-          const idMatch = change.doc.id.match(/^pulse-(\d+)$/);
-          const pulseTime = idMatch ? parseInt(idMatch[1], 10) : 0;
-          if (pulseTime >= listenerStartTime - 60000) {
-            onUpdate({ id: change.doc.id, ...data });
+
+  function attach() {
+    if (isUnsubscribed) return;
+    try {
+      const colRef = collection(db, COLLECTIONS.PULSES);
+      activeUnsubscribe = onSnapshot(
+        colRef,
+        (snap) => {
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data() as MissYouPulse;
+              const idMatch = change.doc.id.match(/^pulse-(\d+)$/);
+              const pulseTime = idMatch ? parseInt(idMatch[1], 10) : 0;
+              if (pulseTime >= listenerStartTime - 60000) {
+                onUpdate({ id: change.doc.id, ...data });
+              }
+            }
+          });
+        },
+        (err) => {
+          logFirestoreSyncIssue('Pulse sync', err);
+          if (onError) onError(err);
+          if (!isUnsubscribed) {
+            if (activeUnsubscribe) {
+              try { activeUnsubscribe(); } catch {}
+              activeUnsubscribe = null;
+            }
+            retryTimer = setTimeout(attach, 3500);
           }
         }
-      });
-    },
-    (err) => {
-      logFirestoreSyncIssue('Pulse sync', err);
-      if (onError) onError(err);
+      );
+    } catch {
+      if (!isUnsubscribed) {
+        retryTimer = setTimeout(attach, 4000);
+      }
     }
-  );
+  }
+
+  attach();
+
+  return () => {
+    isUnsubscribed = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    if (activeUnsubscribe) {
+      try { activeUnsubscribe(); } catch {}
+      activeUnsubscribe = null;
+    }
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -805,63 +802,142 @@ export async function updatePartnerPresence(partnerId: string, isOnline: boolean
   }, 'updatePartnerPresence');
 }
 
+export async function fetchFirestoreChatMessages(): Promise<ChatMessage[]> {
+  try {
+    const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
+    const snap = await getDocs(colRef);
+    const messages: ChatMessage[] = [];
+    snap.forEach((docSnap) => {
+      messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
+    });
+    return sortChatMessagesChronologically(messages);
+  } catch (err) {
+    console.warn('[Firestore] Fetch chat messages error:', err);
+    return [];
+  }
+}
+
 export function subscribeChatMessages(
   onUpdate: (messages: ChatMessage[]) => void,
   onError?: (error: Error) => void
-) {
-  const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
-  return onSnapshot(
-    colRef,
-    (snap) => {
-      const messages: ChatMessage[] = [];
-      snap.forEach((docSnap) => {
-        messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
-      });
-      // Sort chronologically strictly by sending/arrival timestamp to the second
-      const sorted = sortChatMessagesChronologically(messages);
-      onUpdate(sorted);
-    },
-    (err) => {
-      logFirestoreSyncIssue('Chat messages sync', err);
-      if (onError) onError(err);
+): () => void {
+  let isUnsubscribed = false;
+  let activeUnsubscribe: (() => void) | null = null;
+  let retryTimer: any = null;
+
+  function connect() {
+    if (isUnsubscribed) return;
+    try {
+      const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
+      activeUnsubscribe = onSnapshot(
+        colRef,
+        { includeMetadataChanges: true },
+        (snap) => {
+          const messages: ChatMessage[] = [];
+          snap.forEach((docSnap) => {
+            messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
+          });
+          const sorted = sortChatMessagesChronologically(messages);
+          onUpdate(sorted);
+        },
+        (err) => {
+          logFirestoreSyncIssue('Chat messages sync', err);
+          if (onError) onError(err);
+          // Reconnexion automatique si la connexion réseau ou le stream se coupe (sommeil mobile, changement wifi/4g)
+          if (!isUnsubscribed) {
+            if (activeUnsubscribe) {
+              try { activeUnsubscribe(); } catch {}
+              activeUnsubscribe = null;
+            }
+            retryTimer = setTimeout(connect, 3000);
+          }
+        }
+      );
+    } catch (err: any) {
+      logFirestoreSyncIssue('Chat messages connect', err);
+      if (!isUnsubscribed) {
+        retryTimer = setTimeout(connect, 4000);
+      }
     }
-  );
+  }
+
+  connect();
+
+  return () => {
+    isUnsubscribed = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    if (activeUnsubscribe) {
+      try { activeUnsubscribe(); } catch {}
+      activeUnsubscribe = null;
+    }
+  };
 }
 
 export function subscribeChatTypingStatus(
   onUpdate: (statusMap: Record<string, PartnerPresenceInfo>) => void
-) {
-  const colRef = collection(db, COLLECTIONS.CHAT_STATUS);
-  return onSnapshot(
-    colRef,
-    (snap) => {
-      const map: Record<string, PartnerPresenceInfo> = {};
-      const nowMs = Date.now();
-      snap.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data && data.updatedAt) {
-          const updatedMs = new Date(data.updatedAt).getTime();
-          // Typing signal strictly expires after 4.2 seconds if not refreshed
-          const isTypingFresh = nowMs - updatedMs < 4200;
-          // Presence is considered online if lastSeen was within the last 65 seconds
-          const lastSeenMs = data.lastSeen ? new Date(data.lastSeen).getTime() : updatedMs;
-          const isOnlineFresh = Boolean(data.isOnline && nowMs - lastSeenMs < 65000);
+): () => void {
+  let isUnsubscribed = false;
+  let activeUnsubscribe: (() => void) | null = null;
+  let retryTimer: any = null;
 
-          map[docSnap.id] = {
-            partnerId: docSnap.id,
-            isTyping: Boolean(data.isTyping && isTypingFresh),
-            isOnline: isOnlineFresh,
-            lastSeen: data.lastSeen || data.updatedAt,
-            updatedAt: data.updatedAt,
-          };
+  function connect() {
+    if (isUnsubscribed) return;
+    try {
+      const colRef = collection(db, COLLECTIONS.CHAT_STATUS);
+      activeUnsubscribe = onSnapshot(
+        colRef,
+        (snap) => {
+          const map: Record<string, PartnerPresenceInfo> = {};
+          const nowMs = Date.now();
+          snap.forEach((docSnap) => {
+            const data = docSnap.data();
+            if (data && data.updatedAt) {
+              const updatedMs = new Date(data.updatedAt).getTime();
+              // Typing signal strictly expires after 4.5 seconds if not refreshed
+              const isTypingFresh = nowMs - updatedMs < 4500;
+              // Presence is considered online if lastSeen was within the last 65 seconds
+              const lastSeenMs = data.lastSeen ? new Date(data.lastSeen).getTime() : updatedMs;
+              const isOnlineFresh = Boolean(data.isOnline && nowMs - lastSeenMs < 65000);
+
+              map[docSnap.id] = {
+                partnerId: docSnap.id,
+                isTyping: Boolean(data.isTyping && isTypingFresh),
+                isOnline: isOnlineFresh,
+                lastSeen: data.lastSeen || data.updatedAt,
+                updatedAt: data.updatedAt,
+              };
+            }
+          });
+          onUpdate(map);
+        },
+        (err) => {
+          logFirestoreSyncIssue('Typing status sync', err);
+          if (!isUnsubscribed) {
+            if (activeUnsubscribe) {
+              try { activeUnsubscribe(); } catch {}
+              activeUnsubscribe = null;
+            }
+            retryTimer = setTimeout(connect, 3500);
+          }
         }
-      });
-      onUpdate(map);
-    },
-    (err) => {
-      logFirestoreSyncIssue('Typing status sync', err);
+      );
+    } catch {
+      if (!isUnsubscribed) {
+        retryTimer = setTimeout(connect, 4000);
+      }
     }
-  );
+  }
+
+  connect();
+
+  return () => {
+    isUnsubscribed = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    if (activeUnsubscribe) {
+      try { activeUnsubscribe(); } catch {}
+      activeUnsubscribe = null;
+    }
+  };
 }
 
 export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };

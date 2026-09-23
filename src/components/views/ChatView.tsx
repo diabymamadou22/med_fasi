@@ -42,6 +42,7 @@ import {
   Square as SquareIcon,
   Sticker as StickerIcon,
   Upload,
+  RefreshCw,
 } from 'lucide-react';
 import { NotificationActivationBanner } from '../NotificationActivationBanner';
 import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
@@ -105,6 +106,7 @@ export interface ChatViewProps {
   onEditMessage?: (id: string, newContent: string) => Promise<void> | void;
   onBack?: () => void;
   onOpenNotificationModal?: () => void;
+  onRefreshChat?: () => Promise<void> | void;
 }
 
 export type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
@@ -308,10 +310,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onEditMessage,
   onBack,
   onOpenNotificationModal,
+  onRefreshChat,
 }) => {
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
   const otherPartnerId: PartnerId = activePartnerId === 'p1' ? 'p2' : 'p1';
+
+  // Manual chat refresh state
+  const [isRefreshingChat, setIsRefreshingChat] = useState<boolean>(false);
+  const handleManualRefresh = async () => {
+    if (isRefreshingChat) return;
+    setIsRefreshingChat(true);
+    soundEffects.playSoftTap();
+    try {
+      if (onRefreshChat) {
+        await onRefreshChat();
+      }
+    } finally {
+      setTimeout(() => setIsRefreshingChat(false), 600);
+    }
+  };
 
   // Multi-selection state
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
@@ -1803,8 +1821,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </div>
 
-          {/* Header Action Buttons: Direct Theme & Motif button + More Options */}
+          {/* Header Action Buttons: Direct Theme & Motif button + Refresh + More Options */}
           <div className="flex items-center gap-1">
+            {onRefreshChat && (
+              <button
+                type="button"
+                onClick={handleManualRefresh}
+                className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+                  chatTheme === 'velvet-night'
+                    ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
+                    : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
+                }`}
+                title="Actualiser les messages en direct"
+                aria-label="Actualiser les messages"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 transition-transform duration-500 ${
+                    isRefreshingChat ? 'animate-spin text-rose-500' : ''
+                  }`}
+                />
+              </button>
+            )}
+
             {onOpenNotificationModal && (
               <button
                 type="button"
