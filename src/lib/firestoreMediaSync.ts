@@ -56,7 +56,15 @@ async function blobToBase64(blob: Blob): Promise<string> {
     });
   }
   const arrayBuffer = await blob.arrayBuffer();
-  return Buffer.from(arrayBuffer).toString('base64');
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(arrayBuffer).toString('base64');
+  }
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 /**
