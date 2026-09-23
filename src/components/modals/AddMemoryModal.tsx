@@ -88,7 +88,7 @@ export const AddMemoryModal: React.FC<AddMemoryModalProps> = ({
     setIsProcessingMedia(true);
     setProcessingStatusText('Optimisation de la photo...');
     try {
-      const dataUrl = await processPhotoWithoutCropping(file, 1400, 0.85);
+      const dataUrl = await processPhotoWithoutCropping(file, 1280, 0.82);
       setPhotoUrl(dataUrl);
       setVideoUrl('');
       setMediaType('image');

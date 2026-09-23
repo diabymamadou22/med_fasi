@@ -86,11 +86,46 @@ function saveServerChatMessages(messages: any[]) {
 
 let serverChatMessages: any[] = loadServerChatMessages();
 
+// Gallery Memories Store pour synchronisation durable & multi-appareils
+const GALLERY_MEMORIES_FILE = path.join(process.cwd(), "gallery_memories_store.json");
+
+function loadServerMemories(): any[] {
+  try {
+    if (fs.existsSync(GALLERY_MEMORIES_FILE)) {
+      const data = fs.readFileSync(GALLERY_MEMORIES_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (err) {
+    console.warn("Erreur lecture gallery_memories_store.json:", err);
+  }
+  return [];
+}
+
+function saveServerMemories(memories: any[]) {
+  try {
+    fs.writeFileSync(GALLERY_MEMORIES_FILE, JSON.stringify(memories, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Erreur écriture gallery_memories_store.json:", err);
+  }
+}
+
+let serverMemories: any[] = loadServerMemories();
+
 // Server-Sent Events (SSE) pour communication instantanée sans latence
 let sseClients: { id: string; partnerId: string; res: express.Response }[] = [];
 
 function broadcastChatMessage(msg: any) {
   const data = JSON.stringify({ type: "new_message", message: msg });
+  sseClients.forEach((client) => {
+    try {
+      client.res.write(`data: ${data}\n\n`);
+    } catch {}
+  });
+}
+
+function broadcastGalleryEvent(eventType: string, payload: any) {
+  const data = JSON.stringify({ type: eventType, ...payload });
   sseClients.forEach((client) => {
     try {
       client.res.write(`data: ${data}\n\n`);
@@ -124,12 +159,16 @@ async function sendPushToPartner(
   if (targets.length === 0) return 0;
 
   let previewText = content || "Nouveau mot doux de votre amour !";
+  let targetTab = "chat";
   if (mediaType === "image") {
     previewText = "📷 Vous a envoyé une nouvelle photo dans le chat";
   } else if (mediaType === "audio") {
     previewText = "🎵 Vous a envoyé une note vocale d'amour";
   } else if (mediaType === "video") {
     previewText = "🎬 Vous a envoyé une vidéo";
+  } else if (mediaType === "gallery_photo" || mediaType === "memory") {
+    previewText = content || "📷 A ajouté une nouvelle photo à votre galerie !";
+    targetTab = "gallery";
   }
 
   if (previewText.length > 140) {
@@ -141,11 +180,11 @@ async function sendPushToPartner(
     body: previewText,
     icon: "/pwa-192x192.png",
     badge: "/favicon.png",
-    tag: `nid-damour-msg-${Date.now()}`,
+    tag: `nid-damour-${targetTab}-${Date.now()}`,
     timestamp: Date.now(),
     data: {
-      url: "/?tab=chat",
-      tab: "chat",
+      url: `/?tab=${targetTab}`,
+      tab: targetTab,
       senderId,
     },
   });
@@ -534,6 +573,137 @@ async function startServer() {
       return res.json({ success: true });
     } catch (err: any) {
       console.error("Erreur /api/chat/clear:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // DIRECT GALLERY RELAY & REAL-TIME EVENT STREAM
+  // ==========================================
+
+  // Récupérer l'ensemble des photos & souvenirs de la galerie sur le serveur
+  app.get("/api/gallery/memories", (_req, res) => {
+    res.json({
+      success: true,
+      memories: serverMemories,
+      count: serverMemories.length,
+    });
+  });
+
+  // Ajouter un souvenir / photo dans la galerie avec synchronisation SSE instantanée
+  app.post("/api/gallery/add", async (req, res) => {
+    try {
+      const { memory, senderName } = req.body;
+      if (!memory || !memory.id) {
+        return res.status(400).json({ error: "Souvenir invalide" });
+      }
+
+      // Upsert dans le magasin du serveur
+      const existingIdx = serverMemories.findIndex((m) => m.id === memory.id);
+      if (existingIdx >= 0) {
+        serverMemories[existingIdx] = { ...serverMemories[existingIdx], ...memory };
+      } else {
+        serverMemories.unshift(memory);
+      }
+
+      saveServerMemories(serverMemories);
+
+      // Diffusion instantanée vers l'autre partenaire via SSE (0ms)
+      broadcastGalleryEvent("new_memory", { memory });
+
+      // Notification Push vers l'autre partenaire
+      sendPushToPartner(
+        memory.authorId || "p1",
+        senderName || (memory.authorId === "p1" ? "Med" : "Safi"),
+        `📷 A ajouté "${memory.title || "une nouvelle photo"}" à votre galerie !`,
+        "gallery_photo"
+      ).catch(() => {});
+
+      console.log(`[Gallery Relay] Nouveau souvenir synchronisé: ${memory.title || memory.id} (total: ${serverMemories.length})`);
+      return res.json({ success: true, memory });
+    } catch (err: any) {
+      console.error("Erreur /api/gallery/add:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Synchronisation bidirectionnelle des souvenirs locaux et distants
+  app.post("/api/gallery/sync", (req, res) => {
+    try {
+      const { localMemories } = req.body;
+      if (Array.isArray(localMemories) && localMemories.length > 0) {
+        let modified = false;
+        const idMap = new Map<string, any>();
+        serverMemories.forEach((m) => idMap.set(m.id, m));
+
+        localMemories.forEach((m) => {
+          if (m && m.id && !idMap.has(m.id)) {
+            idMap.set(m.id, m);
+            serverMemories.push(m);
+            modified = true;
+          }
+        });
+
+        if (modified) {
+          serverMemories.sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA;
+          });
+          saveServerMemories(serverMemories);
+        }
+      }
+
+      return res.json({
+        success: true,
+        memories: serverMemories,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Mettre à jour un souvenir (j'aime, description, titre, tags)
+  app.post("/api/gallery/update", (req, res) => {
+    try {
+      const { memory } = req.body;
+      if (!memory || !memory.id) {
+        return res.status(400).json({ error: "Souvenir invalide" });
+      }
+
+      const existingIdx = serverMemories.findIndex((m) => m.id === memory.id);
+      if (existingIdx >= 0) {
+        serverMemories[existingIdx] = { ...serverMemories[existingIdx], ...memory };
+        saveServerMemories(serverMemories);
+      } else {
+        serverMemories.unshift(memory);
+        saveServerMemories(serverMemories);
+      }
+
+      broadcastGalleryEvent("update_memory", { memory });
+      return res.json({ success: true, memory });
+    } catch (err: any) {
+      console.error("Erreur /api/gallery/update:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Supprimer un souvenir de la galerie
+  app.post("/api/gallery/delete", (req, res) => {
+    try {
+      const { memoryId } = req.body;
+      if (!memoryId) {
+        return res.status(400).json({ error: "Identifiant memoryId requis" });
+      }
+
+      serverMemories = serverMemories.filter((m) => m.id !== memoryId);
+      saveServerMemories(serverMemories);
+
+      broadcastGalleryEvent("delete_memory", { memoryId });
+      console.log(`[Gallery Relay] Souvenir ${memoryId} supprimé. Restants: ${serverMemories.length}`);
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("Erreur /api/gallery/delete:", err);
       return res.status(500).json({ error: err.message });
     }
   });

@@ -33,6 +33,7 @@ import {
   sortChatMessagesChronologically,
   extractMessageTimestampMs,
 } from './chatUtils';
+import { compressDataUrlIfNeeded } from './imageUtils';
 
 // Collections
 const COLLECTIONS = {
@@ -352,8 +353,21 @@ export async function saveProfile(profile: CoupleProfile) {
 
 export async function saveMemory(memory: TimelineMemory) {
   return safeFirestoreOperation(async () => {
+    let sanitized = sanitizeForFirestore(memory);
+    if (
+      sanitized.photoUrl &&
+      typeof sanitized.photoUrl === 'string' &&
+      sanitized.photoUrl.startsWith('data:image/') &&
+      sanitized.photoUrl.length > 380000
+    ) {
+      try {
+        sanitized.photoUrl = await compressDataUrlIfNeeded(sanitized.photoUrl, 1080, 300 * 1024);
+      } catch (err) {
+        console.warn('Erreur compression préalable photo souvenir:', err);
+      }
+    }
     const ref = doc(db, COLLECTIONS.MEMORIES, memory.id);
-    await setDoc(ref, sanitizeForFirestore(memory), { merge: true });
+    await setDoc(ref, sanitized, { merge: true });
   }, 'saveMemory');
 }
 

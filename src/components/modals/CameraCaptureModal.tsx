@@ -147,8 +147,18 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     setTimeout(() => setIsFlashing(false), 200);
 
     const canvas = canvasRef.current || document.createElement('canvas');
-    const width = video.videoWidth || 1280;
-    const height = video.videoHeight || 720;
+    let width = video.videoWidth || 1280;
+    let height = video.videoHeight || 720;
+    const maxDim = 1280;
+    if (width > maxDim || height > maxDim) {
+      if (width > height) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+    }
     canvas.width = width;
     canvas.height = height;
 
@@ -163,7 +173,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
     ctx.drawImage(video, 0, 0, width, height);
 
-    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    const rawDataUrl = canvas.toDataURL('image/jpeg', 0.82);
     setCapturedPhoto(rawDataUrl);
     stopCamera();
     soundEffects.playSuccessSparkle();
@@ -201,7 +211,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
     setIsProcessing(true);
     try {
-      const optimizedUrl = await processPhotoWithoutCropping(file, 1600, 0.86);
+      const optimizedUrl = await processPhotoWithoutCropping(file, 1280, 0.82);
       setCapturedPhoto(optimizedUrl);
       soundEffects.playCameraShutter();
       soundEffects.playSuccessSparkle();

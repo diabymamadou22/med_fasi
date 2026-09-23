@@ -1,4 +1,4 @@
-import { ChatMessage, MissYouPulse } from '../types';
+import { ChatMessage, MissYouPulse, TimelineMemory } from '../types';
 
 export interface ChatPresenceInfo {
   partnerId: string;
@@ -162,6 +162,9 @@ export function connectChatEvents(options: {
   onClearChat?: () => void;
   onPresence?: (presence: ChatPresenceState) => void;
   onPulse?: (pulse: MissYouPulse) => void;
+  onNewMemory?: (memory: TimelineMemory) => void;
+  onUpdateMemory?: (memory: TimelineMemory) => void;
+  onDeleteMemory?: (memoryId: string) => void;
 }): () => void {
   let eventSource: EventSource | null = null;
   let isClosed = false;
@@ -191,6 +194,12 @@ export function connectChatEvents(options: {
             options.onPresence(payload.presence);
           } else if (payload.type === 'pulse' && payload.pulse && options.onPulse) {
             options.onPulse(payload.pulse);
+          } else if (payload.type === 'new_memory' && payload.memory && options.onNewMemory) {
+            options.onNewMemory(payload.memory);
+          } else if (payload.type === 'update_memory' && payload.memory && options.onUpdateMemory) {
+            options.onUpdateMemory(payload.memory);
+          } else if (payload.type === 'delete_memory' && payload.memoryId && options.onDeleteMemory) {
+            options.onDeleteMemory(payload.memoryId);
           }
         } catch {}
       };

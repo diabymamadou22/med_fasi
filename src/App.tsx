@@ -128,6 +128,12 @@ import {
   deleteChatMessagesViaRelay,
   clearChatViaRelay,
 } from './lib/chatRelayService';
+import {
+  sendMemoryViaRelay,
+  syncMemoriesWithRelay,
+  updateMemoryViaRelay,
+  deleteMemoryViaRelay,
+} from './lib/galleryRelayService';
 
 const STORAGE_KEYS = {
   PROFILE: 'nid_damour_profile',
@@ -756,7 +762,22 @@ export default function App() {
             seen.add(m.id);
             return true;
           });
-          setMemories(deduped);
+          setMemories((prevLocal) => {
+            const idMap = new Map<string, TimelineMemory>();
+            deduped.forEach((m) => idMap.set(m.id, m));
+            prevLocal.forEach((m) => {
+              if (m && m.id && !idMap.has(m.id)) {
+                idMap.set(m.id, m);
+              }
+            });
+            const merged = Array.from(idMap.values());
+            merged.sort((a, b) => {
+              const dateA = a.date ? new Date(a.date).getTime() : 0;
+              const dateB = b.date ? new Date(b.date).getTime() : 0;
+              return dateB - dateA;
+            });
+            return merged;
+          });
           setIsCloudSynced(true);
           setIsInitialRemoteLoaded(true);
         }
@@ -1025,12 +1046,93 @@ export default function App() {
           }
         }
       },
+      onNewMemory: (newMem) => {
+        if (!newMem || !newMem.id) return;
+        setMemories((prev) => {
+          if (prev.some((m) => m.id === newMem.id)) {
+            return prev.map((m) => (m.id === newMem.id ? { ...m, ...newMem } : m));
+          }
+          const updated = [newMem, ...prev];
+          updated.sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA;
+          });
+          return updated;
+        });
+
+        if (newMem.authorId !== activePartnerIdRef.current) {
+          soundEffects.playSuccessSparkle();
+          triggerVibration([150, 80, 150]);
+          const curProf = profileRef.current;
+          const sender = newMem.authorId === 'p1' ? curProf.partner1 : curProf.partner2;
+          const authorName = sender?.name || 'Votre amour';
+
+          startTabMessageAlert(authorName, `📷 A ajouté "${newMem.title || 'une photo'}" à la galerie`);
+
+          if (document.visibilityState === 'hidden' || activeTabRef.current !== 'gallery') {
+            sendSystemNotification({
+              title: `${authorName} a ajouté une photo ❤️`,
+              body: newMem.title ? `"${newMem.title}" dans votre galerie partagée` : 'Nouvelle photo ajoutée à votre galerie',
+              icon: newMem.photoUrl || sender?.avatar || '/app-icon.png',
+              tab: 'gallery',
+              tag: `mem-${newMem.id}`,
+            });
+          }
+
+          if (activeTabRef.current !== 'gallery') {
+            setFloatingAlert({
+              id: newMem.id,
+              senderId: (newMem.authorId as PartnerId) || 'p1',
+              senderName: authorName,
+              senderAvatar: sender?.avatar,
+              content: `📷 A ajouté une photo : "${newMem.title || 'Souvenir'}"`,
+              mediaType: 'image',
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      },
+      onUpdateMemory: (updatedMem) => {
+        if (!updatedMem || !updatedMem.id) return;
+        setMemories((prev) =>
+          prev.map((m) => (m.id === updatedMem.id ? { ...m, ...updatedMem } : m))
+        );
+      },
+      onDeleteMemory: (memId) => {
+        if (!memId) return;
+        setMemories((prev) => prev.filter((m) => m.id !== memId));
+      },
     });
 
     return () => {
       disconnectSse();
     };
   }, [activePartnerId]);
+
+  // Synchronisation initiale et périodique de la galerie via le serveur relais
+  useEffect(() => {
+    syncMemoriesWithRelay(memories)
+      .then((serverList) => {
+        if (Array.isArray(serverList) && serverList.length > 0) {
+          setMemories((prev) => {
+            const idMap = new Map<string, TimelineMemory>();
+            serverList.forEach((m) => idMap.set(m.id, m));
+            prev.forEach((m) => {
+              if (!idMap.has(m.id)) idMap.set(m.id, m);
+            });
+            const merged = Array.from(idMap.values());
+            merged.sort((a, b) => {
+              const dateA = a.date ? new Date(a.date).getTime() : 0;
+              const dateB = b.date ? new Date(b.date).getTime() : 0;
+              return dateB - dateA;
+            });
+            return merged;
+          });
+        }
+      })
+      .catch((err) => console.warn('Erreur synchronisation initiale galerie:', err));
+  }, []);
 
   // Sync state to localStorage as offline fallback (uniquement après chargement initial)
   useEffect(() => {
@@ -1580,7 +1682,18 @@ export default function App() {
       likes: [activePartnerId],
     };
     setMemories((prev) => [newMem, ...prev.filter((m) => m.id !== newMem.id)]);
-    saveMemory(newMem).catch(console.error);
+
+    // Relais direct serveur (disque persistant + SSE instantané vers le partenaire + push)
+    const authorName =
+      activePartnerId === 'p1' ? profile.partner1.name : profile.partner2.name;
+    sendMemoryViaRelay(newMem, authorName).catch((err) =>
+      console.warn('Erreur transmission relais souvenir:', err)
+    );
+
+    // Persistance Firestore en parallèle
+    saveMemory(newMem).catch((err) =>
+      console.warn('Erreur sauvegarde Firestore souvenir:', err)
+    );
   };
 
   const handleLikeMemory = (memId: string) => {
@@ -1596,7 +1709,12 @@ export default function App() {
       setMemories((prev) =>
         prev.map((m) => (m.id === memId ? updatedMem : m))
       );
-      saveMemory(updatedMem).catch(console.error);
+      updateMemoryViaRelay(updatedMem).catch((err) =>
+        console.warn('Erreur relais like souvenir:', err)
+      );
+      saveMemory(updatedMem).catch((err) =>
+        console.warn('Erreur sauvegarde Firestore like souvenir:', err)
+      );
     }
   };
 
@@ -1745,7 +1863,12 @@ export default function App() {
   const handleUpdateMemory = (updated: TimelineMemory) => {
     setMemories((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
     setEditingMemory(null);
-    saveMemory(updated).catch(console.error);
+    updateMemoryViaRelay(updated).catch((err) =>
+      console.warn('Erreur relais mise à jour souvenir:', err)
+    );
+    saveMemory(updated).catch((err) =>
+      console.warn('Erreur Firestore mise à jour souvenir:', err)
+    );
   };
 
   const handleDeleteMemory = (memoryId: string) => {
@@ -1757,7 +1880,12 @@ export default function App() {
       onConfirm: () => {
         setMemories((prev) => prev.filter((m) => m.id !== memoryId));
         setEditingMemory(null);
-        deleteMemoryFromDb(memoryId).catch(console.error);
+        deleteMemoryViaRelay(memoryId).catch((err) =>
+          console.warn('Erreur relais suppression souvenir:', err)
+        );
+        deleteMemoryFromDb(memoryId).catch((err) =>
+          console.warn('Erreur Firestore suppression souvenir:', err)
+        );
       },
     });
   };
@@ -2243,6 +2371,7 @@ export default function App() {
                 locations={locations}
                 capsules={capsules}
                 challenges={challenges}
+                messages={messages}
                 onLikeMemory={handleLikeMemory}
                 onAddMemory={handleAddMemory}
                 onOpenAddMemoryModal={() => {

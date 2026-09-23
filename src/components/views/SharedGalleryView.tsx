@@ -43,6 +43,7 @@ import {
   MemoryLocation,
   TimeCapsule,
   CoupleChallenge,
+  ChatMessage,
 } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
@@ -70,13 +71,14 @@ export type GallerySourceType =
   | 'profile'
   | 'location'
   | 'capsule'
-  | 'challenge';
+  | 'challenge'
+  | 'chat';
 
 export type GalleryMediaMode = 'all' | 'photos' | 'videos';
 
 export interface GalleryItem {
   id: string;
-  sourceType: 'memory' | 'profile' | 'location' | 'capsule' | 'challenge';
+  sourceType: 'memory' | 'profile' | 'location' | 'capsule' | 'challenge' | 'chat';
   sourceLabel: string;
   title: string;
   photoUrl: string;
@@ -110,6 +112,7 @@ interface SharedGalleryViewProps {
   locations: MemoryLocation[];
   capsules: TimeCapsule[];
   challenges: CoupleChallenge[];
+  messages?: ChatMessage[];
   onLikeMemory?: (memoryId: string) => void;
   onAddMemory?: (memory: Omit<TimelineMemory, 'id' | 'likes'>) => void;
   onOpenAddMemoryModal: (defaultType?: 'image' | 'video') => void;
@@ -127,6 +130,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   locations,
   capsules,
   challenges,
+  messages = [],
   onLikeMemory,
   onAddMemory,
   onOpenAddMemoryModal,
@@ -304,6 +308,31 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       }
     });
 
+    // 6. Photos et vidéos partagées dans le Chat
+    if (Array.isArray(messages)) {
+      messages.forEach((msg) => {
+        if (msg.photoUrl && msg.photoUrl.trim().length > 0) {
+          items.push({
+            id: `chat-${msg.id}`,
+            sourceType: 'chat',
+            sourceLabel: 'Discussion',
+            title:
+              msg.content && msg.content.length > 0 && !msg.content.startsWith('data:')
+                ? msg.content.slice(0, 35)
+                : 'Photo du chat',
+            photoUrl: msg.photoUrl,
+            mediaType: msg.mediaType === 'video' ? 'video' : 'image',
+            date: msg.timestamp ? msg.timestamp.split('T')[0] : undefined,
+            locationName: 'Discussion privée',
+            description: msg.content || 'Photo partagée dans notre nid',
+            authorId: (msg.senderId as PartnerId) || 'p1',
+            tags: ['Chat', 'Discussion'],
+            originalEntityId: msg.id,
+          });
+        }
+      });
+    }
+
     // Unique IDs & Sort by date (newest first)
     const seenIds = new Set<string>();
     const uniqueItems: GalleryItem[] = [];
@@ -322,7 +351,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       const dateB = b.date ? new Date(b.date).getTime() : 0;
       return dateB - dateA;
     });
-  }, [profile, memories, locations, capsules, challenges]);
+  }, [profile, memories, locations, capsules, challenges, messages]);
 
   // Fallback romantic cover if no media uploaded yet
   const defaultRomanticCover =
@@ -392,7 +421,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     });
 
     // 5. Download (Téléchargements / Reçus)
-    const downloadItems = allGalleryItems.filter((i) => i.sourceType === 'memory');
+    const downloadItems = allGalleryItems.filter(
+      (i) => i.sourceType === 'memory' || i.sourceType === 'chat'
+    );
     list.push({
       id: 'download',
       title: 'Download',
@@ -402,6 +433,21 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       items: downloadItems.length > 0 ? downloadItems : allGalleryItems,
       isEssential: true,
     });
+
+    // Album dédié : Photos échangées dans le Chat
+    const chatItems = allGalleryItems.filter((i) => i.sourceType === 'chat');
+    if (chatItems.length > 0) {
+      list.push({
+        id: 'chat_media',
+        title: 'Photos du Chat',
+        count: chatItems.length,
+        coverUrl: chatItems[0]?.photoUrl || defaultRomanticCover,
+        type: 'photo',
+        badge: 'dot',
+        items: chatItems,
+        isEssential: true,
+      });
+    }
 
     // 6. Ray Ban Meta (Moments duo & complices)
     const duoItems = allGalleryItems.filter(

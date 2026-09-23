@@ -152,7 +152,7 @@ export async function compressImageWithStats(
           let estimatedBytes = Math.round((dataUrl.length * 3) / 4);
 
           // Step down quality if image is still above budget
-          const qualitySteps = [0.75, 0.68, 0.60, 0.52];
+          const qualitySteps = [0.75, 0.68, 0.60, 0.52, 0.45];
           let stepIndex = 0;
 
           while (estimatedBytes > maxSizeBytes && stepIndex < qualitySteps.length) {
@@ -160,6 +160,27 @@ export async function compressImageWithStats(
             dataUrl = canvas.toDataURL('image/jpeg', currentQuality);
             estimatedBytes = Math.round((dataUrl.length * 3) / 4);
             stepIndex++;
+          }
+
+          // If still over budget, downscale dimensions proportionally
+          if (estimatedBytes > maxSizeBytes) {
+            let scaleFactor = 0.8;
+            for (let attempt = 0; attempt < 3 && estimatedBytes > maxSizeBytes; attempt++) {
+              const scaledW = Math.max(320, Math.round(width * scaleFactor));
+              const scaledH = Math.max(320, Math.round(height * scaleFactor));
+              const scaledCanvas = document.createElement('canvas');
+              scaledCanvas.width = scaledW;
+              scaledCanvas.height = scaledH;
+              const scaledCtx = scaledCanvas.getContext('2d');
+              if (scaledCtx) {
+                scaledCtx.imageSmoothingEnabled = true;
+                scaledCtx.imageSmoothingQuality = 'high';
+                scaledCtx.drawImage(canvas, 0, 0, scaledW, scaledH);
+                dataUrl = scaledCanvas.toDataURL('image/jpeg', 0.72);
+                estimatedBytes = Math.round((dataUrl.length * 3) / 4);
+              }
+              scaleFactor *= 0.8;
+            }
           }
 
           const reductionPercent = Math.max(
@@ -182,6 +203,66 @@ export async function compressImageWithStats(
       img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Recompresses an existing base64 dataUrl if it exceeds the target size,
+ * ensuring it safely fits in Firestore (< 400 KB) without losing visible crispness.
+ */
+export async function compressDataUrlIfNeeded(
+  dataUrl: string,
+  maxDimension = 1200,
+  maxSizeBytes = 360 * 1024
+): Promise<string> {
+  if (!dataUrl || !dataUrl.startsWith('data:image/')) return dataUrl;
+  const currentBytes = Math.round((dataUrl.length * 3) / 4);
+  if (currentBytes <= maxSizeBytes) return dataUrl;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(dataUrl);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let q = 0.80;
+        let compressed = canvas.toDataURL('image/jpeg', q);
+        let b = Math.round((compressed.length * 3) / 4);
+
+        const steps = [0.72, 0.64, 0.55];
+        for (const nextQ of steps) {
+          if (b <= maxSizeBytes) break;
+          q = nextQ;
+          compressed = canvas.toDataURL('image/jpeg', q);
+          b = Math.round((compressed.length * 3) / 4);
+        }
+
+        resolve(compressed);
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
   });
 }
 
