@@ -125,6 +125,8 @@ import {
   syncLocalMessagesWithRelay,
   sendPulseViaRelay,
   connectChatEvents,
+  deleteChatMessagesViaRelay,
+  clearChatViaRelay,
 } from './lib/chatRelayService';
 
 const STORAGE_KEYS = {
@@ -176,6 +178,7 @@ export default function App() {
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
+  const deletedMessageIdsRef = useRef<Set<string>>(new Set());
   const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
   const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab>('roulette');
 
@@ -566,11 +569,37 @@ export default function App() {
   // Gestionnaire unifié de réception des messages avec alertes sonores et visuelles
   const handleIncomingChatMessages = useCallback(
     (incomingList: ChatMessage[], _source = 'unknown') => {
-      if (!Array.isArray(incomingList) || incomingList.length === 0) return;
+      if (!Array.isArray(incomingList)) return;
+
+      // Filtrer immédiatement les messages déjà supprimés
+      const validIncoming = incomingList.filter(
+        (m) => m && m.id && !deletedMessageIdsRef.current.has(m.id)
+      );
 
       setMessages((prev) => {
+        // Si la source est le flux direct Firestore (authoritatif):
+        // La liste reçue reflète l'état actuel exact de la base Cloud Firestore.
+        // Si des messages ont été supprimés sur un appareil, ils ne sont plus dans incomingList.
+        if (_source === 'firestore-stream') {
+          const incomingIds = new Set(validIncoming.map((m) => m.id));
+          const now = Date.now();
+          const merged: ChatMessage[] = [...validIncoming];
+
+          // On conserve uniquement les messages locaux très récents (moins de 15s) envoyés par l'utilisateur actif
+          // et qui seraient encore en cours d'envoi.
+          prev.forEach((m) => {
+            if (!incomingIds.has(m.id) && !deletedMessageIdsRef.current.has(m.id)) {
+              const msgTime = m.timestampMs || new Date(m.timestamp || 0).getTime();
+              if (now - msgTime < 15000 && m.senderId === activePartnerIdRef.current) {
+                merged.push(m);
+              }
+            }
+          });
+          return sortChatMessagesChronologically(merged);
+        }
+
         const prevIds = new Set(prev.map((m) => m.id));
-        const newFromPartner = incomingList.filter(
+        const newFromPartner = validIncoming.filter(
           (m) => !prevIds.has(m.id) && m.senderId !== activePartnerIdRef.current
         );
 
@@ -617,9 +646,13 @@ export default function App() {
 
         // Fusionner avec déduplication stricte pour ne jamais perdre de message
         const idMap = new Map<string, ChatMessage>();
-        prev.forEach((m) => idMap.set(m.id, m));
-        incomingList.forEach((m) => {
-          if (m && m.id) {
+        prev.forEach((m) => {
+          if (!deletedMessageIdsRef.current.has(m.id)) {
+            idMap.set(m.id, m);
+          }
+        });
+        validIncoming.forEach((m) => {
+          if (m && m.id && !deletedMessageIdsRef.current.has(m.id)) {
             const existing = idMap.get(m.id);
             idMap.set(m.id, existing ? { ...existing, ...m } : m);
           }
@@ -643,7 +676,7 @@ export default function App() {
 
       if (Array.isArray(firestoreMsgs)) {
         firestoreMsgs.forEach((m) => {
-          if (m && m.id && !seen.has(m.id)) {
+          if (m && m.id && !seen.has(m.id) && !deletedMessageIdsRef.current.has(m.id)) {
             seen.add(m.id);
             allIncoming.push(m);
           }
@@ -651,7 +684,7 @@ export default function App() {
       }
       if (Array.isArray(relayMsgs)) {
         relayMsgs.forEach((m) => {
-          if (m && m.id && !seen.has(m.id)) {
+          if (m && m.id && !seen.has(m.id) && !deletedMessageIdsRef.current.has(m.id)) {
             seen.add(m.id);
             allIncoming.push(m);
           }
@@ -962,6 +995,16 @@ export default function App() {
 
           return updated;
         });
+      },
+      onDeleteMessages: (deletedIds) => {
+        if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+          deletedIds.forEach((id) => deletedMessageIdsRef.current.add(id));
+          const idSet = new Set(deletedIds);
+          setMessages((prev) => prev.filter((m) => !idSet.has(m.id)));
+        }
+      },
+      onClearChat: () => {
+        setMessages([]);
       },
       onPulse: (pulse) => {
         if (pulse && pulse.senderId !== activePartnerIdRef.current) {
@@ -1329,8 +1372,16 @@ export default function App() {
 
   const handleDeleteChatMessages = async (messageIds: string[]) => {
     if (!messageIds || messageIds.length === 0) return;
+    messageIds.forEach((id) => deletedMessageIdsRef.current.add(id));
     const idSet = new Set(messageIds);
     setMessages((prev) => prev.filter((m) => !idSet.has(m.id)));
+
+    // 1. Relais direct serveur (immédiat, informe l'autre appareil en temps réel via SSE)
+    deleteChatMessagesViaRelay(messageIds).catch((err) => {
+      console.warn('Suppression relais serveur différée:', err);
+    });
+
+    // 2. Persistance Firestore
     try {
       await deleteMultipleChatMessagesFromDb(messageIds);
     } catch (err) {
@@ -1342,8 +1393,23 @@ export default function App() {
 
   const handleClearChat = async () => {
     if (messages.length === 0) return;
+    messages.forEach((m) => deletedMessageIdsRef.current.add(m.id));
     const allIds = messages.map((m) => m.id);
-    await handleDeleteChatMessages(allIds);
+    setMessages([]);
+
+    // 1. Relais direct serveur
+    clearChatViaRelay().catch(() => {});
+
+    // 2. Persistance Firestore
+    if (allIds.length > 0) {
+      try {
+        await deleteMultipleChatMessagesFromDb(allIds);
+      } catch (err) {
+        if (!isQuotaOrResourceError(err)) {
+          console.warn('Effacement distant messages différé:', err);
+        }
+      }
+    }
   };
 
   // Purge de l'historique des messages plus vieux qu'un certain nombre de jours

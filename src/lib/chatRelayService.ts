@@ -119,11 +119,47 @@ export async function sendPulseViaRelay(
 }
 
 /**
+ * Supprime un ou plusieurs messages sur le serveur relais
+ */
+export async function deleteChatMessagesViaRelay(messageIds: string[]): Promise<boolean> {
+  if (!Array.isArray(messageIds) || messageIds.length === 0) return true;
+  try {
+    const res = await fetch('/api/chat/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageIds }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Chat Relay] Erreur suppression messages:', err);
+    return false;
+  }
+}
+
+/**
+ * Efface l'intégralité de la discussion sur le serveur relais
+ */
+export async function clearChatViaRelay(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/chat/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Chat Relay] Erreur effacement discussion:', err);
+    return false;
+  }
+}
+
+/**
  * Écoute en temps réel via Server-Sent Events (SSE)
  */
 export function connectChatEvents(options: {
   partnerId: string;
   onNewMessage?: (msg: ChatMessage) => void;
+  onDeleteMessages?: (messageIds: string[]) => void;
+  onClearChat?: () => void;
   onPresence?: (presence: ChatPresenceState) => void;
   onPulse?: (pulse: MissYouPulse) => void;
 }): () => void {
@@ -141,6 +177,14 @@ export function connectChatEvents(options: {
           const payload = JSON.parse(event.data);
           if (payload.type === 'new_message' && payload.message && options.onNewMessage) {
             options.onNewMessage(payload.message);
+          } else if (
+            payload.type === 'delete_messages' &&
+            Array.isArray(payload.messageIds) &&
+            options.onDeleteMessages
+          ) {
+            options.onDeleteMessages(payload.messageIds);
+          } else if (payload.type === 'clear_chat' && options.onClearChat) {
+            options.onClearChat();
           } else if (payload.type === 'presence' && payload.presence && options.onPresence) {
             options.onPresence(payload.presence);
           } else if (payload.type === 'handshake' && payload.presence && options.onPresence) {

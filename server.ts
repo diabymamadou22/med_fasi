@@ -485,6 +485,59 @@ async function startServer() {
     }
   });
 
+  // Supprimer un ou plusieurs messages du serveur et diffuser en SSE vers tous les appareils
+  app.post("/api/chat/delete", (req, res) => {
+    try {
+      const { messageIds } = req.body;
+      if (!Array.isArray(messageIds) || messageIds.length === 0) {
+        return res.status(400).json({ error: "Liste messageIds invalide" });
+      }
+
+      const idSet = new Set(messageIds);
+      const initialCount = serverChatMessages.length;
+      serverChatMessages = serverChatMessages.filter((m) => !idSet.has(m.id));
+
+      if (serverChatMessages.length !== initialCount) {
+        saveServerChatMessages(serverChatMessages);
+      }
+
+      // Diffuser instantanément l'événement de suppression à tous les clients connectés
+      const payload = JSON.stringify({ type: "delete_messages", messageIds });
+      sseClients.forEach((client) => {
+        try {
+          client.res.write(`data: ${payload}\n\n`);
+        } catch {}
+      });
+
+      console.log(`[Relay] ${messageIds.length} message(s) supprimé(s). Messages restants: ${serverChatMessages.length}`);
+      return res.json({ success: true, remainingCount: serverChatMessages.length });
+    } catch (err: any) {
+      console.error("Erreur /api/chat/delete:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Vider entièrement la discussion et diffuser l'effacement vers tous les appareils
+  app.post("/api/chat/clear", (_req, res) => {
+    try {
+      serverChatMessages = [];
+      saveServerChatMessages([]);
+
+      const payload = JSON.stringify({ type: "clear_chat" });
+      sseClients.forEach((client) => {
+        try {
+          client.res.write(`data: ${payload}\n\n`);
+        } catch {}
+      });
+
+      console.log("[Relay] Conversation entièrement effacée");
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error("Erreur /api/chat/clear:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // Flux temps-réel Server-Sent Events (SSE)
   app.get("/api/chat/events", (req, res) => {
     const partnerId = (req.query.partnerId as string) || "p1";
