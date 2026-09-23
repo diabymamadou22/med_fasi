@@ -16,6 +16,7 @@ import {
   Pencil,
   Tag,
   Maximize2,
+  Minimize2,
   Sparkles,
   Play,
   Pause,
@@ -29,6 +30,8 @@ import {
   Sliders,
   Info,
   Check,
+  Palette,
+  Eye,
 } from 'lucide-react';
 import { soundEffects } from '../lib/audio';
 import { triggerHeartConfetti } from '../lib/confetti';
@@ -43,6 +46,32 @@ import {
 import { SleekLoveVideoPlayer } from './SleekLoveVideoPlayer';
 import { useBackHandler } from '../lib/backNavigation';
 import { useGesture, usePinch } from 'react-use-gesture';
+
+export type PhotoFilterMode = 'normal' | 'vivid' | 'warm' | 'soft' | 'bw';
+
+export interface PhotoFilterOption {
+  id: PhotoFilterMode;
+  label: string;
+  shortDesc: string;
+  filter: string;
+  icon: string;
+}
+
+export const PHOTO_FILTERS: PhotoFilterOption[] = [
+  { id: 'normal', label: 'Naturel', shortDesc: 'Fidèle à l’originale', filter: 'none', icon: '🌿' },
+  { id: 'vivid', label: 'Éclat d’amour', shortDesc: 'Couleurs vives et lumineuses', filter: 'contrast(106%) saturate(122%) brightness(102%)', icon: '✨' },
+  { id: 'warm', label: 'Romance dorée', shortDesc: 'Tons chauds & chaleureux', filter: 'sepia(20%) saturate(115%) brightness(103%) hue-rotate(-5deg)', icon: '🌅' },
+  { id: 'soft', label: 'Nuit douce', shortDesc: 'Confort visuel reposant', filter: 'brightness(92%) contrast(96%)', icon: '🌙' },
+  { id: 'bw', label: 'Noir & Blanc', shortDesc: 'Argentique & intemporel', filter: 'grayscale(100%) contrast(110%)', icon: '🎞️' },
+];
+
+export interface PhotoMeta {
+  width: number;
+  height: number;
+  aspectRatio: string;
+  megapixels: string;
+  format: string;
+}
 
 export interface PhotoViewerItem {
   id: string;
@@ -152,6 +181,89 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   const [videoPlaybackRate, setVideoPlaybackRate] = useState<number>(1);
   const [showOptionsMenu, setShowOptionsMenu] = useState<boolean>(false);
   const [showDetailsModal, setShowDetailsModal] = useState<boolean>(false);
+
+  // Photo Visual Ambiance, Fullscreen & Metadata States
+  const [filterMode, setFilterMode] = useState<PhotoFilterMode>('normal');
+  const [showFilterPicker, setShowFilterPicker] = useState<boolean>(false);
+  const [currentImageMeta, setCurrentImageMeta] = useState<PhotoMeta | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 2400);
+  }, []);
+
+  // Sync browser fullscreen status
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleNativeFullscreen = useCallback(() => {
+    soundEffects.playSoftTap();
+    triggerVibration([20]);
+    if (!document.fullscreenElement) {
+      if (containerRef.current?.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      } else if ((containerRef.current as any)?.webkitRequestFullscreen) {
+        (containerRef.current as any).webkitRequestFullscreen();
+      }
+      setIsFullscreen(true);
+      showToast('Plein écran immersif activé ⛶');
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
+      setIsFullscreen(false);
+      showToast('Plein écran quitté');
+    }
+  }, [showToast]);
+
+  // Reset metadata when photo changes
+  useEffect(() => {
+    setCurrentImageMeta(null);
+  }, [currentIndex]);
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return;
+
+    const ratio = w / h;
+    let ratioLabel = `${ratio.toFixed(2)}:1`;
+    if (Math.abs(ratio - 1) < 0.05) ratioLabel = '1:1 Carré';
+    else if (Math.abs(ratio - 16 / 9) < 0.08) ratioLabel = '16:9 Paysage';
+    else if (Math.abs(ratio - 9 / 16) < 0.08) ratioLabel = '9:16 Portrait';
+    else if (Math.abs(ratio - 4 / 3) < 0.08) ratioLabel = '4:3 Standard';
+    else if (Math.abs(ratio - 3 / 4) < 0.08) ratioLabel = '3:4 Portrait';
+    else if (w > h) ratioLabel = `${ratio.toFixed(1)}:1 Paysage`;
+    else ratioLabel = `1:${(1 / ratio).toFixed(1)} Portrait`;
+
+    const mp = ((w * h) / 1_000_000).toFixed(1) + ' MP';
+
+    let format = 'Photo HD';
+    const url = activeItem?.photoUrl || '';
+    if (url.includes('image/png') || url.endsWith('.png')) format = 'Format PNG HD';
+    else if (url.includes('image/webp') || url.endsWith('.webp')) format = 'Format WebP';
+    else if (url.includes('image/jpeg') || url.endsWith('.jpg') || url.endsWith('.jpeg')) format = 'Format JPEG HD';
+
+    setCurrentImageMeta({
+      width: w,
+      height: h,
+      aspectRatio: ratioLabel,
+      megapixels: mp,
+      format,
+    });
+  }, [activeItem?.photoUrl]);
 
   // Samsung Video Player States & Ref
   const videoElRef = useRef<HTMLVideoElement | null>(null);
@@ -305,6 +417,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   }, [activeItem, isCurrentItemVideo, resolvedVideoUrl]);
 
   // Mobile Back Button Support: closes modals/menus first, then closes viewer without exiting the app
+  useBackHandler(isOpen && showFilterPicker, () => setShowFilterPicker(false), 'photo-viewer-filter-picker');
   useBackHandler(isOpen && showDetailsModal, () => setShowDetailsModal(false), 'photo-viewer-details');
   useBackHandler(isOpen && showOptionsMenu, () => setShowOptionsMenu(false), 'photo-viewer-options');
   useBackHandler(isOpen, onClose, 'mobile-photo-viewer');
@@ -627,6 +740,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
   return (
     <AnimatePresence>
       <motion.div
+        ref={containerRef}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -646,7 +760,7 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Back button & Samsung Memory Capsule */}
+          {/* Back button & Partner Info Capsule */}
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={onClose}
@@ -658,22 +772,27 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             </button>
 
             {/* Samsung Capsule Card */}
-            <div className="flex flex-col min-w-0 max-w-[210px] sm:max-w-xs md:max-w-md bg-black/45 backdrop-blur-md border border-white/15 px-3 py-1.5 rounded-2xl text-white shadow-lg">
+            <div className="flex flex-col min-w-0 max-w-[210px] sm:max-w-xs md:max-w-md bg-black/50 backdrop-blur-xl border border-white/20 px-3.5 py-1.5 rounded-2xl text-white shadow-xl">
               <div className="flex items-center gap-1.5 text-xs font-bold leading-tight truncate">
-                <span>{activeItem.authorName || (activeItem.authorId === 'p2' ? 'NID' : 'MD')}</span>
-                <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500 inline shrink-0" />
-                <span className="text-[10px] font-normal text-white/60 truncate">
-                  from {activeItem.authorId === 'p2' ? 'NID' : 'MD'}
+                <span>{activeItem.authorName || (activeItem.authorId === 'p2' ? 'Med' : 'Safi')}</span>
+                <Heart className="w-3 h-3 fill-rose-500 text-rose-500 inline shrink-0" />
+                <span className="text-[10px] font-semibold text-rose-300 px-1.5 py-0.2 rounded-full bg-white/15 font-mono">
+                  {currentIndex + 1} / {items.length}
                 </span>
+                {activeItem.date && (
+                  <span className="text-[10px] font-normal text-white/70 truncate hidden sm:inline">
+                    • {activeItem.date}
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-white/80 truncate font-medium">
-                💌 Mot doux : {activeItem.title || activeItem.description || 'Tu es la plus belle chose qui me soit arrivée...'}
+                {activeItem.title || activeItem.description || 'Photo partagée dans votre salon d’amour'}
               </div>
             </div>
           </div>
 
-          {/* Quick Circular Action Buttons (Samsung Style) */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Quick Circular Action Buttons (Fullscreen, Filters, Details, Download) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Loop Toggle Button for Videos */}
             {isCurrentItemVideo && (
               <button
@@ -690,6 +809,56 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
               </button>
             )}
 
+            {/* Native Fullscreen Toggle Button ⛶ */}
+            <button
+              type="button"
+              onClick={toggleNativeFullscreen}
+              className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all cursor-pointer shadow-md active:scale-95 ${
+                isFullscreen
+                  ? 'bg-rose-600/80 border-rose-300 text-white shadow-rose-600/40 ring-2 ring-rose-400/50'
+                  : 'bg-black/50 hover:bg-black/70 border-white/15 text-white'
+              }`}
+              title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran immersif'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-4.5 h-4.5 text-rose-300" />
+              ) : (
+                <Maximize2 className="w-4.5 h-4.5 text-white" />
+              )}
+            </button>
+
+            {/* Visual Ambiance / Filters for Photos */}
+            {!isCurrentItemVideo && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setShowFilterPicker((prev) => !prev);
+                }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md border transition-all cursor-pointer shadow-md active:scale-95 ${
+                  filterMode !== 'normal'
+                    ? 'bg-rose-600/80 border-rose-300 text-white shadow-rose-600/40 ring-2 ring-rose-400/50'
+                    : 'bg-black/50 hover:bg-black/70 border-white/15 text-white'
+                }`}
+                title="Ambiance & Confort Visuel"
+              >
+                <Palette className="w-4.5 h-4.5 text-rose-300" />
+              </button>
+            )}
+
+            {/* Details Modal Trigger directly in Top Bar */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowDetailsModal(true);
+              }}
+              className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all shadow-md cursor-pointer"
+              title="Détails & Fiche Technique"
+            >
+              <Info className="w-4.5 h-4.5 text-rose-300" />
+            </button>
+
             {/* Vision Amour (Sparkles / Smart Scan) */}
             <button
               type="button"
@@ -704,24 +873,23 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   ? 'bg-purple-600 border-purple-400 text-white shadow-purple-600/30 ring-2 ring-purple-400/40'
                   : 'bg-black/50 hover:bg-black/70 border-white/15 text-white'
               }`}
-              title="Vision Amour Samsung ✨"
+              title="Vision Romance Complice ✨"
             >
               <Sparkles className="w-4.5 h-4.5 text-purple-200" />
             </button>
 
-            {/* Zoom tool reset / download for photos */}
-            {!isCurrentItemVideo && (
-              <a
-                href={activeItem.photoUrl}
-                download={`souvenir-${currentIndex + 1}.jpg`}
-                target="_blank"
-                rel="noreferrer"
-                className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all shadow-md cursor-pointer"
-                title="Télécharger la photo"
-              >
-                <Download className="w-4.5 h-4.5" />
-              </a>
-            )}
+            {/* Download HD */}
+            <a
+              href={activeItem.photoUrl}
+              download={`souvenir-${currentIndex + 1}.jpg`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => showToast('Téléchargement haute qualité...')}
+              className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center backdrop-blur-md border border-white/15 transition-all shadow-md cursor-pointer hidden sm:flex"
+              title="Télécharger la photo HD"
+            >
+              <Download className="w-4.5 h-4.5" />
+            </a>
 
             {/* Three Dots More Options Button ⋮ */}
             <button
@@ -782,7 +950,6 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
             2. MAIN INTERACTIVE PHOTO/VIDEO STAGE (SWIPE, PINCH, PAN)
            ========================================================= */}
         <div
-          ref={containerRef}
           {...(isCurrentItemVideo ? {} : bindGesture())}
           onClick={handleStageClick}
           className="absolute inset-0 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-pointer"
@@ -887,13 +1054,21 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                 translateX: pan.x,
                 translateY: pan.y,
               }}
-              className="relative max-w-full max-h-full flex items-center justify-center p-2 sm:p-6"
+              className="relative max-w-full max-h-full flex items-center justify-center p-1 sm:p-4"
             >
               <img
                 src={activeItem.photoUrl}
                 alt={activeItem.title || 'Photo complice'}
                 draggable={false}
-                className="max-h-[72vh] sm:max-h-[78vh] max-w-[94vw] sm:max-w-[88vw] w-auto h-auto object-contain rounded-xl sm:rounded-2xl shadow-2xl select-none"
+                onLoad={handleImageLoad}
+                style={{
+                  filter: PHOTO_FILTERS.find((f) => f.id === filterMode)?.filter || 'none',
+                }}
+                className={`transition-all duration-300 w-auto h-auto object-contain select-none drop-shadow-2xl ${
+                  showUiChrome
+                    ? 'max-h-[82vh] sm:max-h-[85vh] max-w-[96vw] sm:max-w-[92vw] rounded-xl sm:rounded-2xl'
+                    : 'max-h-[96vh] sm:max-h-[97vh] max-w-[98vw] sm:max-w-[98vw] rounded-none sm:rounded-xl'
+                }`}
               />
             </motion.div>
           )}
@@ -901,28 +1076,57 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           {/* Dynamic Pinch & Zoom HUD Badge */}
           <AnimatePresence>
             {!isCurrentItemVideo && scale > 1.05 && (
-              <motion.button
+              <motion.div
                 key="zoom-badge-hud"
                 initial={{ opacity: 0, y: -10, scale: 0.85 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.85 }}
                 transition={{ duration: 0.15 }}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  resetZoom();
-                  triggerVibration([20]);
-                }}
-                className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-black/80 hover:bg-black/95 active:scale-95 backdrop-blur-md border border-white/20 text-white font-mono text-xs shadow-xl flex items-center gap-2 cursor-pointer pointer-events-auto transition-transform"
-                title="Cliquer pour réinitialiser le zoom (1x)"
+                className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-black/85 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white font-mono text-xs shadow-2xl flex items-center gap-2 pointer-events-auto"
               >
-                <ZoomIn className="w-3.5 h-3.5 text-rose-400" />
-                <span className="font-semibold">{Math.round(scale * 100)}%</span>
-                <span className="text-white/60">({scale.toFixed(1)}x)</span>
-                <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white/90">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleZoomOut();
+                  }}
+                  className="p-1 rounded-full hover:bg-white/20 active:scale-90 text-white transition-transform"
+                  title="Dézoomer"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold text-rose-300">{Math.round(scale * 100)}%</span>
+                  <span className="text-white/60 text-[11px]">({scale.toFixed(1)}x)</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleZoomIn();
+                  }}
+                  className="p-1 rounded-full hover:bg-white/20 active:scale-90 text-white transition-transform"
+                  title="Zoomer"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    resetZoom();
+                    triggerVibration([20]);
+                    showToast('Zoom 1x');
+                  }}
+                  className="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-white font-bold ml-1 active:scale-95 transition-all"
+                  title="Réinitialiser à 1x"
+                >
                   1x
-                </span>
-              </motion.button>
+                </button>
+              </motion.div>
             )}
           </AnimatePresence>
 
@@ -1099,8 +1303,8 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
           )}
 
           {/* Samsung Bottom Floating Action Dock */}
-          <div className="max-w-xs sm:max-w-sm mx-auto w-full px-2 pt-0.5">
-            <div className="rounded-full bg-white/95 dark:bg-stone-900/95 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-2xl px-6 py-2.5 flex items-center justify-between gap-4">
+          <div className="max-w-xs sm:max-w-md mx-auto w-full px-2 pt-0.5">
+            <div className="rounded-full bg-white/95 dark:bg-stone-900/95 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-2xl px-5 sm:px-6 py-2.5 flex items-center justify-between gap-3 sm:gap-4">
               {/* Favoris (Heart) */}
               <button
                 type="button"
@@ -1109,8 +1313,9 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   soundEffects.playHeartPulse();
                   triggerVibration([40, 30, 40]);
                   activeItem.onLike?.();
+                  showToast(activeItem.isLiked ? 'Retiré des favoris' : 'Ajouté aux favoris ❤️');
                 }}
-                className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer"
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer shrink-0"
                 title="Ajouter aux favoris"
               >
                 <Heart
@@ -1120,18 +1325,24 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                 />
               </button>
 
-              {/* Modifier (Pencil) */}
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  activeItem.onEdit?.();
-                }}
-                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer"
-                title="Modifier"
-              >
-                <Pencil className="w-5 h-5 stroke-[1.8]" />
-              </button>
+              {/* Photo Ambiance & Confort (for photos) */}
+              {!isCurrentItemVideo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setShowFilterPicker((prev) => !prev);
+                  }}
+                  className={`p-1 transition-all active:scale-90 cursor-pointer shrink-0 ${
+                    filterMode !== 'normal'
+                      ? 'text-rose-500'
+                      : 'text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white'
+                  }`}
+                  title="Filtres & Ambiance de vision"
+                >
+                  <Palette className="w-5 h-5 stroke-[1.8]" />
+                </button>
+              )}
 
               {/* Détails (Info ⓘ) */}
               <button
@@ -1140,39 +1351,78 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
                   soundEffects.playSoftTap();
                   setShowDetailsModal(true);
                 }}
-                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer"
-                title="Détails"
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer shrink-0"
+                title="Détails & Informations"
               >
                 <Info className="w-5 h-5 stroke-[1.8]" />
               </button>
+
+              {/* Quick Zoom / Fullscreen toggle */}
+              {!isCurrentItemVideo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    if (scale > 1.05) {
+                      resetZoom();
+                      showToast('Zoom 1x');
+                    } else {
+                      setScale(2);
+                      showToast('Zoom 2x');
+                    }
+                    triggerVibration([20]);
+                  }}
+                  className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer shrink-0"
+                  title={scale > 1.05 ? 'Réinitialiser zoom (1x)' : 'Zoom avant (2x)'}
+                >
+                  <ZoomIn className={`w-5 h-5 ${scale > 1.05 ? 'text-rose-500' : 'stroke-[1.8]'}`} />
+                </button>
+              )}
 
               {/* Partager (Share2) */}
               <button
                 type="button"
                 onClick={handleShare}
-                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer"
+                className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer shrink-0"
                 title="Partager"
               >
                 <Share2 className="w-5 h-5 stroke-[1.8]" />
               </button>
 
+              {/* Modifier (Pencil if onEdit available) */}
+              {activeItem.onEdit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    activeItem.onEdit?.();
+                  }}
+                  className="p-1 text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white active:scale-90 transition-all cursor-pointer shrink-0"
+                  title="Modifier"
+                >
+                  <Pencil className="w-5 h-5 stroke-[1.8]" />
+                </button>
+              )}
+
               {/* Supprimer (Trash2) */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeItem.onDelete) {
-                    activeItem.onDelete();
-                    onClose();
-                  } else if (activeItem.onRemovePhotoOnly) {
-                    activeItem.onRemovePhotoOnly();
-                    onClose();
-                  }
-                }}
-                className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer"
-                title="Supprimer"
-              >
-                <Trash2 className="w-5 h-5 stroke-[1.8]" />
-              </button>
+              {(activeItem.onDelete || activeItem.onRemovePhotoOnly) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeItem.onDelete) {
+                      activeItem.onDelete();
+                      onClose();
+                    } else if (activeItem.onRemovePhotoOnly) {
+                      activeItem.onRemovePhotoOnly();
+                      onClose();
+                    }
+                  }}
+                  className="p-1 text-stone-700 dark:text-stone-300 hover:text-rose-500 dark:hover:text-rose-400 active:scale-90 transition-all cursor-pointer shrink-0"
+                  title="Supprimer"
+                >
+                  <Trash2 className="w-5 h-5 stroke-[1.8]" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1356,81 +1606,263 @@ export const MobilePhotoViewer: React.FC<MobilePhotoViewerProps> = ({
         </AnimatePresence>
 
         {/* =========================================================
-            5. DETAILS MODAL FOR VIDEO SOUVENIR
+            5. PHOTO AMBIANCE & VISUAL COMFORT PICKER POPOVER
            ========================================================= */}
         <AnimatePresence>
-          {showDetailsModal && activeItem && (
-            <div className="fixed inset-0 z-65 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          {showFilterPicker && !isCurrentItemVideo && (
+            <>
+              <div
+                className="fixed inset-0 z-55 bg-black/40 backdrop-blur-2xs"
+                onClick={() => setShowFilterPicker(false)}
+              />
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                initial={{ opacity: 0, scale: 0.92, y: -10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                exit={{ opacity: 0, scale: 0.92, y: -10 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-md rounded-2xl bg-stone-900 border border-white/15 p-5 shadow-2xl text-white space-y-4"
+                className="absolute top-18 right-3 sm:right-6 z-60 w-80 max-w-[calc(100vw-24px)] rounded-3xl bg-stone-900/95 backdrop-blur-2xl border border-white/20 p-4 shadow-2xl text-white space-y-3"
               >
-                <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                  <h4 className="text-base font-serif font-bold text-white flex items-center gap-2">
-                    <Video className="w-4 h-4 text-purple-400" />
-                    <span>Détails du souvenir</span>
-                  </h4>
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-rose-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">
+                      Vision & Ambiance Confort
+                    </span>
+                  </div>
                   <button
-                    onClick={() => setShowDetailsModal(false)}
-                    className="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                    onClick={() => setShowFilterPicker(false)}
+                    className="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="space-y-3 text-xs text-stone-300">
-                  {activeItem.title && (
-                    <div>
-                      <span className="text-[10px] text-white/40 uppercase tracking-wider block">Titre</span>
-                      <p className="text-sm font-semibold text-white mt-0.5">{activeItem.title}</p>
-                    </div>
-                  )}
+                <p className="text-[11px] text-stone-300 leading-relaxed">
+                  Ajustez l’ambiance de la photo pour une vue agréable et douce pour vos yeux :
+                </p>
 
-                  {activeItem.description && (
+                <div className="grid grid-cols-1 gap-2 pt-0.5">
+                  {PHOTO_FILTERS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => {
+                        setFilterMode(f.id);
+                        soundEffects.playSoftTap();
+                        triggerVibration([20]);
+                        showToast(`Ambiance : ${f.icon} ${f.label}`);
+                        setShowFilterPicker(false);
+                      }}
+                      className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                        filterMode === f.id
+                          ? 'bg-rose-600/30 border-rose-400 text-white shadow-lg ring-1 ring-rose-400/40'
+                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 text-left">
+                        <span className="text-lg">{f.icon}</span>
+                        <div>
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                            {f.label}
+                            {filterMode === f.id && (
+                              <span className="text-[10px] text-rose-300 font-mono">● Actif</span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-stone-400">{f.shortDesc}</div>
+                        </div>
+                      </div>
+                      {filterMode === f.id && <Check className="w-4 h-4 text-rose-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* =========================================================
+            6. RICH FULLSCREEN DETAILS & TECHNICAL SPECIFICATIONS MODAL
+           ========================================================= */}
+        <AnimatePresence>
+          {showDetailsModal && activeItem && (
+            <div className="fixed inset-0 z-65 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.94, y: 15 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg rounded-3xl bg-stone-900/95 backdrop-blur-2xl border border-white/20 p-5 sm:p-6 shadow-2xl text-white space-y-4 max-h-[90vh] overflow-y-auto"
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                      {isCurrentItemVideo ? <Video className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
+                    </div>
                     <div>
-                      <span className="text-[10px] text-white/40 uppercase tracking-wider block">Note d'amour</span>
-                      <p className="text-xs text-stone-200 mt-0.5 leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
-                        {activeItem.description}
+                      <h4 className="text-sm sm:text-base font-bold text-white">
+                        {isCurrentItemVideo ? 'Fiche détaillée du souvenir vidéo' : 'Détails & Fiche Photo Haute Définition'}
+                      </h4>
+                      <p className="text-[11px] text-stone-400">
+                        Élément {currentIndex + 1} sur {items.length} • Salon complice
                       </p>
                     </div>
-                  )}
+                  </div>
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
-                  <div className="flex items-center gap-3 pt-1 flex-wrap text-stone-300">
-                    {activeItem.date && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-rose-400" />
-                        <span>{activeItem.date}</span>
+                {/* Technical Specifications Card (Résolution, Définition, Ratio, Format) */}
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-stone-200 uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5 text-rose-300">
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      Spécifications de l'image
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-medium">
+                      Qualité Originale
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {/* Dimensions */}
+                    <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-[10px] text-stone-400 block uppercase">Résolution</span>
+                      <span className="font-mono font-bold text-stone-100 text-xs mt-0.5 block">
+                        {currentImageMeta ? `${currentImageMeta.width} × ${currentImageMeta.height} px` : (isCurrentItemVideo ? 'Format Haute Qualité' : 'Détection HD...')}
                       </span>
-                    )}
-                    {activeItem.locationName && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                        <span>{activeItem.locationName}</span>
+                    </div>
+
+                    {/* Megapixels & Ratio */}
+                    <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-[10px] text-stone-400 block uppercase">Définition & Ratio</span>
+                      <span className="font-bold text-stone-100 text-xs mt-0.5 block">
+                        {currentImageMeta ? `${currentImageMeta.megapixels} • ${currentImageMeta.aspectRatio}` : (isCurrentItemVideo ? '16:9 HD' : 'Optimisée')}
                       </span>
-                    )}
-                    {activeItem.author && (
-                      <span className="flex items-center gap-1.5">
-                        <PartnerAvatar partnerId={activeItem.author} size="xs" />
-                        <span>Partagé par {activeItem.author === 'partner1' ? 'Moi' : 'Mon amour'}</span>
+                    </div>
+
+                    {/* Format */}
+                    <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-[10px] text-stone-400 block uppercase">Format de fichier</span>
+                      <span className="font-bold text-stone-100 text-xs mt-0.5 block">
+                        {isCurrentItemVideo ? 'Vidéo MP4 HD' : (currentImageMeta?.format || 'Image Web')}
                       </span>
-                    )}
+                    </div>
+
+                    {/* Zoom / Ambiance */}
+                    <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                      <span className="text-[10px] text-stone-400 block uppercase">Zoom & Ambiance</span>
+                      <span className="font-bold text-rose-300 text-xs mt-0.5 block">
+                        {scale > 1.05 ? `${Math.round(scale * 100)}% (${scale.toFixed(1)}x)` : '1.0x (Plein écran)'}
+                        {!isCurrentItemVideo && ` • ${PHOTO_FILTERS.find((f) => f.id === filterMode)?.label}`}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                {/* Sender & Complice Information */}
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 space-y-2.5">
+                  <span className="text-[10px] text-stone-400 uppercase tracking-wider block font-semibold">
+                    Informations de partage
+                  </span>
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <PartnerAvatar
+                        name={activeItem.authorName || (activeItem.authorId === 'p2' ? 'Med' : 'Safi')}
+                        avatar={activeItem.authorAvatar}
+                        partnerId={activeItem.authorId === 'p2' ? 'p2' : 'p1'}
+                        size="sm"
+                      />
+                      <div>
+                        <span className="font-bold text-white block">
+                          {activeItem.authorName || (activeItem.authorId === 'p2' ? 'Med' : 'Safi')}
+                        </span>
+                        <span className="text-[10px] text-rose-300 font-medium">Partenaire complice</span>
+                      </div>
+                    </div>
+
+                    {activeItem.date && (
+                      <div className="flex items-center gap-1.5 text-stone-300 text-xs font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-rose-400" />
+                        <span>{activeItem.date}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {activeItem.locationName && (
+                    <div className="flex items-center gap-1.5 text-xs text-stone-300 pt-1 border-t border-white/5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                      <span>{activeItem.locationName}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Note / Caption if present */}
+                {(activeItem.title || activeItem.description) && (
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 space-y-1.5">
+                    <span className="text-[10px] text-stone-400 uppercase tracking-wider block font-semibold">
+                      Mot doux ou légende
+                    </span>
+                    <p className="text-xs text-stone-100 italic leading-relaxed bg-black/30 p-3 rounded-xl border border-white/5">
+                      « {activeItem.description || activeItem.title} »
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Buttons inside Details */}
+                <div className="pt-2 flex items-center justify-between gap-2.5 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={activeItem.photoUrl}
+                      download={`photo-${currentIndex + 1}.jpg`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => showToast('Téléchargement haute qualité...')}
+                      className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-rose-300" />
+                      <span>Télécharger HD</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleShare}
+                      className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Share2 className="w-4 h-4 text-stone-300" />
+                      <span>Partager</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => setShowDetailsModal(false)}
-                    className="px-4 py-2 rounded-xl bg-white/15 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer transition-all"
+                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-md"
                   >
                     Fermer
                   </button>
                 </div>
               </motion.div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* =========================================================
+            7. FLOATING TOAST NOTIFICATION FEEDBACK
+           ========================================================= */}
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: 15, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.92 }}
+              className="absolute bottom-24 sm:bottom-28 left-1/2 -translate-x-1/2 z-65 px-4 py-2 rounded-full bg-stone-900/90 text-white border border-white/20 backdrop-blur-xl text-xs font-medium shadow-2xl flex items-center gap-2 pointer-events-none"
+            >
+              <span>{toastMessage}</span>
+            </motion.div>
           )}
         </AnimatePresence>
       </motion.div>

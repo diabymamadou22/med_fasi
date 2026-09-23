@@ -43,6 +43,7 @@ import {
   Sticker as StickerIcon,
   Upload,
   RefreshCw,
+  Maximize2,
 } from 'lucide-react';
 import { NotificationActivationBanner } from '../NotificationActivationBanner';
 import { MobilePhotoViewer, PhotoViewerItem } from '../MobilePhotoViewer';
@@ -612,9 +613,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
           authorId: m.senderId,
           authorName: sender?.name,
           authorAvatar: sender?.avatar,
+          onDelete: onDeleteMessages ? () => onDeleteMessages([m.id]) : undefined,
         };
       });
-  }, [messages, profile.partner1, profile.partner2]);
+  }, [messages, profile.partner1, profile.partner2, onDeleteMessages]);
 
   // Audio playback state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -2643,20 +2645,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
                               </span>
                             </div>
                           ) : (
-                            <div className="rounded-xl overflow-hidden mb-2 bg-black/10 cursor-pointer relative group/img border border-white/15">
+                            <div
+                              onClick={() => {
+                                const idx = chatPhotoItems.findIndex(
+                                  (p) => p.id === msg.id || p.photoUrl === msg.mediaUrl
+                                );
+                                setActiveChatPhotoIndex(idx >= 0 ? idx : 0);
+                              }}
+                              className="rounded-2xl overflow-hidden mb-2 bg-stone-900/10 dark:bg-black/30 cursor-pointer relative group/img border border-white/20 shadow-md hover:shadow-lg transition-all duration-200"
+                            >
                               <img
                                 src={msg.mediaUrl}
                                 alt="Photo partagée"
-                                onClick={() => {
-                                  const idx = chatPhotoItems.findIndex(
-                                    (p) => p.id === msg.id || p.photoUrl === msg.mediaUrl
-                                  );
-                                  setActiveChatPhotoIndex(idx >= 0 ? idx : 0);
-                                }}
-                                className="max-h-72 w-auto object-contain rounded-xl hover:opacity-95 transition-opacity"
+                                loading="lazy"
+                                className="max-h-76 w-auto max-w-full object-contain rounded-2xl group-hover/img:scale-[1.01] transition-transform duration-300"
                               />
-                              <div className="absolute inset-0 bg-black/25 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white pointer-events-none text-xs font-semibold">
-                                🔍 Cliquer pour agrandir
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end justify-between p-2.5 text-white pointer-events-none">
+                                <span className="text-[11px] font-semibold flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 shadow-sm">
+                                  <Maximize2 className="w-3.5 h-3.5 text-rose-300" />
+                                  Plein écran & Détails
+                                </span>
+                                <span className="text-[10px] text-white/90 bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full font-medium">
+                                  HD
+                                </span>
                               </div>
                             </div>
                           )
