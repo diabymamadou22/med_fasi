@@ -1110,103 +1110,150 @@ export default function App() {
     };
   }, [activePartnerId]);
 
-  // Synchronisation initiale et périodique de la galerie via le serveur relais
+  // Synchronisation périodique et automatique de la galerie (Relais + Firestore)
+  const memoriesRef = useRef<TimelineMemory[]>(memories);
   useEffect(() => {
-    syncMemoriesWithRelay(memories)
-      .then((serverList) => {
-        if (Array.isArray(serverList) && serverList.length > 0) {
-          setMemories((prev) => {
-            const idMap = new Map<string, TimelineMemory>();
-            serverList.forEach((m) => idMap.set(m.id, m));
-            prev.forEach((m) => {
-              if (!idMap.has(m.id)) idMap.set(m.id, m);
-            });
-            const merged = Array.from(idMap.values());
-            merged.sort((a, b) => {
-              const dateA = a.date ? new Date(a.date).getTime() : 0;
-              const dateB = b.date ? new Date(b.date).getTime() : 0;
-              return dateB - dateA;
-            });
-            return merged;
+    memoriesRef.current = memories;
+  }, [memories]);
+
+  const runGallerySync = useCallback(async () => {
+    try {
+      const serverList = await syncMemoriesWithRelay(memoriesRef.current);
+      if (Array.isArray(serverList) && serverList.length > 0) {
+        setMemories((prev) => {
+          const idMap = new Map<string, TimelineMemory>();
+          serverList.forEach((m) => {
+            if (m && m.id) idMap.set(m.id, m);
           });
-        }
-      })
-      .catch((err) => console.warn('Erreur synchronisation initiale galerie:', err));
+          let changed = false;
+          prev.forEach((m) => {
+            if (m && m.id && !idMap.has(m.id)) {
+              idMap.set(m.id, m);
+              changed = true;
+            }
+          });
+          if (!changed && idMap.size === prev.length) {
+            return prev;
+          }
+          const merged = Array.from(idMap.values());
+          merged.sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA;
+          });
+          return merged;
+        });
+      }
+    } catch (err) {
+      console.warn('Erreur synchronisation périodique galerie:', err);
+    }
   }, []);
+
+  useEffect(() => {
+    // Synchronisation immédiate au montage
+    runGallerySync();
+    // Synchronisation fréquente en tâche de fond (toutes les 6 secondes)
+    const interval = setInterval(runGallerySync, 6000);
+    // Synchronisation dès que l'utilisateur déverrouille son téléphone ou revient sur l'onglet
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        runGallerySync();
+      }
+    };
+    const handleWindowFocus = () => {
+      runGallerySync();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleWindowFocus);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [runGallerySync]);
+
+  // Sauvegarde sécurisée sans crash si le quota de localStorage est saturé par les médias
+  const safeSetLocalStorage = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (err) {
+      console.warn(`[Storage] Quota localStorage dépassé pour la clé ${key}:`, err);
+    }
+  };
 
   // Sync state to localStorage as offline fallback (uniquement après chargement initial)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_PARTNER, activePartnerId);
+    safeSetLocalStorage(STORAGE_KEYS.ACTIVE_PARTNER, activePartnerId);
   }, [activePartnerId]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    safeSetLocalStorage(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
   }, [profile, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.WEEKLY_CHALLENGES, JSON.stringify(weeklyChallenges));
+    safeSetLocalStorage(STORAGE_KEYS.WEEKLY_CHALLENGES, JSON.stringify(weeklyChallenges));
   }, [weeklyChallenges, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.MEMORIES, JSON.stringify(memories));
+    safeSetLocalStorage(STORAGE_KEYS.MEMORIES, JSON.stringify(memories));
   }, [memories, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.CAPSULES, JSON.stringify(capsules));
+    safeSetLocalStorage(STORAGE_KEYS.CAPSULES, JSON.stringify(capsules));
   }, [capsules, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(locations));
+    safeSetLocalStorage(STORAGE_KEYS.LOCATIONS, JSON.stringify(locations));
   }, [locations, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+    safeSetLocalStorage(STORAGE_KEYS.NOTES, JSON.stringify(notes));
   }, [notes, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.QUIZZES, JSON.stringify(quizzes));
+    safeSetLocalStorage(STORAGE_KEYS.QUIZZES, JSON.stringify(quizzes));
   }, [quizzes, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.LEXICON, JSON.stringify(lexicon));
+    safeSetLocalStorage(STORAGE_KEYS.LEXICON, JSON.stringify(lexicon));
   }, [lexicon, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.DATES, JSON.stringify(dateIdeas));
+    safeSetLocalStorage(STORAGE_KEYS.DATES, JSON.stringify(dateIdeas));
   }, [dateIdeas, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.CHALLENGES, JSON.stringify(challenges));
+    safeSetLocalStorage(STORAGE_KEYS.CHALLENGES, JSON.stringify(challenges));
   }, [challenges, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.BUCKET, JSON.stringify(bucketList));
+    safeSetLocalStorage(STORAGE_KEYS.BUCKET, JSON.stringify(bucketList));
   }, [bucketList, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.VOUCHERS, JSON.stringify(vouchers));
+    safeSetLocalStorage(STORAGE_KEYS.VOUCHERS, JSON.stringify(vouchers));
   }, [vouchers, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.GRATITUDES, JSON.stringify(gratitudes));
+    safeSetLocalStorage(STORAGE_KEYS.GRATITUDES, JSON.stringify(gratitudes));
   }, [gratitudes, isInitialRemoteLoaded]);
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    safeSetLocalStorage(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }, [settings, isInitialRemoteLoaded]);
 
   useEffect(() => {

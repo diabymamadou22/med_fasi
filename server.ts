@@ -5,8 +5,30 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import webpush from "web-push";
+import { initializeApp as initFirebaseApp, getApps as getFirebaseApps, getApp as getFirebaseApp } from "firebase/app";
+import {
+  getFirestore as getFirestoreDb,
+  collection as firestoreCollection,
+  getDocs as firestoreGetDocs,
+  doc as firestoreDoc,
+  setDoc as firestoreSetDoc,
+  deleteDoc as firestoreDeleteDoc,
+} from "firebase/firestore";
 
 dotenv.config();
+
+// Configuration Firebase Server-Side pour liaison permanente avec Firestore
+const serverFirebaseConfig = {
+  projectId: "gen-lang-client-0642060417",
+  appId: "1:1042153388421:web:8630a205913b53df62acec",
+  apiKey: "AIzaSyA2lVPrzPZxIrH6i3ITNVYUO7cOnKvni9w",
+  authDomain: "gen-lang-client-0642060417.firebaseapp.com",
+  storageBucket: "gen-lang-client-0642060417.firebasestorage.app",
+  messagingSenderId: "1042153388421",
+};
+
+const serverFbApp = getFirebaseApps().length > 0 ? getFirebaseApp() : initFirebaseApp(serverFirebaseConfig);
+const serverFirestore = getFirestoreDb(serverFbApp, "ai-studio-medfasi-a61ace20-d640-4c42-8981-763ab243b0d7");
 
 // Web Push VAPID Setup
 const DEFAULT_VAPID_PUBLIC_KEY =
@@ -111,6 +133,50 @@ function saveServerMemories(memories: any[]) {
 }
 
 let serverMemories: any[] = loadServerMemories();
+
+// Synchronisation bidirectionnelle du serveur avec Cloud Firestore
+async function syncServerWithFirestore() {
+  try {
+    const snap = await firestoreGetDocs(firestoreCollection(serverFirestore, "memories"));
+    let modified = false;
+    const idMap = new Map<string, any>();
+    serverMemories.forEach((m) => idMap.set(m.id, m));
+
+    snap.docs.forEach((docSnap) => {
+      const data = { id: docSnap.id, ...docSnap.data() };
+      if (!idMap.has(docSnap.id)) {
+        serverMemories.push(data);
+        idMap.set(docSnap.id, data);
+        modified = true;
+      }
+    });
+
+    // Envoi des souvenirs du serveur vers Firestore s'ils n'y sont pas encore
+    for (const mem of serverMemories) {
+      if (mem && mem.id) {
+        const docExists = snap.docs.some((d) => d.id === mem.id);
+        if (!docExists) {
+          firestoreSetDoc(firestoreDoc(serverFirestore, "memories", mem.id), mem, { merge: true }).catch(() => {});
+        }
+      }
+    }
+
+    if (modified) {
+      serverMemories.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateB - dateA;
+      });
+      saveServerMemories(serverMemories);
+      console.log(`[Server Firestore Sync] Synchro effectuée avec succès. Total photos/souvenirs: ${serverMemories.length}`);
+    }
+  } catch (err: any) {
+    console.warn("[Server Firestore Sync] Erreur synchro Firestore:", err?.message || err);
+  }
+}
+
+// Lancer la première synchronisation Firestore au démarrage
+syncServerWithFirestore().catch(() => {});
 
 // Server-Sent Events (SSE) pour communication instantanée sans latence
 let sseClients: { id: string; partnerId: string; res: express.Response }[] = [];
@@ -582,7 +648,9 @@ async function startServer() {
   // ==========================================
 
   // Récupérer l'ensemble des photos & souvenirs de la galerie sur le serveur
-  app.get("/api/gallery/memories", (_req, res) => {
+  app.get("/api/gallery/memories", async (_req, res) => {
+    // S'assurer que le serveur a les dernières données Firestore
+    await syncServerWithFirestore().catch(() => {});
     res.json({
       success: true,
       memories: serverMemories,
@@ -608,6 +676,11 @@ async function startServer() {
 
       saveServerMemories(serverMemories);
 
+      // Persistance Cloud Firestore en direct depuis le serveur
+      firestoreSetDoc(firestoreDoc(serverFirestore, "memories", memory.id), memory, { merge: true }).catch((err) => {
+        console.warn("[Gallery Relay] Écriture Firestore différée:", err?.message || err);
+      });
+
       // Diffusion instantanée vers l'autre partenaire via SSE (0ms)
       broadcastGalleryEvent("new_memory", { memory });
 
@@ -628,7 +701,7 @@ async function startServer() {
   });
 
   // Synchronisation bidirectionnelle des souvenirs locaux et distants
-  app.post("/api/gallery/sync", (req, res) => {
+  app.post("/api/gallery/sync", async (req, res) => {
     try {
       const { localMemories } = req.body;
       if (Array.isArray(localMemories) && localMemories.length > 0) {
@@ -653,6 +726,9 @@ async function startServer() {
           saveServerMemories(serverMemories);
         }
       }
+
+      // Synchroniser avec Firestore
+      await syncServerWithFirestore().catch(() => {});
 
       return res.json({
         success: true,
@@ -680,6 +756,8 @@ async function startServer() {
         saveServerMemories(serverMemories);
       }
 
+      firestoreSetDoc(firestoreDoc(serverFirestore, "memories", memory.id), memory, { merge: true }).catch(() => {});
+
       broadcastGalleryEvent("update_memory", { memory });
       return res.json({ success: true, memory });
     } catch (err: any) {
@@ -698,6 +776,8 @@ async function startServer() {
 
       serverMemories = serverMemories.filter((m) => m.id !== memoryId);
       saveServerMemories(serverMemories);
+
+      firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", memoryId)).catch(() => {});
 
       broadcastGalleryEvent("delete_memory", { memoryId });
       console.log(`[Gallery Relay] Souvenir ${memoryId} supprimé. Restants: ${serverMemories.length}`);
