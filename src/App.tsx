@@ -163,6 +163,18 @@ export default function App() {
     }
     return 'home';
   });
+
+  // Stable refs for real-time Firestore listeners to avoid tearing down and recreating listeners
+  const activePartnerIdRef = useRef<PartnerId>(activePartnerId);
+  const activeTabRef = useRef<MainTab>(activeTab);
+
+  useEffect(() => {
+    activePartnerIdRef.current = activePartnerId;
+  }, [activePartnerId]);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
   const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
   const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab>('roulette');
 
@@ -213,6 +225,11 @@ export default function App() {
       return INITIAL_PROFILE;
     }
   });
+
+  const profileRef = useRef<CoupleProfile>(profile);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const [memories, setMemories] = useState<TimelineMemory[]>(() => {
     try {
@@ -709,14 +726,15 @@ export default function App() {
     );
 
     const unsubPulse = subscribeLatestPulse((pulse) => {
-      if (pulse && pulse.senderId !== activePartnerId) {
+      if (pulse && pulse.senderId !== activePartnerIdRef.current) {
         setActiveMissYouPulse(pulse);
         soundEffects.playHeartPulse();
         triggerVibration([100, 50, 150]);
 
         // Background Web Push / Native notification if app is in background or not on chat tab
-        if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
-          const sender = pulse.senderId === 'p1' ? profile.partner1 : profile.partner2;
+        if (document.visibilityState === 'hidden' || activeTabRef.current !== 'chat') {
+          const curProf = profileRef.current;
+          const sender = pulse.senderId === 'p1' ? curProf.partner1 : curProf.partner2;
           sendSystemNotification({
             title: `Tu me manques ! 💓`,
             body: `${sender.name || 'Votre amour'} vous envoie une impulsion de cœur !`,
@@ -734,7 +752,7 @@ export default function App() {
           setMessages((prev) => {
             const prevIds = new Set(prev.map((m) => m.id));
             const newFromPartner = remoteMessages.filter(
-              (m) => !prevIds.has(m.id) && m.senderId !== activePartnerId
+              (m) => !prevIds.has(m.id) && m.senderId !== activePartnerIdRef.current
             );
 
             if (prev.length > 0 && newFromPartner.length > 0) {
@@ -742,7 +760,8 @@ export default function App() {
               soundEffects.playMessageReceived();
               triggerVibration([250, 100, 250, 100, 250]);
 
-              const sender = lastMsg.senderId === 'p1' ? profile.partner1 : profile.partner2;
+              const curProf = profileRef.current;
+              const sender = lastMsg.senderId === 'p1' ? curProf.partner1 : curProf.partner2;
               const bodyText =
                 lastMsg.mediaType === 'image'
                   ? '📷 Vous a envoyé une photo'
@@ -754,7 +773,7 @@ export default function App() {
 
               startTabMessageAlert(sender.name || 'Votre amour', bodyText);
 
-              if (document.visibilityState === 'hidden' || activeTab !== 'chat') {
+              if (document.visibilityState === 'hidden' || activeTabRef.current !== 'chat') {
                 sendSystemNotification({
                   title: `${sender.name || 'Votre amour'} ❤️`,
                   body: bodyText,
@@ -764,7 +783,7 @@ export default function App() {
                 });
               }
 
-              if (activeTab !== 'chat') {
+              if (activeTabRef.current !== 'chat') {
                 setFloatingAlert({
                   id: lastMsg.id,
                   senderId: lastMsg.senderId,
@@ -806,7 +825,7 @@ export default function App() {
       unsubPulse();
       unsubChat();
     };
-  }, [activePartnerId]);
+  }, []);
 
   // Synchronisation directe haute disponibilité avec le serveur relais Express (SSE + polling)
   useEffect(() => {

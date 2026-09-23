@@ -667,12 +667,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
     soundEffects.playMessageSent();
   };
 
-  // Subscribe to real-time presence and typing status (Firestore + SSE direct relay)
+  // Subscribe to real-time presence and typing status from Firestore (mount-only)
   useEffect(() => {
     const unsubTyping = subscribeChatTypingStatus((map) => {
       setPresenceMap((prev) => ({ ...prev, ...map }));
     });
+    return () => {
+      unsubTyping();
+    };
+  }, []);
 
+  // SSE direct relay connection
+  useEffect(() => {
     const disconnectSse = connectChatEvents({
       partnerId: activePartnerId,
       onPresence: (remoteMap) => {
@@ -695,7 +701,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
     });
 
     return () => {
-      unsubTyping();
       disconnectSse();
     };
   }, [activePartnerId]);

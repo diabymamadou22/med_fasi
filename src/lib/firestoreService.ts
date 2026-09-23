@@ -296,7 +296,8 @@ export function isQuotaOrResourceError(err: any): boolean {
     msg.includes('resource exhausted') ||
     msg.includes('limit exceeded') ||
     msg.includes('client is offline') ||
-    msg.includes('network')
+    msg.includes('network') ||
+    msg.includes('target id')
   );
 }
 
@@ -304,6 +305,11 @@ let quotaExceededNotified = false;
 
 export function logFirestoreSyncIssue(context: string, err: any) {
   if (isQuotaOrResourceError(err)) {
+    const msg = (err?.message || String(err)).toLowerCase();
+    if (msg.includes('target id')) {
+      console.warn(`[Firestore Warning] Sync issue on ${context}:`, err?.message || err);
+      return;
+    }
     markQuotaExhausted();
     if (!quotaExceededNotified) {
       quotaExceededNotified = true;

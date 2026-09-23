@@ -48,27 +48,12 @@ export const firebaseConfig = {
 // Initialisation de Firebase
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Base de données Firestore avec cache local persistant (IndexedDB multi-onglets)
+// Base de données Firestore initialisée selon les recommandations Firebase SDK
 const databaseId = getEnvVar('VITE_FIREBASE_DATABASE_ID') || DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId;
 
-let firestoreInstance: any = null;
-try {
-  firestoreInstance = initializeFirestore(
-    app,
-    {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    },
-    databaseId && databaseId !== '(default)' ? databaseId : undefined
-  );
-} catch {
-  firestoreInstance = databaseId && databaseId !== '(default)'
-    ? getFirestore(app, databaseId)
-    : getFirestore(app);
-}
-
-export const db = firestoreInstance;
+export const db = databaseId && databaseId !== '(default)'
+  ? getFirestore(app, databaseId)
+  : getFirestore(app);
 
 // S'assurer que le réseau Firestore est actif pour la réception des données en temps réel
 if (typeof window !== 'undefined' && db) {
