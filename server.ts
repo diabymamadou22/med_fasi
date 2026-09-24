@@ -13,7 +13,12 @@ import {
   doc as firestoreDoc,
   setDoc as firestoreSetDoc,
   deleteDoc as firestoreDeleteDoc,
-} from "firebase/firestore";
+  setLogLevel as setFirestoreLogLevel,
+} from "firebase/firestore/lite";
+
+try {
+  setFirestoreLogLevel("silent");
+} catch {}
 
 dotenv.config();
 

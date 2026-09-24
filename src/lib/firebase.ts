@@ -60,6 +60,7 @@ function createFirestoreInstance() {
         localCache: memoryLocalCache({
           garbageCollector: memoryLruGarbageCollector(),
         }),
+        experimentalAutoDetectLongPolling: true,
       },
       dbId
     );
