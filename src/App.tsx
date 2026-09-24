@@ -697,7 +697,21 @@ export default function App() {
             idMap.set(m.id, existing ? { ...existing, ...m } : m);
           }
         });
-        return sortChatMessagesChronologically(Array.from(idMap.values()));
+        const nextList = sortChatMessagesChronologically(Array.from(idMap.values()));
+        if (
+          nextList.length === prev.length &&
+          nextList.every(
+            (m, i) =>
+              m.id === prev[i]?.id &&
+              m.content === prev[i]?.content &&
+              m.readStatus === prev[i]?.readStatus &&
+              m.status === prev[i]?.status &&
+              m.mediaUrl === prev[i]?.mediaUrl
+          )
+        ) {
+          return prev;
+        }
+        return nextList;
       });
     },
     []
@@ -742,7 +756,11 @@ export default function App() {
   // Synchronisation périodique et sur reprise de focus
   useEffect(() => {
     runUnifiedChatSync();
-    const pollInterval = setInterval(runUnifiedChatSync, 3500);
+    const pollInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
+        runUnifiedChatSync();
+      }
+    }, 5000);
 
     const handleSyncOnVisible = () => {
       if (document.visibilityState === 'visible') {
@@ -811,6 +829,18 @@ export default function App() {
               const dateB = b.date ? new Date(b.date).getTime() : 0;
               return dateB - dateA;
             });
+            if (
+              merged.length === prevLocal.length &&
+              merged.every(
+                (m, i) =>
+                  m.id === prevLocal[i]?.id &&
+                  m.photoUrl === prevLocal[i]?.photoUrl &&
+                  m.likes?.length === prevLocal[i]?.likes?.length &&
+                  m.title === prevLocal[i]?.title
+              )
+            ) {
+              return prevLocal;
+            }
             return merged;
           });
           setIsCloudSynced(true);
@@ -1198,6 +1228,18 @@ export default function App() {
             const dateB = b.date ? new Date(b.date).getTime() : 0;
             return dateB - dateA;
           });
+          if (
+            merged.length === prev.length &&
+            merged.every(
+              (m, i) =>
+                m.id === prev[i]?.id &&
+                m.photoUrl === prev[i]?.photoUrl &&
+                m.likes?.length === prev[i]?.likes?.length &&
+                m.title === prev[i]?.title
+            )
+          ) {
+            return prev;
+          }
           return merged;
         });
       }
@@ -1209,8 +1251,12 @@ export default function App() {
   useEffect(() => {
     // Synchronisation immédiate au montage
     runGallerySync();
-    // Synchronisation fréquente en tâche de fond (toutes les 6 secondes)
-    const interval = setInterval(runGallerySync, 6000);
+    // Synchronisation fréquente en tâche de fond (uniquement en premier plan & connecté)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
+        runGallerySync();
+      }
+    }, 8000);
     // Synchronisation dès que l'utilisateur déverrouille son téléphone ou revient sur l'onglet
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -1228,6 +1274,27 @@ export default function App() {
       window.removeEventListener('focus', handleWindowFocus);
     };
   }, [runGallerySync]);
+
+  // Actualisation manuelle globale des flux (Chat + Galerie + Push)
+  const [isGlobalRefreshing, setIsGlobalRefreshing] = useState(false);
+
+  const handleGlobalRefresh = useCallback(async () => {
+    setIsGlobalRefreshing(true);
+    try {
+      await Promise.allSettled([
+        runUnifiedChatSync(),
+        runGallerySync(),
+        checkPushSubscription(),
+      ]);
+      setIsCloudSynced(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    } catch (err) {
+      console.warn('Global refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setIsGlobalRefreshing(false);
+      }, 600);
+    }
+  }, [runUnifiedChatSync, runGallerySync]);
 
   // Sync state to localStorage as offline fallback (uniquement après chargement initial)
   useEffect(() => {
@@ -2493,6 +2560,8 @@ export default function App() {
           onOpenInstallModal={() => setShowInstallModal(true)}
           onOpenNotifications={() => setShowNotificationModal(true)}
           isNotificationsActive={isNotificationsActive}
+          onRefresh={handleGlobalRefresh}
+          isRefreshing={isGlobalRefreshing}
         />
       )}
 

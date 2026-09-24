@@ -13,6 +13,7 @@ import {
   Check,
   X,
   Sparkles,
+  RotateCw,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, MissYouPulse } from '../types';
 import { soundEffects } from '../lib/audio';
@@ -32,9 +33,11 @@ interface HeaderProps {
   onOpenInstallModal?: () => void;
   onOpenNotifications?: () => void;
   isNotificationsActive?: boolean;
+  onRefresh?: () => Promise<void> | void;
+  isRefreshing?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   profile,
   activePartnerId,
   onSwitchPartner,
@@ -48,9 +51,34 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenInstallModal,
   onOpenNotifications,
   isNotificationsActive = false,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pulseSending, setPulseSending] = useState<string | null>(null);
+  const [localRefreshing, setLocalRefreshing] = useState(false);
+  const [showRefreshFeedback, setShowRefreshFeedback] = useState(false);
+
+  const refreshing = isRefreshing || localRefreshing;
+
+  const handleRefreshClick = async () => {
+    if (refreshing) return;
+    setLocalRefreshing(true);
+    soundEffects.playSoftTap();
+    try {
+      if (onRefresh) {
+        await onRefresh();
+      }
+      setShowRefreshFeedback(true);
+      setTimeout(() => setShowRefreshFeedback(false), 2200);
+    } catch (e) {
+      console.warn('Manual refresh issue:', e);
+    } finally {
+      setTimeout(() => {
+        setLocalRefreshing(false);
+      }, 650);
+    }
+  };
 
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -167,25 +195,67 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: Single Sleek Vertical 3-Dots Menu Button */}
-        <div className="relative shrink-0">
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className={`w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-              isMenuOpen
-                ? 'bg-rose-500 text-white shadow-md scale-95'
-                : 'bg-white hover:bg-rose-50/80 text-stone-700 hover:text-rose-600 border border-stone-200/90 hover:border-rose-300 shadow-2xs active:scale-95'
-            }`}
-            title="Menu des options et paramètres"
-            aria-label="Options de l'en-tête"
-            id="btn-header-more-vertical"
-          >
-            <MoreVertical className="w-4.5 h-4.5" />
-            {/* Direct indicator dot if notifications are active */}
-            {isNotificationsActive && !isMenuOpen && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1.5 ring-white" />
-            )}
-          </button>
+        {/* Right: Actualiser Button & Single Sleek Vertical 3-Dots Menu Button */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Refresh Button */}
+          <div className="relative">
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.88 }}
+              onClick={handleRefreshClick}
+              disabled={refreshing}
+              className={`w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                refreshing
+                  ? 'bg-rose-100 text-rose-600 border border-rose-200 shadow-xs'
+                  : 'bg-white hover:bg-rose-50/80 text-stone-600 hover:text-rose-600 border border-stone-200/90 hover:border-rose-300 shadow-2xs active:scale-95'
+              }`}
+              title="Actualiser et synchroniser l'application"
+              aria-label="Actualiser"
+              id="btn-header-refresh"
+            >
+              <RotateCw
+                className={`w-4 h-4 transition-transform ${
+                  refreshing ? 'animate-spin text-rose-600' : ''
+                }`}
+              />
+            </motion.button>
+
+            {/* Micro sync feedback pill */}
+            <AnimatePresence>
+              {showRefreshFeedback && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.88 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.88 }}
+                  transition={{ duration: 0.16 }}
+                  className="absolute right-0 top-full mt-1.5 px-2.5 py-1 bg-stone-900/92 backdrop-blur-md text-white text-[11px] font-medium rounded-full shadow-lg whitespace-nowrap z-50 flex items-center gap-1.5 border border-stone-700 pointer-events-none"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-300 animate-spin" />
+                  <span>Synchronisé !</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* 3-Dots Menu Button */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`w-8.5 h-8.5 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                isMenuOpen
+                  ? 'bg-rose-500 text-white shadow-md scale-95'
+                  : 'bg-white hover:bg-rose-50/80 text-stone-700 hover:text-rose-600 border border-stone-200/90 hover:border-rose-300 shadow-2xs active:scale-95'
+              }`}
+              title="Menu des options et paramètres"
+              aria-label="Options de l'en-tête"
+              id="btn-header-more-vertical"
+            >
+              <MoreVertical className="w-4.5 h-4.5" />
+              {/* Direct indicator dot if notifications are active */}
+              {isNotificationsActive && !isMenuOpen && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-1.5 ring-white" />
+              )}
+            </button>
 
           {/* Vertical Dropdown Menu */}
           <AnimatePresence>
@@ -435,9 +505,10 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </AnimatePresence>
+          </div>
         </div>
       </div>
     </header>
   );
-};
+});
 

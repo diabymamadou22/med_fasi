@@ -14,6 +14,7 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -26,6 +27,24 @@
     -webkit-touch-callout: none;
     overscroll-behavior-y: none;
     touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Smooth 60fps/120fps hardware acceleration and performance classes */
+  .gpu-layer {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: transform, opacity;
+  }
+
+  /* Prevent browser layout jumps during orientation or keyboard events */
+  .stable-viewport {
+    min-height: 100dvh;
+    width: 100%;
+    contain: paint;
   }
 
   /* Prevent automatic iOS Safari zoom-in when tapping form inputs */
