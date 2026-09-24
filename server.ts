@@ -110,6 +110,7 @@ let serverChatMessages: any[] = loadServerChatMessages();
 
 // Gallery Memories Store pour synchronisation durable & multi-appareils
 const GALLERY_MEMORIES_FILE = path.join(process.cwd(), "gallery_memories_store.json");
+const DELETED_MEMORIES_FILE = path.join(process.cwd(), "deleted_memories_store.json");
 
 function loadServerMemories(): any[] {
   try {
@@ -132,7 +133,29 @@ function saveServerMemories(memories: any[]) {
   }
 }
 
-let serverMemories: any[] = loadServerMemories();
+function loadDeletedMemoryIds(): Set<string> {
+  try {
+    if (fs.existsSync(DELETED_MEMORIES_FILE)) {
+      const data = fs.readFileSync(DELETED_MEMORIES_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch (err) {
+    console.warn("Erreur lecture deleted_memories_store.json:", err);
+  }
+  return new Set();
+}
+
+function saveDeletedMemoryIds(ids: Set<string>) {
+  try {
+    fs.writeFileSync(DELETED_MEMORIES_FILE, JSON.stringify(Array.from(ids), null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Erreur écriture deleted_memories_store.json:", err);
+  }
+}
+
+const serverDeletedMemoryIds: Set<string> = loadDeletedMemoryIds();
+let serverMemories: any[] = loadServerMemories().filter((m) => !serverDeletedMemoryIds.has(m?.id));
 
 // Synchronisation bidirectionnelle du serveur avec Cloud Firestore
 async function syncServerWithFirestore() {
@@ -142,23 +165,25 @@ async function syncServerWithFirestore() {
     const idMap = new Map<string, any>();
     serverMemories.forEach((m) => idMap.set(m.id, m));
 
-    snap.docs.forEach((docSnap) => {
+    // 1. Purger les documents Firestore et le serveur qui ont été supprimés
+    for (const docSnap of snap.docs) {
+      if (serverDeletedMemoryIds.has(docSnap.id)) {
+        firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", docSnap.id)).catch(() => {});
+        continue;
+      }
       const data = { id: docSnap.id, ...docSnap.data() };
       if (!idMap.has(docSnap.id)) {
         serverMemories.push(data);
         idMap.set(docSnap.id, data);
         modified = true;
       }
-    });
+    }
 
-    // Envoi des souvenirs du serveur vers Firestore s'ils n'y sont pas encore
-    for (const mem of serverMemories) {
-      if (mem && mem.id) {
-        const docExists = snap.docs.some((d) => d.id === mem.id);
-        if (!docExists) {
-          firestoreSetDoc(firestoreDoc(serverFirestore, "memories", mem.id), mem, { merge: true }).catch(() => {});
-        }
-      }
+    // 2. Nettoyer serverMemories si des souvenirs sont dans serverDeletedMemoryIds
+    const beforeCount = serverMemories.length;
+    serverMemories = serverMemories.filter((m) => m && m.id && !serverDeletedMemoryIds.has(m.id));
+    if (serverMemories.length !== beforeCount) {
+      modified = true;
     }
 
     if (modified) {
@@ -168,7 +193,7 @@ async function syncServerWithFirestore() {
         return dateB - dateA;
       });
       saveServerMemories(serverMemories);
-      console.log(`[Server Firestore Sync] Synchro effectuée avec succès. Total photos/souvenirs: ${serverMemories.length}`);
+      console.log(`[Server Firestore Sync] Synchro effectuée. Total photos/souvenirs actifs: ${serverMemories.length}`);
     }
   } catch (err: any) {
     console.warn("[Server Firestore Sync] Erreur synchro Firestore:", err?.message || err);
@@ -667,6 +692,12 @@ async function startServer() {
       }
 
       // Upsert dans le magasin du serveur
+      // Si le souvenir avait été supprimé précédemment, le réhabiliter
+      if (serverDeletedMemoryIds.has(memory.id)) {
+        serverDeletedMemoryIds.delete(memory.id);
+        saveDeletedMemoryIds(serverDeletedMemoryIds);
+      }
+
       const existingIdx = serverMemories.findIndex((m) => m.id === memory.id);
       if (existingIdx >= 0) {
         serverMemories[existingIdx] = { ...serverMemories[existingIdx], ...memory };
@@ -703,14 +734,32 @@ async function startServer() {
   // Synchronisation bidirectionnelle des souvenirs locaux et distants
   app.post("/api/gallery/sync", async (req, res) => {
     try {
-      const { localMemories } = req.body;
+      const { localMemories, deletedIds } = req.body;
+
+      // 1. Enregistrer les suppressions signalées par le client (tombstones)
+      if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+        let deletedModified = false;
+        deletedIds.forEach((id) => {
+          if (id && typeof id === "string" && !serverDeletedMemoryIds.has(id)) {
+            serverDeletedMemoryIds.add(id);
+            deletedModified = true;
+          }
+        });
+        if (deletedModified) {
+          saveDeletedMemoryIds(serverDeletedMemoryIds);
+          serverMemories = serverMemories.filter((m) => !serverDeletedMemoryIds.has(m?.id));
+          saveServerMemories(serverMemories);
+        }
+      }
+
+      // 2. Intégrer les souvenirs locaux, en ignorant STRICTEMENT ceux qui sont supprimés
       if (Array.isArray(localMemories) && localMemories.length > 0) {
         let modified = false;
         const idMap = new Map<string, any>();
         serverMemories.forEach((m) => idMap.set(m.id, m));
 
         localMemories.forEach((m) => {
-          if (m && m.id && !idMap.has(m.id)) {
+          if (m && m.id && !idMap.has(m.id) && !serverDeletedMemoryIds.has(m.id)) {
             idMap.set(m.id, m);
             serverMemories.push(m);
             modified = true;
@@ -727,12 +776,13 @@ async function startServer() {
         }
       }
 
-      // Synchroniser avec Firestore
+      // 3. Synchroniser avec Firestore
       await syncServerWithFirestore().catch(() => {});
 
       return res.json({
         success: true,
-        memories: serverMemories,
+        memories: serverMemories.filter((m) => !serverDeletedMemoryIds.has(m?.id)),
+        deletedIds: Array.from(serverDeletedMemoryIds),
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -774,14 +824,21 @@ async function startServer() {
         return res.status(400).json({ error: "Identifiant memoryId requis" });
       }
 
+      // 1. Ajouter à la liste des identifiants supprimés (tombstone)
+      serverDeletedMemoryIds.add(memoryId);
+      saveDeletedMemoryIds(serverDeletedMemoryIds);
+
+      // 2. Retirer de la mémoire et du fichier serveur
       serverMemories = serverMemories.filter((m) => m.id !== memoryId);
       saveServerMemories(serverMemories);
 
+      // 3. Supprimer de Firestore immédiatement
       firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", memoryId)).catch(() => {});
 
+      // 4. Diffuser à tous les clients connectés (SSE 0ms)
       broadcastGalleryEvent("delete_memory", { memoryId });
-      console.log(`[Gallery Relay] Souvenir ${memoryId} supprimé. Restants: ${serverMemories.length}`);
-      return res.json({ success: true });
+      console.log(`[Gallery Relay] Souvenir ${memoryId} supprimé avec succès. Restants: ${serverMemories.length}`);
+      return res.json({ success: true, memoryId, deletedIds: Array.from(serverDeletedMemoryIds) });
     } catch (err: any) {
       console.error("Erreur /api/gallery/delete:", err);
       return res.status(500).json({ error: err.message });

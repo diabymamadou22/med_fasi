@@ -41,24 +41,33 @@ export async function fetchMemoriesFromRelay(): Promise<TimelineMemory[]> {
   }
 }
 
+export interface GallerySyncResult {
+  memories: TimelineMemory[];
+  deletedIds: string[];
+}
+
 /**
- * Synchronise les souvenirs locaux avec le serveur relais (fusion bidirectionnelle)
+ * Synchronise les souvenirs locaux avec le serveur relais (fusion bidirectionnelle avec liste noire de suppression)
  */
 export async function syncMemoriesWithRelay(
-  localMemories: TimelineMemory[]
-): Promise<TimelineMemory[]> {
+  localMemories: TimelineMemory[],
+  deletedIds?: string[]
+): Promise<GallerySyncResult> {
   try {
     const res = await fetch('/api/gallery/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ localMemories }),
+      body: JSON.stringify({ localMemories, deletedIds: deletedIds || [] }),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { memories: [], deletedIds: [] };
     const data = await res.json();
-    return Array.isArray(data.memories) ? data.memories : [];
+    return {
+      memories: Array.isArray(data.memories) ? data.memories : [],
+      deletedIds: Array.isArray(data.deletedIds) ? data.deletedIds : [],
+    };
   } catch (err) {
     console.warn('[Gallery Relay] Erreur synchronisation souvenirs:', err);
-    return [];
+    return { memories: [], deletedIds: [] };
   }
 }
 

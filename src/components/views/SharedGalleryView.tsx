@@ -120,6 +120,7 @@ interface SharedGalleryViewProps {
   onEditMemory?: (memory: TimelineMemory) => void;
   onDeleteMemory?: (memoryId: string) => void;
   onDeleteMediaItem?: (item: GalleryItem) => void;
+  onDeleteMultipleMediaItems?: (items: GalleryItem[]) => void;
   onRemovePhotoOnly?: (item: GalleryItem) => void;
 }
 
@@ -138,10 +139,15 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   onEditMemory,
   onDeleteMemory,
   onDeleteMediaItem,
+  onDeleteMultipleMediaItems,
   onRemovePhotoOnly,
 }) => {
   // Samsung One UI Bottom Dock Tab: 'pictures' | 'albums' | 'stories'
   const [oneUiTab, setOneUiTab] = useState<'pictures' | 'albums' | 'stories'>('pictures');
+
+  // Mode sélection multiple (style Samsung One UI pour suppression groupée ou individuelle)
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
   // Search state
   const [showSearch, setShowSearch] = useState(false);
@@ -189,6 +195,10 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   // Android / Mobile back navigation handlers
+  useBackHandler(isSelectionMode, () => {
+    setIsSelectionMode(false);
+    setSelectedItemIds(new Set());
+  }, 'gallery-selection-mode');
   useBackHandler(Boolean(selectedAlbumId), () => setSelectedAlbumId(null), 'samsung-album-detail');
   useBackHandler(showSamsungMenu, () => setShowSamsungMenu(false), 'samsung-bottom-menu');
   useBackHandler(showCreateMenu, () => setShowCreateMenu(false), 'samsung-create-menu');
@@ -233,8 +243,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     // 2. Timeline memories
     memories.forEach((mem) => {
       if (mem.photoUrl && mem.photoUrl.trim().length > 0) {
+        const canonicalId = mem.id.startsWith('mem-') ? mem.id : `mem-${mem.id}`;
         items.push({
-          id: `mem-${mem.id}`,
+          id: canonicalId,
           sourceType: 'memory',
           sourceLabel: 'Souvenir',
           title: mem.title,
@@ -873,6 +884,19 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
     }
   };
 
+  const handleToggleSelectItem = (id: string) => {
+    soundEffects.playSoftTap();
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   return (
     <div
       onDragOver={handleDragOver}
@@ -923,7 +947,50 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           SAMSUNG ONE UI TOP BAR & HEADER
          ========================================================= */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6">
-        {activeSelectedAlbum ? (
+        {isSelectionMode ? (
+          /* Selection Mode Top Bar (Samsung One UI style) */
+          <div className="flex items-center justify-between py-2 border-b border-stone-200 dark:border-stone-800 pb-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setIsSelectionMode(false);
+                  setSelectedItemIds(new Set());
+                }}
+                className="px-3 py-1.5 rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <X className="w-4 h-4" />
+                <span>Annuler</span>
+              </button>
+              <span className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100">
+                {selectedItemIds.size}{' '}
+                {selectedItemIds.size > 1 ? 'sélectionnés' : 'sélectionné'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  const targetItems = activeSelectedAlbum ? activeSelectedAlbum.items : picturesTabItems;
+                  if (selectedItemIds.size === targetItems.length) {
+                    setSelectedItemIds(new Set());
+                  } else {
+                    setSelectedItemIds(new Set(targetItems.map((i) => i.id)));
+                  }
+                }}
+                className="px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 text-xs font-semibold cursor-pointer transition-colors"
+              >
+                {selectedItemIds.size ===
+                (activeSelectedAlbum ? activeSelectedAlbum.items.length : picturesTabItems.length)
+                  ? 'Désélectionner tout'
+                  : 'Tout sélectionner'}
+              </button>
+            </div>
+          </div>
+        ) : activeSelectedAlbum ? (
           /* Album Detail Header */
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
@@ -951,6 +1018,17 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setIsSelectionMode(true);
+                }}
+                className="px-2.5 py-1 text-xs font-semibold rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 transition-colors cursor-pointer"
+                title="Sélectionner des éléments"
+              >
+                Sélectionner
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -990,6 +1068,19 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
               </h1>
 
               <div className="flex items-center gap-0.5 sm:gap-1">
+                {/* Sélectionner Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setIsSelectionMode(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-semibold rounded-full hover:bg-stone-200/70 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 transition-colors cursor-pointer"
+                  title="Sélectionner des photos"
+                >
+                  Sélectionner
+                </button>
+
                 {/* Add (+) Button */}
                 <button
                   type="button"
@@ -1312,6 +1403,18 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                 type="button"
                 onClick={() => {
                   setShowTopMenu(false);
+                  setIsSelectionMode(true);
+                }}
+                className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
+              >
+                <Check className="w-4 h-4 text-sky-500" />
+                <span>Sélectionner des éléments</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTopMenu(false);
                   setShowViewAll(!showViewAll);
                 }}
                 className="w-full px-3 py-2.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-700 text-left text-xs sm:text-sm font-medium flex items-center gap-2.5 text-stone-800 dark:text-stone-200 transition-colors cursor-pointer"
@@ -1398,6 +1501,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     autoplayVideo={autoplayVideosInGrid}
                     partner1={profile.partner1}
                     partner2={profile.partner2}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedItemIds.has(item.id)}
+                    onToggleSelect={() => handleToggleSelectItem(item.id)}
                   />
                 ))}
               </div>
@@ -1452,6 +1558,9 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     autoplayVideo={autoplayVideosInGrid}
                     partner1={profile.partner1}
                     partner2={profile.partner2}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedItemIds.has(item.id)}
+                    onToggleSelect={() => handleToggleSelectItem(item.id)}
                   />
                 ))}
               </div>
@@ -1493,82 +1602,133 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
           (Positioned nicely above the bottom navigation bar on mobile)
          ========================================================= */}
       <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-6 left-1/2 -translate-x-1/2 z-35 pointer-events-auto">
-        <div className="flex items-center bg-white/90 dark:bg-stone-900/90 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-[0_12px_36px_rgba(0,0,0,0.16)] rounded-full px-3.5 sm:px-4 py-1.5 sm:py-2 gap-2 sm:gap-4">
-          {/* 1. Pictures / Photos Tab */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setOneUiTab('pictures');
-              setSelectedAlbumId(null);
-            }}
-            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
-              oneUiTab === 'pictures'
-                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
-                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
-            }`}
-            title="Photos"
-            aria-label="Photos"
-          >
-            <ImageIcon className="w-5 h-5" />
-          </button>
+        {isSelectionMode ? (
+          /* Selection Mode Floating Bar */
+          <div className="flex items-center bg-stone-900/95 dark:bg-stone-800/95 backdrop-blur-2xl border border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.35)] rounded-full px-4 py-2 gap-3 text-white animate-fade-in">
+            <span className="text-xs font-semibold text-white/80">
+              {selectedItemIds.size} sélectionné{selectedItemIds.size > 1 ? 's' : ''}
+            </span>
 
-          {/* 2. Albums Tab (Active pill style matching the screenshot) */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setOneUiTab('albums');
-              setSelectedAlbumId(null);
-            }}
-            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
-              oneUiTab === 'albums'
-                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
-                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
-            }`}
-            title="Albums"
-            aria-label="Albums"
-          >
-            <BookOpen className="w-5 h-5" />
-          </button>
+            <div className="h-4 w-px bg-white/20" />
 
-          {/* 3. Stories Tab */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setOneUiTab('stories');
-              setSelectedAlbumId(null);
-            }}
-            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
-              oneUiTab === 'stories'
-                ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
-                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
-            }`}
-            title="Histoires"
-            aria-label="Histoires"
-          >
-            <Bookmark className="w-5 h-5" />
-          </button>
+            <button
+              type="button"
+              disabled={selectedItemIds.size === 0}
+              onClick={() => {
+                if (selectedItemIds.size === 0) return;
+                soundEffects.playTrashDelete();
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                  navigator.vibrate([60, 40, 60]);
+                }
+                const itemsToDelete = allGalleryItems.filter((i) => selectedItemIds.has(i.id));
+                if (onDeleteMultipleMediaItems) {
+                  onDeleteMultipleMediaItems(itemsToDelete);
+                } else if (onDeleteMediaItem) {
+                  itemsToDelete.forEach((i) => onDeleteMediaItem(i));
+                }
+                setIsSelectionMode(false);
+                setSelectedItemIds(new Set());
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                selectedItemIds.size > 0
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-950/40 active:scale-95'
+                  : 'bg-white/10 text-white/30 cursor-not-allowed'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Supprimer</span>
+            </button>
 
-          {/* 4. More Menu Button */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playSoftTap();
-              setShowSamsungMenu(true);
-            }}
-            className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
-              showSamsungMenu
-                ? 'bg-stone-200 text-stone-900 dark:bg-stone-700 dark:text-white'
-                : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
-            }`}
-            title="Menu de la galerie"
-            aria-label="Menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setIsSelectionMode(false);
+                setSelectedItemIds(new Set());
+              }}
+              className="text-xs font-medium text-white/70 hover:text-white px-2 py-1 cursor-pointer"
+            >
+              Fermer
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center bg-white/90 dark:bg-stone-900/90 backdrop-blur-2xl border border-stone-200/80 dark:border-stone-800 shadow-[0_12px_36px_rgba(0,0,0,0.16)] rounded-full px-3.5 sm:px-4 py-1.5 sm:py-2 gap-2 sm:gap-4">
+            {/* 1. Pictures / Photos Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setOneUiTab('pictures');
+                setSelectedAlbumId(null);
+              }}
+              className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+                oneUiTab === 'pictures'
+                  ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+              title="Photos"
+              aria-label="Photos"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
+
+            {/* 2. Albums Tab (Active pill style matching the screenshot) */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setOneUiTab('albums');
+                setSelectedAlbumId(null);
+              }}
+              className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+                oneUiTab === 'albums'
+                  ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+              title="Albums"
+              aria-label="Albums"
+            >
+              <BookOpen className="w-5 h-5" />
+            </button>
+
+            {/* 3. Stories Tab */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setOneUiTab('stories');
+                setSelectedAlbumId(null);
+              }}
+              className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+                oneUiTab === 'stories'
+                  ? 'bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+              title="Histoires"
+              aria-label="Histoires"
+            >
+              <Bookmark className="w-5 h-5" />
+            </button>
+
+            {/* 4. More Menu Button */}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowSamsungMenu(true);
+              }}
+              className={`p-2.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+                showSamsungMenu
+                  ? 'bg-stone-200 text-stone-900 dark:bg-stone-700 dark:text-white'
+                  : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
+              }`}
+              title="Menu de la galerie"
+              aria-label="Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* =========================================================
@@ -2043,12 +2203,34 @@ const SamsungPhotoItem: React.FC<{
   autoplayVideo?: boolean;
   partner1?: { name: string; avatar?: string };
   partner2?: { name: string; avatar?: string };
-}> = ({ item, index, onClick, autoplayVideo = false, partner1, partner2 }) => {
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+}> = ({
+  item,
+  index,
+  onClick,
+  autoplayVideo = false,
+  partner1,
+  partner2,
+  isSelectionMode = false,
+  isSelected = false,
+  onToggleSelect,
+}) => {
   const isVideo =
     item.mediaType === 'video' ||
     Boolean(item.videoUrl) ||
     isVideoMediaType(item.videoUrl || item.photoUrl, item.mediaType);
   const [videoError, setVideoError] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isSelectionMode) {
+      e.stopPropagation();
+      onToggleSelect?.();
+    } else {
+      onClick();
+    }
+  };
 
   return (
     <motion.div
@@ -2056,9 +2238,26 @@ const SamsungPhotoItem: React.FC<{
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.12, delay: Math.min(index * 0.01, 0.2) }}
-      onClick={onClick}
-      className="group relative aspect-square overflow-hidden bg-stone-100 dark:bg-stone-800 cursor-pointer select-none"
+      onClick={handleClick}
+      className={`group relative aspect-square overflow-hidden bg-stone-100 dark:bg-stone-800 cursor-pointer select-none transition-all ${
+        isSelected ? 'ring-3 ring-sky-500 rounded-lg scale-[0.96]' : ''
+      }`}
     >
+      {/* Samsung One UI Selection Circle Checkbox */}
+      {isSelectionMode && (
+        <div className="absolute top-1.5 left-1.5 z-20 pointer-events-none">
+          <div
+            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center transition-all ${
+              isSelected
+                ? 'bg-sky-500 text-white shadow-md ring-2 ring-white scale-105'
+                : 'bg-black/50 text-white/80 border-2 border-white/90'
+            }`}
+          >
+            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+          </div>
+        </div>
+      )}
+
       {isVideo && autoplayVideo && !videoError ? (
         <div className="w-full h-full bg-black flex items-center justify-center overflow-hidden">
           <video

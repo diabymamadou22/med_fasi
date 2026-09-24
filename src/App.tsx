@@ -135,6 +135,36 @@ import {
   deleteMemoryViaRelay,
 } from './lib/galleryRelayService';
 
+// Sauvegarde sécurisée sans crash si le quota de localStorage est saturé par les médias
+export const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`[Storage] Quota localStorage dépassé pour la clé ${key}:`, err);
+  }
+};
+
+export const loadDeletedMemoryIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem('nid_damour_deleted_memories');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch (e) {
+    console.warn('Erreur lecture tombstones:', e);
+  }
+  return new Set();
+};
+
+export const saveDeletedMemoryIds = (ids: Set<string>) => {
+  try {
+    safeSetLocalStorage('nid_damour_deleted_memories', JSON.stringify(Array.from(ids)));
+  } catch (e) {
+    console.warn('Erreur sauvegarde tombstones:', e);
+  }
+};
+
 const STORAGE_KEYS = {
   PROFILE: 'nid_damour_profile',
   MEMORIES: 'nid_damour_memories',
@@ -152,6 +182,7 @@ const STORAGE_KEYS = {
   CHAT_MESSAGES: 'nid_damour_chat_messages',
   LEXICON: 'nid_damour_lexicon',
   WEEKLY_CHALLENGES: 'nid_damour_weekly_challenges',
+  DELETED_MEMORIES: 'nid_damour_deleted_memories',
 };
 
 export default function App() {
@@ -241,6 +272,8 @@ export default function App() {
     profileRef.current = profile;
   }, [profile]);
 
+  const deletedMemoryIdsRef = useRef<Set<string>>(loadDeletedMemoryIds());
+
   const [memories, setMemories] = useState<TimelineMemory[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.MEMORIES);
@@ -248,8 +281,9 @@ export default function App() {
       const parsed = JSON.parse(saved);
       if (!Array.isArray(parsed)) return [];
       const seen = new Set<string>();
+      const deletedSet = loadDeletedMemoryIds();
       return parsed.filter((m: any) => {
-        if (!m || !m.id || seen.has(m.id)) return false;
+        if (!m || !m.id || seen.has(m.id) || deletedSet.has(m.id)) return false;
         seen.add(m.id);
         return true;
       });
@@ -756,9 +790,10 @@ export default function App() {
       COLLECTIONS.MEMORIES,
       (remoteMemories) => {
         if (Array.isArray(remoteMemories)) {
+          const currentDeleted = deletedMemoryIdsRef.current;
           const seen = new Set<string>();
           const deduped = remoteMemories.filter((m) => {
-            if (!m || !m.id || seen.has(m.id)) return false;
+            if (!m || !m.id || seen.has(m.id) || currentDeleted.has(m.id)) return false;
             seen.add(m.id);
             return true;
           });
@@ -766,11 +801,11 @@ export default function App() {
             const idMap = new Map<string, TimelineMemory>();
             deduped.forEach((m) => idMap.set(m.id, m));
             prevLocal.forEach((m) => {
-              if (m && m.id && !idMap.has(m.id)) {
+              if (m && m.id && !idMap.has(m.id) && !currentDeleted.has(m.id)) {
                 idMap.set(m.id, m);
               }
             });
-            const merged = Array.from(idMap.values());
+            const merged = Array.from(idMap.values()).filter((m) => !currentDeleted.has(m.id));
             merged.sort((a, b) => {
               const dateA = a.date ? new Date(a.date).getTime() : 0;
               const dateB = b.date ? new Date(b.date).getTime() : 0;
@@ -1101,6 +1136,8 @@ export default function App() {
       },
       onDeleteMemory: (memId) => {
         if (!memId) return;
+        deletedMemoryIdsRef.current.add(memId);
+        saveDeletedMemoryIds(deletedMemoryIdsRef.current);
         setMemories((prev) => prev.filter((m) => m.id !== memId));
       },
     });
@@ -1118,24 +1155,44 @@ export default function App() {
 
   const runGallerySync = useCallback(async () => {
     try {
-      const serverList = await syncMemoriesWithRelay(memoriesRef.current);
-      if (Array.isArray(serverList) && serverList.length > 0) {
+      const currentDeleted = deletedMemoryIdsRef.current;
+      const syncResult = await syncMemoriesWithRelay(
+        memoriesRef.current.filter((m) => m && m.id && !currentDeleted.has(m.id)),
+        Array.from(currentDeleted)
+      );
+
+      // Si le serveur nous renvoie des suppressions effectuées par le partenaire
+      if (Array.isArray(syncResult.deletedIds) && syncResult.deletedIds.length > 0) {
+        let changedTombstones = false;
+        syncResult.deletedIds.forEach((id) => {
+          if (id && !currentDeleted.has(id)) {
+            currentDeleted.add(id);
+            changedTombstones = true;
+          }
+        });
+        if (changedTombstones) {
+          saveDeletedMemoryIds(currentDeleted);
+        }
+      }
+
+      const serverList = syncResult.memories;
+      if (Array.isArray(serverList)) {
         setMemories((prev) => {
           const idMap = new Map<string, TimelineMemory>();
           serverList.forEach((m) => {
-            if (m && m.id) idMap.set(m.id, m);
-          });
-          let changed = false;
-          prev.forEach((m) => {
-            if (m && m.id && !idMap.has(m.id)) {
+            if (m && m.id && !currentDeleted.has(m.id)) {
               idMap.set(m.id, m);
-              changed = true;
             }
           });
-          if (!changed && idMap.size === prev.length) {
-            return prev;
-          }
-          const merged = Array.from(idMap.values());
+
+          // Conserver les créations récentes locales uniquement si non supprimées
+          prev.forEach((m) => {
+            if (m && m.id && !idMap.has(m.id) && !currentDeleted.has(m.id)) {
+              idMap.set(m.id, m);
+            }
+          });
+
+          const merged = Array.from(idMap.values()).filter((m) => !currentDeleted.has(m.id));
           merged.sort((a, b) => {
             const dateA = a.date ? new Date(a.date).getTime() : 0;
             const dateB = b.date ? new Date(b.date).getTime() : 0;
@@ -1171,15 +1228,6 @@ export default function App() {
       window.removeEventListener('focus', handleWindowFocus);
     };
   }, [runGallerySync]);
-
-  // Sauvegarde sécurisée sans crash si le quota de localStorage est saturé par les médias
-  const safeSetLocalStorage = (key: string, value: string) => {
-    try {
-      localStorage.setItem(key, value);
-    } catch (err) {
-      console.warn(`[Storage] Quota localStorage dépassé pour la clé ${key}:`, err);
-    }
-  };
 
   // Sync state to localStorage as offline fallback (uniquement après chargement initial)
   useEffect(() => {
@@ -1728,6 +1776,13 @@ export default function App() {
       ...memData,
       likes: [activePartnerId],
     };
+
+    // Si l'élément avait été supprimé précédemment, le réhabiliter
+    if (deletedMemoryIdsRef.current.has(newMem.id)) {
+      deletedMemoryIdsRef.current.delete(newMem.id);
+      saveDeletedMemoryIds(deletedMemoryIdsRef.current);
+    }
+
     setMemories((prev) => [newMem, ...prev.filter((m) => m.id !== newMem.id)]);
 
     // Relais direct serveur (disque persistant + SSE instantané vers le partenaire + push)
@@ -1919,18 +1974,37 @@ export default function App() {
   };
 
   const handleDeleteMemory = (memoryId: string) => {
-    const mem = memories.find((m) => m.id === memoryId);
+    // Résolution robuste de l'ID (au cas où le préfixe mem- est présent ou manquant)
+    const rawId = memoryId.replace(/^mem-/, '');
+    const mem = memories.find(
+      (m) => m.id === memoryId || m.id === rawId || m.id === `mem-${rawId}`
+    );
+    const targetId = mem ? mem.id : memoryId;
+
     setDeleteTarget({
       title: 'Supprimer ce souvenir ?',
       itemType: 'souvenir',
       itemName: mem?.title,
       onConfirm: () => {
-        setMemories((prev) => prev.filter((m) => m.id !== memoryId));
+        // 1. Ajouter définitivement aux identifiants supprimés (tombstones)
+        deletedMemoryIdsRef.current.add(targetId);
+        if (targetId !== memoryId) deletedMemoryIdsRef.current.add(memoryId);
+        if (rawId) deletedMemoryIdsRef.current.add(rawId);
+        saveDeletedMemoryIds(deletedMemoryIdsRef.current);
+
+        // 2. Mettre à jour l'état local immédiatement
+        setMemories((prev) =>
+          prev.filter((m) => m.id !== targetId && m.id !== memoryId && m.id !== rawId)
+        );
         setEditingMemory(null);
-        deleteMemoryViaRelay(memoryId).catch((err) =>
+
+        // 3. Relais serveur (mise à jour mémoire, fichier disque et broadcast SSE)
+        deleteMemoryViaRelay(targetId).catch((err) =>
           console.warn('Erreur relais suppression souvenir:', err)
         );
-        deleteMemoryFromDb(memoryId).catch((err) =>
+
+        // 4. Firestore (suppression définitive dans le cloud)
+        deleteMemoryFromDb(targetId).catch((err) =>
           console.warn('Erreur Firestore suppression souvenir:', err)
         );
       },
@@ -2203,18 +2277,106 @@ export default function App() {
 
   // Delete media item from Gallery
   const handleDeleteMediaItem = (item: GalleryItem) => {
-    if (item.sourceType === 'memory' && item.originalEntityId) {
-      handleDeleteMemory(item.originalEntityId);
-    } else if (item.sourceType === 'location' && item.originalEntityId) {
+    if (!item) return;
+
+    // 1. Souvenirs de la timeline
+    if (item.sourceType === 'memory' || item.id.startsWith('mem-')) {
+      const memoryId = item.originalEntityId || item.id.replace(/^mem-/, '');
+      handleDeleteMemory(memoryId);
+      return;
+    }
+
+    // 2. Photos ou vidéos partagées dans le chat
+    if (item.sourceType === 'chat' || item.id.startsWith('chat-')) {
+      const messageId = item.originalEntityId || item.id.replace(/^chat-/, '');
+      setDeleteTarget({
+        title: 'Supprimer cette photo du chat ?',
+        itemType: 'photo de discussion',
+        itemName: item.title,
+        onConfirm: () => {
+          handleDeleteChatMessages([messageId]);
+        },
+      });
+      return;
+    }
+
+    // 3. Lieux
+    if (item.sourceType === 'location' && item.originalEntityId) {
       handleDeleteLocation(item.originalEntityId);
-    } else if (item.sourceType === 'capsule' && item.originalEntityId) {
+      return;
+    }
+
+    // 4. Capsules temporelles
+    if (item.sourceType === 'capsule' && item.originalEntityId) {
       handleDeleteCapsule(item.originalEntityId);
-    } else if (item.sourceType === 'challenge' && item.originalEntityId) {
+      return;
+    }
+
+    // 5. Défis de couple
+    if (item.sourceType === 'challenge' && item.originalEntityId) {
       handleRemoveChallengePhoto(item.originalEntityId);
-    } else if (item.sourceType === 'profile') {
+      return;
+    }
+
+    // 6. Photo de profil
+    if (item.sourceType === 'profile') {
       const pId = item.authorId === 'p1' || item.authorId === 'p2' ? item.authorId : 'p1';
       handleRemoveProfilePhoto(pId as PartnerId);
+      return;
     }
+
+    // 7. Cas général de secours : chercher dans memories
+    const foundMem = memories.find(
+      (m) =>
+        m.id === item.id ||
+        m.id === item.originalEntityId ||
+        `mem-${m.id}` === item.id ||
+        item.id === `mem-${m.id}`
+    );
+    if (foundMem) {
+      handleDeleteMemory(foundMem.id);
+    }
+  };
+
+  // Suppression multiple d'éléments de la galerie (sélection multiple Samsung One UI)
+  const handleDeleteMultipleMediaItems = (items: GalleryItem[]) => {
+    if (!items || items.length === 0) return;
+    setDeleteTarget({
+      title: `Supprimer ${items.length} photo${items.length > 1 ? 's' : ''} ?`,
+      itemType: 'sélection de médias',
+      itemName: `${items.length} élément${items.length > 1 ? 's' : ''} de la galerie`,
+      onConfirm: () => {
+        const deletedMemIds: string[] = [];
+
+        items.forEach((item) => {
+          if (item.sourceType === 'memory' || item.id.startsWith('mem-')) {
+            const memoryId = item.originalEntityId || item.id.replace(/^mem-/, '');
+            const rawId = memoryId.replace(/^mem-/, '');
+            deletedMemoryIdsRef.current.add(memoryId);
+            if (rawId) deletedMemoryIdsRef.current.add(rawId);
+            deletedMemIds.push(memoryId);
+            deleteMemoryViaRelay(memoryId).catch(() => {});
+            deleteMemoryFromDb(memoryId).catch(() => {});
+          } else if (item.sourceType === 'chat' || item.id.startsWith('chat-')) {
+            const msgId = item.originalEntityId || item.id.replace(/^chat-/, '');
+            handleDeleteChatMessages([msgId]);
+          } else if (item.sourceType === 'location' && item.originalEntityId) {
+            handleDeleteLocation(item.originalEntityId);
+          } else if (item.sourceType === 'capsule' && item.originalEntityId) {
+            handleDeleteCapsule(item.originalEntityId);
+          } else if (item.sourceType === 'challenge' && item.originalEntityId) {
+            handleRemoveChallengePhoto(item.originalEntityId);
+          }
+        });
+
+        if (deletedMemIds.length > 0) {
+          saveDeletedMemoryIds(deletedMemoryIdsRef.current);
+          setMemories((prev) =>
+            prev.filter((m) => !deletedMemoryIdsRef.current.has(m.id))
+          );
+        }
+      },
+    });
   };
 
   // Remove photo only from Gallery item
@@ -2432,6 +2594,7 @@ export default function App() {
                 onEditMemory={(mem) => setEditingMemory(mem)}
                 onDeleteMemory={handleDeleteMemory}
                 onDeleteMediaItem={handleDeleteMediaItem}
+                onDeleteMultipleMediaItems={handleDeleteMultipleMediaItems}
                 onRemovePhotoOnly={handleRemovePhotoOnly}
               />
             </div>
