@@ -111,7 +111,13 @@ export interface ChatViewProps {
 }
 
 export type ChatTheme = 'rose-powder' | 'velvet-night' | 'ivory-linen';
-export type SentBubbleColor = 'rose-ruby' | 'emerald-whatsapp' | 'ocean-blue' | 'slate-dark';
+export type SentBubbleColor =
+  | 'rose-ruby'
+  | 'emerald-whatsapp'
+  | 'ocean-blue'
+  | 'slate-dark'
+  | 'violet-amethyst'
+  | 'sunset-peach';
 export type ChatFontSize = 'normal' | 'large' | 'xlarge';
 export type ChatPattern = 'hearts' | 'floral' | 'stars' | 'doodle' | 'none';
 export type ChatPatternOpacity = 'subtle' | 'medium' | 'vibrant';
@@ -266,6 +272,22 @@ export const SENT_BUBBLE_PRESETS: Record<
     bubbleText: 'text-white font-normal antialiased',
     metaText: 'text-slate-300 font-medium',
     swatch: 'bg-slate-800',
+  },
+  'violet-amethyst': {
+    name: 'Améthyste Royale',
+    description: 'Profond, mystérieux & velouté',
+    bubbleClass: 'bg-gradient-to-br from-purple-600 via-purple-700 to-purple-800 text-white shadow-sm shadow-purple-950/25 border border-purple-500/50',
+    bubbleText: 'text-white font-normal antialiased',
+    metaText: 'text-purple-100/95 font-medium',
+    swatch: 'bg-purple-600',
+  },
+  'sunset-peach': {
+    name: 'Pêche Dorée',
+    description: 'Chaleureux, doux & lumineux',
+    bubbleClass: 'bg-gradient-to-br from-amber-600 via-rose-600 to-rose-700 text-white shadow-sm shadow-amber-950/25 border border-amber-500/50',
+    bubbleText: 'text-white font-normal antialiased',
+    metaText: 'text-amber-100/95 font-medium',
+    swatch: 'bg-amber-600',
   },
 };
 
@@ -898,6 +920,27 @@ export const ChatView: React.FC<ChatViewProps> = ({
     setTimeout(() => {
       setParticles((prev) => prev.filter((p) => !newParticles.some((np) => np.id === p.id)));
     }, 2200);
+  };
+
+  // Quick Heart pulse sender (Frisson d'amour)
+  const handleQuickHeartPulse = (e?: React.MouseEvent) => {
+    if (e) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      spawnHeartBurst(rect.left + rect.width / 2, rect.top, 10);
+    } else {
+      spawnHeartBurst(window.innerWidth / 2, window.innerHeight / 2, 12);
+    }
+    soundEffects.playHeartPulse();
+    triggerHeartConfetti();
+    if (onSendMissYouPulse) {
+      onSendMissYouPulse({
+        senderId: activePartnerId,
+        vibe: 'heartbeat',
+        message: `💓 Frisson d'amour : ${currentPartner.name} pense tendrement à toi en ce moment !`,
+      });
+    }
+    setChatToastFeedback(`Frisson d'amour envoyé à ${otherPartner.name} 💓`);
+    setTimeout(() => setChatToastFeedback(null), 2500);
   };
 
   // Double tap to love message
@@ -1642,7 +1685,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-stone-900/90 dark:bg-slate-900/95 backdrop-blur-md text-white text-xs font-semibold rounded-full shadow-lg flex items-center gap-2 border border-rose-500/40 pointer-events-none"
             >
-              <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse shrink-0" />
               <span>{chatToastFeedback}</span>
             </motion.div>
           )}
@@ -1785,13 +1827,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
             {/* Partner Info */}
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <h2 className={`font-bold text-sm sm:text-base leading-tight truncate ${chatTheme === 'velvet-night' ? 'text-white' : 'text-stone-900'}`}>
                   {otherPartner.name}
                 </h2>
-                <span className={`text-[11px] border px-2 py-0.5 rounded-full font-medium hidden sm:inline ${themeStyles.badgeBg}`}>
+                <span className={`text-[10px] sm:text-[11px] border px-2 py-0.5 rounded-full font-medium hidden sm:inline ${themeStyles.badgeBg}`}>
                   Mon Amour
                 </span>
+                {/* Quick Switch Duo Badge */}
+                <button
+                  type="button"
+                  onClick={() => onSwitchPartner(otherPartnerId)}
+                  className={`hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all border cursor-pointer ${
+                    chatTheme === 'velvet-night'
+                      ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-rose-500/60 hover:text-white'
+                      : 'bg-stone-50 border-stone-200/80 text-stone-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700'
+                  }`}
+                  title={`Changer d'utilisateur (Actuellement connecté en tant que: ${currentPartner.name})`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  <span className="opacity-70">Moi :</span>
+                  <strong className="font-semibold">{currentPartner.name}</strong>
+                  <span className="text-[10px] opacity-60">⇄</span>
+                </button>
               </div>
               
               {/* Online, Typing or Last Seen Status */}
@@ -1823,8 +1881,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </div>
 
-          {/* Header Action Buttons: Direct Theme & Motif button + Refresh + More Options */}
-          <div className="flex items-center gap-1">
+          {/* Header Action Buttons */}
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            {/* Direct Search in Chat button */}
+            <button
+              type="button"
+              onClick={() => setShowSearchBar((prev) => !prev)}
+              className={`p-2 rounded-full transition-colors cursor-pointer relative ${
+                showSearchBar
+                  ? 'bg-rose-100 text-rose-700 dark:bg-slate-800 dark:text-rose-400'
+                  : chatTheme === 'velvet-night'
+                  ? 'text-slate-300 hover:text-rose-400 hover:bg-slate-800'
+                  : 'text-stone-500 hover:text-rose-600 hover:bg-rose-50'
+              }`}
+              title="Rechercher des messages, photos, vocaux..."
+              aria-label="Rechercher"
+            >
+              <Search className="w-4 h-4" />
+              {searchQuery.trim().length > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+              )}
+            </button>
+
             {onRefreshChat && (
               <button
                 type="button"
@@ -1924,9 +2002,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 >
                   {/* Switch Duo Profile */}
                   <div className="p-2 border-b border-rose-100/70 dark:border-slate-800 mb-1.5 bg-rose-50/40 dark:bg-slate-800/40 rounded-xl">
-                    <p className="text-[10px] uppercase font-bold tracking-wider text-stone-400 dark:text-slate-500 mb-1.5 flex items-center justify-between">
-                      <span>Profil actif</span>
-                      <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-stone-400 dark:text-slate-500 mb-1.5">
+                      Profil actif
                     </p>
                     <button
                       type="button"
@@ -2472,7 +2549,103 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </div>
 
           {/* Grouped Messages in WhatsApp chronological flow */}
-          {groupedMessages.map((group) => (
+          {groupedMessages.length === 0 ? (
+            filteredMessages.length === 0 && messages.length > 0 ? (
+              /* Search Empty State */
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto select-none">
+                <div className="w-16 h-16 rounded-3xl bg-rose-50 dark:bg-slate-800/80 border border-rose-100 dark:border-slate-700 flex items-center justify-center text-rose-400 mb-3 shadow-xs">
+                  <Search className="w-8 h-8 opacity-60 text-rose-500" />
+                </div>
+                <h3 className="text-base font-bold text-stone-800 dark:text-stone-200">
+                  Aucun message trouvé
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-slate-400 mt-1 max-w-xs leading-relaxed">
+                  Aucun message ne correspond à votre filtre "{searchQuery || mediaFilter}".
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setMediaFilter('all');
+                  }}
+                  className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-rose-500 text-white hover:bg-rose-600 active:scale-95 shadow-xs transition-all cursor-pointer"
+                >
+                  Réinitialiser les filtres
+                </button>
+              </div>
+            ) : (
+              /* Warm Couple Welcome State */
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto select-none max-w-md mx-auto">
+                <div className="relative mb-4 flex items-center justify-center">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-md ring-2 ring-rose-400 -mr-2.5 z-10 bg-rose-100 flex items-center justify-center font-bold text-rose-700 text-base">
+                    {profile.partner1.avatarUrl ? (
+                      <img src={profile.partner1.avatarUrl} alt={profile.partner1.name} className="w-full h-full object-cover" />
+                    ) : (
+                      profile.partner1.name.slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-500 text-white shadow-lg flex items-center justify-center text-sm z-20 animate-pulse border-2 border-white dark:border-slate-900">
+                    ❤️
+                  </div>
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-md ring-2 ring-pink-400 -ml-2.5 z-10 bg-pink-100 flex items-center justify-center font-bold text-pink-700 text-base">
+                    {profile.partner2.avatarUrl ? (
+                      <img src={profile.partner2.avatarUrl} alt={profile.partner2.name} className="w-full h-full object-cover" />
+                    ) : (
+                      profile.partner2.name.slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-bold font-serif-romantic text-stone-900 dark:text-stone-100">
+                  Votre salon d'amoureux secret 💕
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-slate-400 mt-1.5 leading-relaxed max-w-sm">
+                  {profile.partner1.name} & {profile.partner2.name}, cet espace intime est le vôtre. Tous vos mots doux, photos, vocaux et frissons sont synchronisés en temps réel.
+                </p>
+
+                {/* Quick Romantic Starter Prompts */}
+                <div className="grid grid-cols-2 gap-2 mt-5 w-full text-left">
+                  <button
+                    type="button"
+                    onClick={() => handleSend("Je t'aime de tout mon cœur mon amour ❤️")}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-rose-100 dark:border-slate-700/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all cursor-pointer group"
+                  >
+                    <div className="text-xl mb-1 group-hover:scale-110 transition-transform">💌</div>
+                    <p className="text-xs font-bold text-stone-800 dark:text-stone-200">Mot doux</p>
+                    <p className="text-[10px] text-stone-400 dark:text-slate-500 truncate">Je t'aime de tout mon cœur</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleQuickHeartPulse}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-rose-100 dark:border-slate-700/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all cursor-pointer group"
+                  >
+                    <div className="text-xl mb-1 group-hover:scale-110 transition-transform">💓</div>
+                    <p className="text-xs font-bold text-stone-800 dark:text-stone-200">Frisson d'amour</p>
+                    <p className="text-[10px] text-stone-400 dark:text-slate-500 truncate">Envoyer une impulsion</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-rose-100 dark:border-slate-700/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all cursor-pointer group"
+                  >
+                    <div className="text-xl mb-1 group-hover:scale-110 transition-transform">📸</div>
+                    <p className="text-xs font-bold text-stone-800 dark:text-stone-200">Photo à deux</p>
+                    <p className="text-[10px] text-stone-400 dark:text-slate-500 truncate">Partager un souvenir</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowStickerPicker(true)}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-rose-100 dark:border-slate-700/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition-all cursor-pointer group"
+                  >
+                    <div className="text-xl mb-1 group-hover:scale-110 transition-transform">🧸</div>
+                    <p className="text-xs font-bold text-stone-800 dark:text-stone-200">Stickers duo</p>
+                    <p className="text-[10px] text-stone-400 dark:text-slate-500 truncate">Câlins & bisous tendres</p>
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            groupedMessages.map((group) => (
             <div key={group.dateKey} className="flex flex-col">
               {/* WhatsApp-style Date divider badge */}
               <div className="flex justify-center my-3 sticky top-1 z-10 select-none">
@@ -2897,7 +3070,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 );
               })}
             </div>
-          ))}
+          )))}
 
           {/* Typing Indicator Bubble */}
           {isOtherPartnerTyping && (
@@ -3014,31 +3187,46 @@ export const ChatView: React.FC<ChatViewProps> = ({
         {/* ================================================================= */}
         {/* 4. QUICK LOVE PHRASES EXPRESS RIBBON */}
         {/* ================================================================= */}
-        {showQuickPhrases && (
-          <div className={`px-3 py-1.5 border-t flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0 no-scrollbar ${
-            chatTheme === 'velvet-night'
-              ? 'bg-slate-900/90 border-slate-800'
-              : 'bg-rose-50/60 border-rose-100/70'
-          }`}>
-            <span className="text-rose-500 font-semibold flex items-center gap-1 shrink-0">
-              <MessageSquareHeart className="w-3.5 h-3.5" /> Mots doux :
-            </span>
-            {quickLovePhrases.map((phrase, idx) => (
+        <AnimatePresence>
+          {showQuickPhrases && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className={`px-3 py-1.5 border-t flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0 no-scrollbar ${
+                chatTheme === 'velvet-night'
+                  ? 'bg-slate-900/90 border-slate-800'
+                  : 'bg-rose-50/70 border-rose-100/70'
+              }`}
+            >
+              <span className="text-rose-500 font-semibold flex items-center gap-1 shrink-0">
+                <MessageSquareHeart className="w-3.5 h-3.5" /> Mots doux :
+              </span>
+              {quickLovePhrases.map((phrase, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSend(phrase.text)}
+                  className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all hover:scale-105 active:scale-95 cursor-pointer font-medium shadow-2xs ${
+                    chatTheme === 'velvet-night'
+                      ? 'bg-slate-800 text-rose-300 hover:bg-slate-700 border border-slate-700'
+                      : 'bg-white text-rose-700 hover:bg-rose-50 border border-rose-200/80'
+                  }`}
+                >
+                  {phrase.label}
+                </button>
+              ))}
               <button
-                key={idx}
                 type="button"
-                onClick={() => handleSend(phrase.text)}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all hover:scale-105 cursor-pointer font-medium shadow-2xs ${
-                  chatTheme === 'velvet-night'
-                    ? 'bg-slate-800 text-rose-300 hover:bg-slate-700 border border-slate-700'
-                    : 'bg-white text-rose-700 hover:bg-rose-50 border border-rose-200/80'
-                }`}
+                onClick={() => setShowQuickPhrases(false)}
+                className="p-1 rounded-full text-stone-400 hover:text-stone-600 dark:hover:text-slate-200 ml-auto shrink-0 cursor-pointer"
+                title="Masquer le ruban des mots doux"
               >
-                {phrase.label}
+                <X className="w-3 h-3" />
               </button>
-            ))}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ================================================================= */}
         {/* 5. UNIFIED STICKERS & EMOJIS DRAWER TRAY */}
@@ -3226,6 +3414,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
               <Smile className="w-5 h-5" />
             </button>
 
+            {/* Quick Love Phrases Toggle (shown if ribbon is collapsed) */}
+            {!showQuickPhrases && (
+              <button
+                type="button"
+                onClick={() => setShowQuickPhrases(true)}
+                className="p-2 rounded-full text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0 hidden sm:flex items-center justify-center"
+                title="Afficher les mots doux express"
+                aria-label="Mots doux express"
+              >
+                <MessageSquareHeart className="w-5 h-5" />
+              </button>
+            )}
+
             {/* 3. Text Input OR Recording in-progress inside the capsule */}
             {isRecording ? (
               <div className="flex-1 flex items-center justify-between gap-2 min-w-0 px-2 py-0.5">
@@ -3307,7 +3508,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
               </div>
             )}
 
-            {/* 4. Far Right Action inside capsule: Send or Mic */}
+            {/* 4. Far Right Action inside capsule: Send or Heart/Mic */}
             {!isRecording && (
               inputText.trim() ? (
                 <button
@@ -3321,16 +3522,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <Send className="w-4 h-4 ml-0.5" />
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={startRecording}
-                  className="p-2 text-stone-700 dark:text-slate-300 hover:text-stone-900 dark:hover:text-white rounded-full transition-colors cursor-pointer shrink-0 hover:bg-stone-100 dark:hover:bg-slate-800"
-                  title="Enregistrer une note vocale"
-                  aria-label="Enregistrer une note vocale"
-                  id="chat-mic-btn"
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleQuickHeartPulse}
+                    className="p-2 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-full transition-all hover:scale-110 active:scale-90 cursor-pointer shrink-0"
+                    title={`Envoyer un frisson d'amour instantané à ${otherPartner.name} 💕`}
+                    aria-label="Frisson d'amour"
+                    id="chat-heart-pulse-btn"
+                  >
+                    <Heart className="w-5 h-5 fill-rose-500 text-rose-500 animate-pulse" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startRecording}
+                    className="p-2 text-stone-700 dark:text-slate-300 hover:text-stone-900 dark:hover:text-white rounded-full transition-colors cursor-pointer shrink-0 hover:bg-stone-100 dark:hover:bg-slate-800"
+                    title="Enregistrer une note vocale"
+                    aria-label="Enregistrer une note vocale"
+                    id="chat-mic-btn"
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                </div>
               )
             )}
           </div>

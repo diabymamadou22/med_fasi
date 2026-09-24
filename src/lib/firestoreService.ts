@@ -574,58 +574,32 @@ export function subscribeLatestPulse(
   onUpdate: (pulse: MissYouPulse) => void,
   onError?: (error: Error) => void
 ): () => void {
-  let isUnsubscribed = false;
-  let activeUnsubscribe: (() => void) | null = null;
-  let retryTimer: any = null;
   const listenerStartTime = Date.now();
-
-  function attach() {
-    if (isUnsubscribed) return;
-    try {
-      const colRef = collection(db, COLLECTIONS.PULSES);
-      activeUnsubscribe = onSnapshot(
-        colRef,
-        (snap) => {
-          snap.docChanges().forEach((change) => {
-            if (change.type === 'added') {
-              const data = change.doc.data() as MissYouPulse;
-              const idMatch = change.doc.id.match(/^pulse-(\d+)$/);
-              const pulseTime = idMatch ? parseInt(idMatch[1], 10) : 0;
-              if (pulseTime >= listenerStartTime - 60000) {
-                onUpdate({ id: change.doc.id, ...data });
-              }
+  try {
+    const colRef = collection(db, COLLECTIONS.PULSES);
+    return onSnapshot(
+      colRef,
+      (snap) => {
+        snap.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data() as MissYouPulse;
+            const idMatch = change.doc.id.match(/^pulse-(\d+)$/);
+            const pulseTime = idMatch ? parseInt(idMatch[1], 10) : 0;
+            if (pulseTime >= listenerStartTime - 60000) {
+              onUpdate({ id: change.doc.id, ...data });
             }
-          });
-        },
-        (err) => {
-          logFirestoreSyncIssue('Pulse sync', err);
-          if (onError) onError(err);
-          if (!isUnsubscribed) {
-            if (activeUnsubscribe) {
-              try { activeUnsubscribe(); } catch {}
-              activeUnsubscribe = null;
-            }
-            retryTimer = setTimeout(attach, 3500);
           }
-        }
-      );
-    } catch {
-      if (!isUnsubscribed) {
-        retryTimer = setTimeout(attach, 4000);
+        });
+      },
+      (err) => {
+        logFirestoreSyncIssue('Pulse sync', err);
+        if (onError) onError(err);
       }
-    }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('Pulse attach', err);
+    return () => {};
   }
-
-  attach();
-
-  return () => {
-    isUnsubscribed = true;
-    if (retryTimer) clearTimeout(retryTimer);
-    if (activeUnsubscribe) {
-      try { activeUnsubscribe(); } catch {}
-      activeUnsubscribe = null;
-    }
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -835,122 +809,68 @@ export function subscribeChatMessages(
   onUpdate: (messages: ChatMessage[]) => void,
   onError?: (error: Error) => void
 ): () => void {
-  let isUnsubscribed = false;
-  let activeUnsubscribe: (() => void) | null = null;
-  let retryTimer: any = null;
-
-  function connect() {
-    if (isUnsubscribed) return;
-    try {
-      const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
-      activeUnsubscribe = onSnapshot(
-        colRef,
-        (snap) => {
-          const messages: ChatMessage[] = [];
-          snap.forEach((docSnap) => {
-            messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
-          });
-          const sorted = sortChatMessagesChronologically(messages);
-          onUpdate(sorted);
-        },
-        (err) => {
-          logFirestoreSyncIssue('Chat messages sync', err);
-          if (onError) onError(err);
-          // Reconnexion automatique si la connexion réseau ou le stream se coupe (sommeil mobile, changement wifi/4g)
-          if (!isUnsubscribed) {
-            if (activeUnsubscribe) {
-              try { activeUnsubscribe(); } catch {}
-              activeUnsubscribe = null;
-            }
-            retryTimer = setTimeout(connect, 3000);
-          }
-        }
-      );
-    } catch (err: any) {
-      logFirestoreSyncIssue('Chat messages connect', err);
-      if (!isUnsubscribed) {
-        retryTimer = setTimeout(connect, 4000);
+  try {
+    const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
+    return onSnapshot(
+      colRef,
+      (snap) => {
+        const messages: ChatMessage[] = [];
+        snap.forEach((docSnap) => {
+          messages.push({ id: docSnap.id, ...(docSnap.data() as any) });
+        });
+        const sorted = sortChatMessagesChronologically(messages);
+        onUpdate(sorted);
+      },
+      (err) => {
+        logFirestoreSyncIssue('Chat messages sync', err);
+        if (onError) onError(err);
       }
-    }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('Chat messages connect', err);
+    return () => {};
   }
-
-  connect();
-
-  return () => {
-    isUnsubscribed = true;
-    if (retryTimer) clearTimeout(retryTimer);
-    if (activeUnsubscribe) {
-      try { activeUnsubscribe(); } catch {}
-      activeUnsubscribe = null;
-    }
-  };
 }
 
 export function subscribeChatTypingStatus(
   onUpdate: (statusMap: Record<string, PartnerPresenceInfo>) => void
 ): () => void {
-  let isUnsubscribed = false;
-  let activeUnsubscribe: (() => void) | null = null;
-  let retryTimer: any = null;
+  try {
+    const colRef = collection(db, COLLECTIONS.CHAT_STATUS);
+    return onSnapshot(
+      colRef,
+      (snap) => {
+        const map: Record<string, PartnerPresenceInfo> = {};
+        const nowMs = Date.now();
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && data.updatedAt) {
+            const updatedMs = new Date(data.updatedAt).getTime();
+            // Typing signal strictly expires after 4.5 seconds if not refreshed
+            const isTypingFresh = nowMs - updatedMs < 4500;
+            // Presence is considered online if lastSeen was within the last 65 seconds
+            const lastSeenMs = data.lastSeen ? new Date(data.lastSeen).getTime() : updatedMs;
+            const isOnlineFresh = Boolean(data.isOnline && nowMs - lastSeenMs < 65000);
 
-  function connect() {
-    if (isUnsubscribed) return;
-    try {
-      const colRef = collection(db, COLLECTIONS.CHAT_STATUS);
-      activeUnsubscribe = onSnapshot(
-        colRef,
-        (snap) => {
-          const map: Record<string, PartnerPresenceInfo> = {};
-          const nowMs = Date.now();
-          snap.forEach((docSnap) => {
-            const data = docSnap.data();
-            if (data && data.updatedAt) {
-              const updatedMs = new Date(data.updatedAt).getTime();
-              // Typing signal strictly expires after 4.5 seconds if not refreshed
-              const isTypingFresh = nowMs - updatedMs < 4500;
-              // Presence is considered online if lastSeen was within the last 65 seconds
-              const lastSeenMs = data.lastSeen ? new Date(data.lastSeen).getTime() : updatedMs;
-              const isOnlineFresh = Boolean(data.isOnline && nowMs - lastSeenMs < 65000);
-
-              map[docSnap.id] = {
-                partnerId: docSnap.id,
-                isTyping: Boolean(data.isTyping && isTypingFresh),
-                isOnline: isOnlineFresh,
-                lastSeen: data.lastSeen || data.updatedAt,
-                updatedAt: data.updatedAt,
-              };
-            }
-          });
-          onUpdate(map);
-        },
-        (err) => {
-          logFirestoreSyncIssue('Typing status sync', err);
-          if (!isUnsubscribed) {
-            if (activeUnsubscribe) {
-              try { activeUnsubscribe(); } catch {}
-              activeUnsubscribe = null;
-            }
-            retryTimer = setTimeout(connect, 3500);
+            map[docSnap.id] = {
+              partnerId: docSnap.id,
+              isTyping: Boolean(data.isTyping && isTypingFresh),
+              isOnline: isOnlineFresh,
+              lastSeen: data.lastSeen || data.updatedAt,
+              updatedAt: data.updatedAt,
+            };
           }
-        }
-      );
-    } catch {
-      if (!isUnsubscribed) {
-        retryTimer = setTimeout(connect, 4000);
+        });
+        onUpdate(map);
+      },
+      (err) => {
+        logFirestoreSyncIssue('Typing status sync', err);
       }
-    }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('Typing status attach', err);
+    return () => {};
   }
-
-  connect();
-
-  return () => {
-    isUnsubscribed = true;
-    if (retryTimer) clearTimeout(retryTimer);
-    if (activeUnsubscribe) {
-      try { activeUnsubscribe(); } catch {}
-      activeUnsubscribe = null;
-    }
-  };
 }
 
 export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };

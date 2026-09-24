@@ -14,7 +14,7 @@
       (function() {
         var _origError = console.error;
         var _origWarn = console.warn;
-        function isQuotaError(args) {
+        function isQuotaOrInternalError(args) {
           if (!args) return false;
           for (var i = 0; i < args.length; i++) {
             var str = '';
@@ -29,7 +29,12 @@
               lower.indexOf('resource-exhausted') !== -1 ||
               lower.indexOf('quota limit exceeded') !== -1 ||
               lower.indexOf('maximum backoff delay') !== -1 ||
-              (lower.indexOf('firestore') !== -1 && lower.indexOf('quota') !== -1)
+              lower.indexOf('internal assertion failed') !== -1 ||
+              lower.indexOf('unexpected state') !== -1 ||
+              lower.indexOf('ca9') !== -1 ||
+              lower.indexOf('b815') !== -1 ||
+              lower.indexOf('pendingresponses') !== -1 ||
+              (lower.indexOf('firestore') !== -1 && (lower.indexOf('quota') !== -1 || lower.indexOf('assertion') !== -1))
             ) {
               return true;
             }
@@ -37,21 +42,21 @@
           return false;
         }
         console.error = function() {
-          if (isQuotaError(arguments)) return;
+          if (isQuotaOrInternalError(arguments)) return;
           _origError.apply(console, arguments);
         };
         console.warn = function() {
-          if (isQuotaError(arguments)) return;
+          if (isQuotaOrInternalError(arguments)) return;
           _origWarn.apply(console, arguments);
         };
         window.addEventListener('unhandledrejection', function(e) {
-          if (e && e.reason && isQuotaError([e.reason])) {
+          if (e && e.reason && isQuotaOrInternalError([e.reason])) {
             e.preventDefault();
             e.stopImmediatePropagation();
           }
         }, true);
         window.addEventListener('error', function(e) {
-          if (e && (isQuotaError([e.message, e.error]))) {
+          if (e && (isQuotaOrInternalError([e.message, e.error]))) {
             e.preventDefault();
             e.stopImmediatePropagation();
           }

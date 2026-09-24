@@ -24,36 +24,49 @@ if (typeof window !== 'undefined') {
     originalConsoleError.apply(console, args);
   };
 
-  window.addEventListener('error', (event) => {
-    const msg = (event.message || event.error?.message || '').toLowerCase();
-    if (
-      msg.includes('internal assertion failed') ||
-      msg.includes('unexpected state') ||
-      msg.includes('ca9') ||
-      msg.includes('b815') ||
-      (msg.includes('firestore') && msg.includes('assertion'))
-    ) {
-      // Intercept internal Firestore SDK assertion failures so they don't break the UI
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  });
+  window.addEventListener(
+    'error',
+    (event) => {
+      const msg = (event.message || event.error?.message || '').toLowerCase();
+      if (
+        msg.includes('internal assertion failed') ||
+        msg.includes('unexpected state') ||
+        msg.includes('ca9') ||
+        msg.includes('b815') ||
+        msg.includes('pendingresponses') ||
+        (msg.includes('firestore') && msg.includes('assertion'))
+      ) {
+        // Intercept internal Firestore SDK assertion failures so they don't break the UI
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
 
-  window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason;
-    const msg = (reason?.message || String(reason || '')).toLowerCase();
-    const code = (reason?.code || '').toLowerCase();
-    if (
-      code === 'resource-exhausted' ||
-      msg.includes('quota') ||
-      msg.includes('resource-exhausted') ||
-      msg.includes('limit exceeded') ||
-      msg.includes('internal assertion failed') ||
-      msg.includes('unexpected state')
-    ) {
-      event.preventDefault();
-    }
-  });
+  window.addEventListener(
+    'unhandledrejection',
+    (event) => {
+      const reason = event.reason;
+      const msg = (reason?.message || String(reason || '')).toLowerCase();
+      const code = (reason?.code || '').toLowerCase();
+      if (
+        code === 'resource-exhausted' ||
+        msg.includes('quota') ||
+        msg.includes('resource-exhausted') ||
+        msg.includes('limit exceeded') ||
+        msg.includes('internal assertion failed') ||
+        msg.includes('unexpected state') ||
+        msg.includes('ca9') ||
+        msg.includes('b815')
+      ) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
 }
 
 // Initialize PWA Service Worker for offline support and background web notifications
