@@ -141,7 +141,7 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
   onRemovePhotoOnly,
 }) => {
   // Samsung One UI Bottom Dock Tab: 'pictures' | 'albums' | 'stories'
-  const [oneUiTab, setOneUiTab] = useState<'pictures' | 'albums' | 'stories'>('albums');
+  const [oneUiTab, setOneUiTab] = useState<'pictures' | 'albums' | 'stories'>('pictures');
 
   // Search state
   const [showSearch, setShowSearch] = useState(false);
@@ -391,6 +391,38 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
       items: favItems.length > 0 ? favItems : allGalleryItems.slice(0, 5),
       isEssential: true,
     });
+
+    // Album dédié : Photos de Safi
+    const p2Name = profile.partner2?.name || 'Safi';
+    const p2Items = allGalleryItems.filter((i) => i.authorId === 'p2');
+    if (p2Items.length > 0) {
+      list.push({
+        id: 'photos_p2',
+        title: `Photos de ${p2Name}`,
+        count: p2Items.length,
+        coverUrl: p2Items[0]?.photoUrl || profile.partner2?.avatar || defaultRomanticCover,
+        type: 'photo',
+        badge: 'camera',
+        items: p2Items,
+        isEssential: true,
+      });
+    }
+
+    // Album dédié : Photos de Med
+    const p1Name = profile.partner1?.name || 'Med';
+    const p1Items = allGalleryItems.filter((i) => i.authorId === 'p1');
+    if (p1Items.length > 0) {
+      list.push({
+        id: 'photos_p1',
+        title: `Photos de ${p1Name}`,
+        count: p1Items.length,
+        coverUrl: p1Items[0]?.photoUrl || profile.partner1?.avatar || defaultRomanticCover,
+        type: 'photo',
+        badge: 'camera',
+        items: p1Items,
+        isEssential: true,
+      });
+    }
 
     // 3. Camera (Appareil photo) - Photo card with camera icon badge in top-right
     const cameraItems = allGalleryItems.filter((i) => i.mediaType !== 'video');
@@ -1006,6 +1038,55 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
               </div>
             </div>
 
+            {/* Sélecteur de vue rapide en haut : Photos / Albums / Histoires */}
+            <div className="flex items-center gap-1 p-1 bg-stone-200/70 dark:bg-stone-800/70 rounded-2xl w-fit">
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setOneUiTab('pictures');
+                  setSelectedAlbumId(null);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  oneUiTab === 'pictures'
+                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200'
+                }`}
+              >
+                Photos ({allGalleryItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setOneUiTab('albums');
+                  setSelectedAlbumId(null);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  oneUiTab === 'albums'
+                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200'
+                }`}
+              >
+                Albums ({displayedAlbums.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  setOneUiTab('stories');
+                  setSelectedAlbumId(null);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  oneUiTab === 'stories'
+                    ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200'
+                }`}
+              >
+                Histoires
+              </button>
+            </div>
+
             {/* Inline Search Bar if activated */}
             <AnimatePresence>
               {showSearch && (
@@ -1315,6 +1396,8 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     index={idx}
                     onClick={() => openLightboxForItem(item, activeSelectedAlbum.items)}
                     autoplayVideo={autoplayVideosInGrid}
+                    partner1={profile.partner1}
+                    partner2={profile.partner2}
                   />
                 ))}
               </div>
@@ -1367,6 +1450,8 @@ export const SharedGalleryView: React.FC<SharedGalleryViewProps> = ({
                     index={idx}
                     onClick={() => openLightboxForItem(item, picturesTabItems)}
                     autoplayVideo={autoplayVideosInGrid}
+                    partner1={profile.partner1}
+                    partner2={profile.partner2}
                   />
                 ))}
               </div>
@@ -1956,7 +2041,9 @@ const SamsungPhotoItem: React.FC<{
   index: number;
   onClick: () => void;
   autoplayVideo?: boolean;
-}> = ({ item, index, onClick, autoplayVideo = false }) => {
+  partner1?: { name: string; avatar?: string };
+  partner2?: { name: string; avatar?: string };
+}> = ({ item, index, onClick, autoplayVideo = false, partner1, partner2 }) => {
   const isVideo =
     item.mediaType === 'video' ||
     Boolean(item.videoUrl) ||
@@ -2012,6 +2099,20 @@ const SamsungPhotoItem: React.FC<{
       {item.likes && item.likes.length > 0 && (
         <div className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/40 backdrop-blur-xs text-rose-400">
           <Heart className="w-3 h-3 fill-rose-500 text-rose-500" />
+        </div>
+      )}
+
+      {/* Author Indicator Pill */}
+      {item.authorId && (item.authorId === 'p1' || item.authorId === 'p2') && (
+        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-black/65 backdrop-blur-xs text-white text-[9px] font-medium flex items-center gap-1 shadow-xs pointer-events-none">
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              item.authorId === 'p1' ? 'bg-sky-400' : 'bg-rose-400'
+            }`}
+          />
+          <span className="truncate max-w-[55px]">
+            {item.authorId === 'p1' ? partner1?.name || 'Med' : partner2?.name || 'Safi'}
+          </span>
         </div>
       )}
     </motion.div>
