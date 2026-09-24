@@ -2,8 +2,8 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  memoryLocalCache,
+  memoryLruGarbageCollector,
   setLogLevel,
   enableNetwork,
 } from 'firebase/firestore';
@@ -48,12 +48,46 @@ export const firebaseConfig = {
 // Initialisation de Firebase
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Base de données Firestore initialisée selon les recommandations Firebase SDK
+// Base de données Firestore initialisée avec cache mémoire pour éliminer les désynchronisations d'index IndexedDB (erreur interne SDK ca9 / b815)
 const databaseId = getEnvVar('VITE_FIREBASE_DATABASE_ID') || DEFAULT_FIREBASE_CONFIG.firestoreDatabaseId;
 
-export const db = databaseId && databaseId !== '(default)'
-  ? getFirestore(app, databaseId)
-  : getFirestore(app);
+function createFirestoreInstance() {
+  const dbId = databaseId && databaseId !== '(default)' ? databaseId : undefined;
+  try {
+    return initializeFirestore(
+      app,
+      {
+        localCache: memoryLocalCache({
+          garbageCollector: memoryLruGarbageCollector(),
+        }),
+      },
+      dbId
+    );
+  } catch {
+    // Si déjà initialisé ou fallback
+    return dbId ? getFirestore(app, dbId) : getFirestore(app);
+  }
+}
+
+export const db = createFirestoreInstance();
+
+// Nettoyage préventif des bases IndexedDB Firestore orphelines causant le bug SDK 'targetId'
+if (typeof window !== 'undefined' && window.indexedDB) {
+  try {
+    const req = window.indexedDB.databases?.();
+    if (req) {
+      req.then((dbs) => {
+        dbs.forEach((dbInfo) => {
+          if (dbInfo.name && dbInfo.name.startsWith('firestore')) {
+            try {
+              window.indexedDB.deleteDatabase(dbInfo.name);
+            } catch {}
+          }
+        });
+      }).catch(() => {});
+    }
+  } catch {}
+}
 
 // S'assurer que le réseau Firestore est actif pour la réception des données en temps réel
 if (typeof window !== 'undefined' && db) {

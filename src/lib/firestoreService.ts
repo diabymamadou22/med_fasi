@@ -845,7 +845,6 @@ export function subscribeChatMessages(
       const colRef = collection(db, COLLECTIONS.CHAT_MESSAGES);
       activeUnsubscribe = onSnapshot(
         colRef,
-        { includeMetadataChanges: true },
         (snap) => {
           const messages: ChatMessage[] = [];
           snap.forEach((docSnap) => {
