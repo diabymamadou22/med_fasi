@@ -12,7 +12,7 @@ import {
   ArrowRight,
   MessageCircle,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId } from '../../types';
+import { CoupleProfile, PartnerId, ChatMessage } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 
@@ -67,11 +67,15 @@ const INITIAL_AFFINITY_QUESTIONS: AffinityQuestion[] = [
 interface CompatibilityQuizGameProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
+  onSendChatMessage?: (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => void;
 }
 
 export const CompatibilityQuizGame: React.FC<CompatibilityQuizGameProps> = ({
   profile,
   activePartnerId,
+  onSendChatMessage,
 }) => {
   const [questions, setQuestions] = useState<AffinityQuestion[]>(() => {
     try {
@@ -85,6 +89,7 @@ export const CompatibilityQuizGame: React.FC<CompatibilityQuizGameProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [targetPartnerId, setTargetPartnerId] = useState<PartnerId>('p1');
   const [showResults, setShowResults] = useState(false);
+  const [sentToChatToast, setSentToChatToast] = useState(false);
 
   useEffect(() => {
     try {
@@ -382,7 +387,29 @@ export const CompatibilityQuizGame: React.FC<CompatibilityQuizGameProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {onSendChatMessage && (
+              <button
+                type="button"
+                onClick={() => {
+                  const msg = `🏆 *Quiz de Connivence : ${badge.title} !*\nScore d'affinité : *${scorePercent}%* (${correctCount}/${questions.length} bonnes réponses).\n${badge.desc} 💖`;
+                  onSendChatMessage({
+                    senderId: activePartnerId,
+                    text: msg,
+                    type: 'text',
+                  });
+                  soundEffects.playSuccessSparkle();
+                  triggerHeartConfetti();
+                  setSentToChatToast(true);
+                  setTimeout(() => setSentToChatToast(false), 3000);
+                }}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold text-sm shadow-md flex items-center gap-2 cursor-pointer transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>{sentToChatToast ? 'Envoyé dans le chat ! 💌' : 'Partager notre score dans le chat'}</span>
+              </button>
+            )}
+
             <button
               onClick={handleRestart}
               className="px-6 py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md flex items-center gap-2 cursor-pointer"

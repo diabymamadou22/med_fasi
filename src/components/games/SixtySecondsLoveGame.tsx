@@ -12,8 +12,9 @@ import {
   Trophy,
   Share2,
   Copy,
+  MessageCircle,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId } from '../../types';
+import { CoupleProfile, PartnerId, ChatMessage } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 
@@ -37,11 +38,15 @@ const INSPIRATION_CHIPS = [
 interface SixtySecondsLoveGameProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
+  onSendChatMessage?: (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => void;
 }
 
 export const SixtySecondsLoveGame: React.FC<SixtySecondsLoveGameProps> = ({
   profile,
   activePartnerId,
+  onSendChatMessage,
 }) => {
   const [timeLeft, setTimeLeft] = useState(60);
   const [isActive, setIsActive] = useState(false);
@@ -120,9 +125,20 @@ export const SixtySecondsLoveGame: React.FC<SixtySecondsLoveGameProps> = ({
   const handleCopySummary = () => {
     if (words.length === 0) return;
     const summary = `⏱️ *60 Secondes pour te faire craquer !*\nDe ${activePartner.name} pour ${targetPartner.name} :\n\n${words.map((w) => `• ${w}`).join('\n')}\n\n💖 Total : ${words.length} mots doux en 60 secondes !`;
-    navigator.clipboard.writeText(summary);
-    setCopiedNotification('Texte copié ! Envoyez-le dans le chat ou gardez-le précieusement.');
+    
+    if (onSendChatMessage) {
+      onSendChatMessage({
+        senderId: activePartnerId,
+        text: summary,
+        type: 'text',
+      });
+      setCopiedNotification('Mots doux envoyés directement dans votre chat ! 💌');
+    } else {
+      navigator.clipboard.writeText(summary);
+      setCopiedNotification('Texte copié ! Envoyez-le dans le chat ou gardez-le précieusement.');
+    }
     soundEffects.playSuccessSparkle();
+    triggerHeartConfetti();
     setTimeout(() => setCopiedNotification(null), 3000);
   };
 
@@ -302,13 +318,20 @@ export const SixtySecondsLoveGame: React.FC<SixtySecondsLoveGameProps> = ({
             <p className="text-stone-700 text-sm max-w-md mx-auto">
               <strong>{activePartner.name}</strong> a trouvé <strong>{words.length} mots d'amour</strong> en seulement 60 secondes pour <strong>{targetPartner.name}</strong> !
             </p>
-            <div className="pt-2">
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
               <button
                 onClick={handleCopySummary}
-                className="px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-xs inline-flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-xs inline-flex items-center gap-2 cursor-pointer transition-all"
               >
-                <Share2 className="w-4 h-4" />
-                <span>Partager ce florilège d'amour</span>
+                <MessageCircle className="w-4 h-4" />
+                <span>{onSendChatMessage ? 'Envoyer dans notre chat 💌' : 'Copier ce florilège'}</span>
+              </button>
+              <button
+                onClick={handleReset}
+                className="px-4 py-2.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Rejouer</span>
               </button>
             </div>
           </motion.div>

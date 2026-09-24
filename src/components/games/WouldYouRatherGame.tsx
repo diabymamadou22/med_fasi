@@ -10,8 +10,9 @@ import {
   Compass,
   Flame,
   RotateCcw,
+  MessageCircle,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId } from '../../types';
+import { CoupleProfile, PartnerId, ChatMessage } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 
@@ -92,11 +93,15 @@ const DEFAULT_ITEMS: WouldYouRatherItem[] = [
 interface WouldYouRatherGameProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
+  onSendChatMessage?: (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => void;
 }
 
 export const WouldYouRatherGame: React.FC<WouldYouRatherGameProps> = ({
   profile,
   activePartnerId,
+  onSendChatMessage,
 }) => {
   const [items, setItems] = useState<WouldYouRatherItem[]>(() => {
     try {
@@ -220,6 +225,47 @@ export const WouldYouRatherGame: React.FC<WouldYouRatherGameProps> = ({
     setNewOptB('');
     setCurrentIndex(0);
     soundEffects.playSuccessSparkle();
+  };
+
+  const [sentToChatToast, setSentToChatToast] = useState(false);
+
+  const handleShareDilemma = () => {
+    if (!current) return;
+    const p1Choice = currentVotes.p1
+      ? currentVotes.p1 === 'A'
+        ? `Option A (${current.optionA})`
+        : `Option B (${current.optionB})`
+      : 'Pas encore voté';
+    const p2Choice = currentVotes.p2
+      ? currentVotes.p2 === 'A'
+        ? `Option A (${current.optionA})`
+        : `Option B (${current.optionB})`
+      : 'Pas encore voté';
+
+    const matchText = isMatch
+      ? '💖 Même choix ! Nos désirs sont parfaitement connectés !'
+      : bothVoted
+      ? '✨ Choix différents ! Échangeons nos arguments avec amour !'
+      : '💌 À toi de voter mon amour !';
+
+    const text = `🤔 *Tu préfères... ?*\n🅰️ ${current.optionA}\n🅱️ ${current.optionB}\n\n• ${profile.partner1.name} : ${p1Choice}\n• ${profile.partner2.name} : ${p2Choice}\n${matchText}`;
+
+    if (onSendChatMessage) {
+      onSendChatMessage({
+        senderId: activePartnerId,
+        text,
+        type: 'text',
+      });
+      soundEffects.playSuccessSparkle();
+      triggerHeartConfetti();
+      setSentToChatToast(true);
+      setTimeout(() => setSentToChatToast(false), 3000);
+    } else {
+      navigator.clipboard.writeText(text);
+      soundEffects.playSoftTap();
+      setSentToChatToast(true);
+      setTimeout(() => setSentToChatToast(false), 3000);
+    }
   };
 
   const totalAnswered = items.filter((i) => i.votes?.p1 && i.votes?.p2).length;
@@ -451,6 +497,15 @@ export const WouldYouRatherGame: React.FC<WouldYouRatherGameProps> = ({
               className="px-4 py-2 rounded-xl border border-stone-200 text-stone-600 font-bold text-xs hover:bg-stone-50 cursor-pointer"
             >
               ← Précédent
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShareDilemma}
+              className="px-3.5 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>{sentToChatToast ? 'Envoyé au chat ! 💌' : 'Partager au chat'}</span>
             </button>
 
             <button

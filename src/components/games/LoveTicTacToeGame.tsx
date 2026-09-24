@@ -9,8 +9,10 @@ import {
   CheckCircle2,
   Bot,
   UserCheck,
+  MessageCircle,
+  Edit3,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId } from '../../types';
+import { CoupleProfile, PartnerId, ChatMessage } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 
@@ -29,11 +31,15 @@ const DEFAULT_PLEDGES = [
 interface LoveTicTacToeGameProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
+  onSendChatMessage?: (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => void;
 }
 
 export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
   profile,
   activePartnerId,
+  onSendChatMessage,
 }) => {
   const [board, setBoard] = useState<BoardState>(Array(9).fill(null));
   const [isP1Turn, setIsP1Turn] = useState(true);
@@ -45,6 +51,9 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
   const [ties, setTies] = useState(0);
   const [selectedPledge, setSelectedPledge] = useState<string>(DEFAULT_PLEDGES[0]);
   const [pledgeFulfilled, setPledgeFulfilled] = useState(false);
+  const [isEditingPledge, setIsEditingPledge] = useState(false);
+  const [customPledgeText, setCustomPledgeText] = useState('');
+  const [sentToChatToast, setSentToChatToast] = useState(false);
 
   const p1Symbol = '💖';
   const p2Symbol = '🌹';
@@ -304,16 +313,57 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
                 </p>
 
                 {/* Selected Pledge Box */}
-                <div className="mt-4 p-4 rounded-2xl bg-gradient-to-tr from-rose-50 via-white to-pink-50 border border-rose-200 text-left">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 block mb-1">
-                    Gage Romantique
-                  </span>
-                  <p className="font-serif-romantic text-base sm:text-lg font-bold text-stone-800">
-                    « {selectedPledge} »
-                  </p>
+                <div className="mt-4 p-4 rounded-2xl bg-gradient-to-tr from-rose-50 via-white to-pink-50 border border-rose-200 text-left relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 block">
+                      Gage Romantique
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomPledgeText(selectedPledge);
+                        setIsEditingPledge(!isEditingPledge);
+                      }}
+                      className="text-[10px] text-stone-500 hover:text-rose-600 flex items-center gap-1 font-semibold cursor-pointer"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>{isEditingPledge ? 'Annuler' : 'Personnaliser'}</span>
+                    </button>
+                  </div>
+
+                  {isEditingPledge ? (
+                    <div className="space-y-2 mt-2">
+                      <input
+                        type="text"
+                        value={customPledgeText}
+                        onChange={(e) => setCustomPledgeText(e.target.value)}
+                        placeholder="Écrivez un gage inventé avec amour..."
+                        className="w-full text-xs p-2 rounded-xl border border-rose-300 focus:outline-hidden focus:ring-2 focus:ring-rose-400 bg-white"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (customPledgeText.trim()) {
+                              setSelectedPledge(customPledgeText.trim());
+                            }
+                            setIsEditingPledge(false);
+                            soundEffects.playSoftTap();
+                          }}
+                          className="px-3 py-1 bg-rose-500 text-white rounded-lg text-xs font-bold"
+                        >
+                          Valider ce gage
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="font-serif-romantic text-base sm:text-lg font-bold text-stone-800">
+                      « {selectedPledge} »
+                    </p>
+                  )}
                 </div>
 
-                <div className="mt-4 flex items-center justify-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
                   <button
                     onClick={() => {
                       setPledgeFulfilled(true);
@@ -340,6 +390,31 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
                   >
                     Changer de gage
                   </button>
+
+                  {/* Send to chat button */}
+                  {onSendChatMessage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const winnerName = getWinnerName();
+                        const loserName = getLoserName();
+                        const msg = `⚔️ *Morpion des Gages : Victoire de ${winnerName} !* 👑\nLe gage amoureux pour ${loserName} est :\n« ${selectedPledge} » 🌹`;
+                        onSendChatMessage({
+                          senderId: activePartnerId,
+                          text: msg,
+                          type: 'text',
+                        });
+                        soundEffects.playSuccessSparkle();
+                        triggerHeartConfetti();
+                        setSentToChatToast(true);
+                        setTimeout(() => setSentToChatToast(false), 3000);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>{sentToChatToast ? 'Envoyé dans le chat ! 💌' : 'Envoyer dans le chat'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

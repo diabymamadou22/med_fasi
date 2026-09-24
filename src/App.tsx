@@ -2605,6 +2605,7 @@ export default function App() {
               <GamesView
                 profile={profile}
                 activePartnerId={activePartnerId}
+                memories={memories}
                 quizzes={quizzes}
                 dateIdeas={dateIdeas}
                 challenges={challenges}

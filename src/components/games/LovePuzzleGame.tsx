@@ -11,8 +11,11 @@ import {
   CheckCircle2,
   Mail,
   Lock,
+  Lightbulb,
+  Image as ImageIcon,
+  MessageCircle,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId } from '../../types';
+import { CoupleProfile, PartnerId, TimelineMemory, ChatMessage } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 
@@ -40,11 +43,17 @@ const DEFAULT_PUZZLE_IMAGES = [
 interface LovePuzzleGameProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
+  memories?: TimelineMemory[];
+  onSendChatMessage?: (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => void;
 }
 
 export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
   profile,
   activePartnerId,
+  memories = [],
+  onSendChatMessage,
 }) => {
   const [selectedImage, setSelectedImage] = useState(DEFAULT_PUZZLE_IMAGES[0].url);
   const [secretNote, setSecretNote] = useState(DEFAULT_PUZZLE_IMAGES[0].defaultNote);
@@ -59,8 +68,24 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [customNoteInput, setCustomNoteInput] = useState('');
   const [showCustomModal, setShowCustomModal] = useState(false);
+  const [sentToChatToast, setSentToChatToast] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-solve helper so couple can reveal effortlessly
+  const handleAutoSolve = () => {
+    const total = gridSize * gridSize;
+    const solved = Array.from({ length: total }, (_, i) => i);
+    setTiles(solved);
+    setEmptyIndex(total - 1);
+    setIsSolved(true);
+    setIsTimerRunning(false);
+    soundEffects.playVictoryChime();
+    triggerCelebrationConfetti();
+    setTimeout(() => {
+      setShowLoveLetter(true);
+    }, 600);
+  };
 
   // Initialize and shuffle puzzle
   const initPuzzle = (size: 3 | 4 = gridSize) => {
@@ -216,6 +241,33 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
       {/* Preset photo selector & Difficulty */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          {/* Photos souvenirs de la galerie */}
+          {memories &&
+            memories
+              .filter((m) => Boolean(m.photoUrl && m.photoUrl.trim().length > 0))
+              .slice(0, 8)
+              .map((mem) => (
+                <button
+                  key={mem.id}
+                  onClick={() => {
+                    setSelectedImage(mem.photoUrl!);
+                    if (mem.description || mem.title) {
+                      setSecretNote(mem.description || `Souvenir précieux : ${mem.title} ❤️`);
+                    }
+                    soundEffects.playSoftTap();
+                  }}
+                  className={`flex items-center gap-2 p-1.5 pr-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all shrink-0 ${
+                    selectedImage === mem.photoUrl
+                      ? 'border-rose-500 bg-rose-50 text-rose-800 ring-1 ring-rose-500'
+                      : 'border-stone-200 hover:bg-stone-50 text-stone-600 bg-white'
+                  }`}
+                  title={mem.title}
+                >
+                  <img src={mem.photoUrl} alt={mem.title} className="w-7 h-7 rounded-lg object-cover" />
+                  <span className="truncate max-w-[100px]">{mem.title || 'Notre photo'}</span>
+                </button>
+              ))}
+
           {DEFAULT_PUZZLE_IMAGES.map((img) => (
             <button
               key={img.id}
@@ -224,7 +276,7 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
                 setSecretNote(img.defaultNote);
                 soundEffects.playSoftTap();
               }}
-              className={`flex items-center gap-2 p-1.5 pr-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+              className={`flex items-center gap-2 p-1.5 pr-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all shrink-0 ${
                 selectedImage === img.url
                   ? 'border-rose-500 bg-rose-50 text-rose-800 ring-1 ring-rose-500'
                   : 'border-stone-200 hover:bg-stone-50 text-stone-600 bg-white'
@@ -271,6 +323,17 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
             {showPreview ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             <span className="hidden sm:inline">Modèle</span>
           </button>
+
+          {!isSolved && (
+            <button
+              onClick={handleAutoSolve}
+              className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 cursor-pointer text-xs font-semibold flex items-center gap-1"
+              title="Révéler la solution"
+            >
+              <Lightbulb className="w-4 h-4 text-amber-500" />
+              <span className="hidden sm:inline">Révéler</span>
+            </button>
+          )}
 
           <button
             onClick={() => initPuzzle(gridSize)}
@@ -429,7 +492,30 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
                 </p>
               </div>
 
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                {onSendChatMessage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = `🧩 *Puzzle Romantique Dévoilé !* ❤️\nPhoto reconstituée en ${moves} coups !\nVoici le mot secret dévoilé :\n« ${secretNote} » 💌`;
+                      onSendChatMessage({
+                        senderId: activePartnerId,
+                        text: msg,
+                        type: 'text',
+                        photoUrl: selectedImage,
+                      });
+                      soundEffects.playSuccessSparkle();
+                      triggerHeartConfetti();
+                      setSentToChatToast(true);
+                      setTimeout(() => setSentToChatToast(false), 3000);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>{sentToChatToast ? 'Envoyé dans le chat ! 💌' : 'Envoyer dans le chat'}</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => setShowLoveLetter(false)}
                   className="px-6 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-xs cursor-pointer"

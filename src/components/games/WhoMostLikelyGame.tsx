@@ -13,7 +13,7 @@ import {
   Share2,
   Flame,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId } from '../../types';
+import { CoupleProfile, PartnerId, ChatMessage } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 
@@ -53,11 +53,15 @@ const DEFAULT_QUESTIONS: WhoQuestion[] = [
 interface WhoMostLikelyGameProps {
   profile: CoupleProfile;
   activePartnerId: PartnerId;
+  onSendChatMessage?: (
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+  ) => void;
 }
 
 export const WhoMostLikelyGame: React.FC<WhoMostLikelyGameProps> = ({
   profile,
   activePartnerId,
+  onSendChatMessage,
 }) => {
   const [questions, setQuestions] = useState<WhoQuestion[]>(() => {
     try {
@@ -209,11 +213,21 @@ export const WhoMostLikelyGame: React.FC<WhoMostLikelyGameProps> = ({
     const p1Choice = currentVotes.p1 ? (currentVotes.p1 === 'p1' ? profile.partner1.name : profile.partner2.name) : 'Non voté';
     const p2Choice = currentVotes.p2 ? (currentVotes.p2 === 'p1' ? profile.partner1.name : profile.partner2.name) : 'Non voté';
     
-    const summary = `🔮 *Qui de nous deux ?*\n« ${currentQuestion.text} »\n• ${profile.partner1.name} a voté : ${p1Choice}\n• ${profile.partner2.name} a voté : ${p2Choice}\n${isMatch ? '💖 Accord parfait !' : '✨ Les avis divergent !'}`;
+    const summary = `🔮 *Qui de nous deux ?*\n« ${currentQuestion.text} »\n• ${profile.partner1.name} a voté : ${p1Choice}\n• ${profile.partner2.name} a voté : ${p2Choice}\n${isMatch ? '💖 Accord parfait !' : '✨ Les avis divergent, débattons-en !'}`;
     
-    navigator.clipboard.writeText(summary);
-    setCopiedNotification('Texte copié ! Vous pouvez le coller dans votre chat.');
+    if (onSendChatMessage) {
+      onSendChatMessage({
+        senderId: activePartnerId,
+        text: summary,
+        type: 'text',
+      });
+      setCopiedNotification('Envoyé directement dans votre chat d’amoureux ! 💌');
+    } else {
+      navigator.clipboard.writeText(summary);
+      setCopiedNotification('Texte copié ! Vous pouvez le coller dans votre chat.');
+    }
     soundEffects.playSuccessSparkle();
+    triggerHeartConfetti();
     setTimeout(() => setCopiedNotification(null), 3000);
   };
 
