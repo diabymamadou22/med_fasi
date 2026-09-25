@@ -40,7 +40,6 @@ import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
 import { LexiconSection } from './LexiconSection';
 import { WeeklyChallengesSection } from './WeeklyChallengesSection';
-import { LoveRouletteGame } from './games/LoveRouletteGame';
 import { FlirtCardsGame } from './games/FlirtCardsGame';
 import { LoveRoleplayGame } from './games/LoveRoleplayGame';
 import { LoveBlindTestGame } from './games/LoveBlindTestGame';
@@ -65,7 +64,6 @@ export type EnglishGameTab =
   | 'voice_coach'
   | 'mad_libs'
   | 'date_missions'
-  | 'roulette'
   | 'cards'
   | 'roleplay'
   | 'trivia'
@@ -112,7 +110,7 @@ interface GamesViewProps {
   onSelectActiveWeeklyChallenge?: (challengeId: string) => void;
   onSaveWeeklyChallenge?: (challenge: WeeklyLearningChallenge) => void;
   onOpenChatWithDraft?: (prefilledText: string) => void;
-  initialTab?: EnglishGameTab;
+  initialTab?: EnglishGameTab | null;
 }
 
 interface GameCardDef {
@@ -346,17 +344,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
       icon: <Grid3X3 className="w-5 h-5 text-rose-500" />,
       color: 'bg-rose-50/70 hover:bg-rose-100/80 border-rose-200/80',
       badge: 'Gages 🌹',
-    },
-    {
-      id: 'roulette',
-      title: 'Roue des Gages',
-      desc: 'Tournez la roue et réalisez le gage romantique ou passionné tiré au sort',
-      category: 'duo',
-      categoryLabel: 'Défis & Duels',
-      tag: 'Hasard 🎲',
-      icon: <Shuffle className="w-5 h-5 text-pink-500" />,
-      color: 'bg-pink-50/70 hover:bg-pink-100/80 border-pink-200/80',
-      badge: 'Populaire 🔥',
     },
     {
       id: 'puzzle',
@@ -896,29 +883,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
               activePartnerId={activePartnerId}
               onSendChatMessage={onSendChatMessage}
               onAddXp={handleAddXp}
-            />
-          )}
-
-          {resolvedTab === 'roulette' && (
-            <LoveRouletteGame
-              profile={profile}
-              activePartnerId={activePartnerId}
-              speechRate={speechRate}
-              onSendChatMessage={onSendChatMessage}
-              onAddXp={handleAddXp}
-              onSaveToLexicon={(item) =>
-                handleSaveWord({
-                  id: `lex-${Date.now()}`,
-                  english: item.english,
-                  french: item.french,
-                  phonetic: item.phonetic,
-                  category: 'romantique',
-                  addedBy: activePartnerId,
-                  isFavorite: true,
-                  isMastered: false,
-                  createdAt: new Date().toISOString(),
-                })
-              }
             />
           )}
 

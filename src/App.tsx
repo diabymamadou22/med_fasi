@@ -217,11 +217,14 @@ export default function App() {
   }, [activeTab]);
   const deletedMessageIdsRef = useRef<Set<string>>(new Set());
   const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
-  const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab>('roulette');
+  const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab | null>(null);
 
   const handleSelectTab = (tab: MainTab) => {
     if (activeTab !== 'chat') {
       setLastNonChatTab(activeTab);
+    }
+    if (tab === 'games' && activeTab !== 'games') {
+      setSelectedGameTab(null);
     }
     setActiveTab(tab);
   };
