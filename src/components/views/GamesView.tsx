@@ -57,6 +57,7 @@ import { SixtySecondsLoveGame } from '../games/SixtySecondsLoveGame';
 import { LovePuzzleGame } from '../games/LovePuzzleGame';
 import { INITIAL_LEXICON_WORDS } from '../../data/initialLexiconData';
 import { INITIAL_WEEKLY_LEARNING_CHALLENGES } from '../../data/initialWeeklyChallenges';
+import { useBackHandler } from '../../lib/backNavigation';
 
 export type EnglishGameTab =
   | 'wordle'
@@ -330,6 +331,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
       : activeTab === 'challenges' || activeTab === 'couple_extras'
       ? 'vouchers'
       : activeTab;
+
+  // Handle hardware / gesture back button to return to games catalog
+  useBackHandler(Boolean(resolvedTab), () => setActiveTab(null), 'game-detail-view');
 
   // Curated catalog of 18 romantic couple games & activities
   const gameCards: GameCardDef[] = [

@@ -367,7 +367,7 @@ export const HomeView: React.FC<HomeViewProps> = React.memo(({
                 Jeux à deux
               </h3>
               <p className="text-[11px] text-stone-400 mt-0.5 line-clamp-1">
-                Quiz, gages & complicité
+                Quiz, duels & complicité
               </p>
             </div>
             <div className="mt-3 flex items-center gap-1 text-[11px] font-medium text-violet-600">
