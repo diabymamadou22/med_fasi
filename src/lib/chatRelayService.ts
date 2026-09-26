@@ -46,24 +46,33 @@ export async function fetchChatMessagesFromRelay(): Promise<ChatMessage[]> {
   }
 }
 
+export interface ChatSyncRelayResult {
+  messages: ChatMessage[];
+  deletedIds: string[];
+}
+
 /**
- * Synchronise les messages locaux avec le serveur
+ * Synchronise les messages locaux avec le serveur et échange les identifiants supprimés (tombstones)
  */
 export async function syncLocalMessagesWithRelay(
-  localMessages: ChatMessage[]
-): Promise<ChatMessage[]> {
+  localMessages: ChatMessage[],
+  deletedIds?: string[]
+): Promise<ChatSyncRelayResult> {
   try {
     const res = await fetch('/api/chat/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ localMessages }),
+      body: JSON.stringify({ localMessages, deletedIds: deletedIds || [] }),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { messages: [], deletedIds: [] };
     const data = await res.json();
-    return Array.isArray(data.messages) ? data.messages : [];
+    return {
+      messages: Array.isArray(data.messages) ? data.messages : [],
+      deletedIds: Array.isArray(data.deletedIds) ? data.deletedIds : [],
+    };
   } catch (err) {
     console.warn('[Chat Relay] Erreur synchronisation messages:', err);
-    return [];
+    return { messages: [], deletedIds: [] };
   }
 }
 

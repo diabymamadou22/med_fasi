@@ -165,6 +165,27 @@ export const saveDeletedMemoryIds = (ids: Set<string>) => {
   }
 };
 
+export const loadDeletedMessageIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem('nid_damour_deleted_messages');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch (e) {
+    console.warn('Erreur lecture tombstones messages:', e);
+  }
+  return new Set();
+};
+
+export const saveDeletedMessageIds = (ids: Set<string>) => {
+  try {
+    safeSetLocalStorage('nid_damour_deleted_messages', JSON.stringify(Array.from(ids)));
+  } catch (e) {
+    console.warn('Erreur sauvegarde tombstones messages:', e);
+  }
+};
+
 const STORAGE_KEYS = {
   PROFILE: 'nid_damour_profile',
   MEMORIES: 'nid_damour_memories',
@@ -215,7 +236,7 @@ export default function App() {
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
-  const deletedMessageIdsRef = useRef<Set<string>>(new Set());
+  const deletedMessageIdsRef = useRef<Set<string>>(loadDeletedMessageIds());
   const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
   const [selectedGameTab, setSelectedGameTab] = useState<EnglishGameTab | null>(null);
 
@@ -380,7 +401,10 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
       const parsed: ChatMessage[] = saved ? JSON.parse(saved) : [];
-      return sortChatMessagesChronologically(parsed);
+      const deletedSet = loadDeletedMessageIds();
+      return sortChatMessagesChronologically(
+        parsed.filter((m) => m && m.id && !deletedSet.has(m.id))
+      );
     } catch {
       return [];
     }
@@ -723,25 +747,43 @@ export default function App() {
   // Fonction de synchronisation unifiée Firestore + Relais haute disponibilité
   const runUnifiedChatSync = useCallback(async () => {
     try {
-      const [firestoreMsgs, relayMsgs] = await Promise.all([
+      const currentDeleted = deletedMessageIdsRef.current;
+      const [relaySyncResult, firestoreMsgs] = await Promise.all([
+        syncLocalMessagesWithRelay(
+          [],
+          Array.from(currentDeleted)
+        ).catch(() => ({ messages: [] as ChatMessage[], deletedIds: [] as string[] })),
         fetchFirestoreChatMessages().catch(() => [] as ChatMessage[]),
-        fetchChatMessagesFromRelay().catch(() => [] as ChatMessage[]),
       ]);
+
+      if (Array.isArray(relaySyncResult.deletedIds) && relaySyncResult.deletedIds.length > 0) {
+        let changedTombstones = false;
+        relaySyncResult.deletedIds.forEach((id) => {
+          if (id && !currentDeleted.has(id)) {
+            currentDeleted.add(id);
+            changedTombstones = true;
+          }
+        });
+        if (changedTombstones) {
+          saveDeletedMessageIds(currentDeleted);
+          setMessages((prev) => prev.filter((m) => !currentDeleted.has(m.id)));
+        }
+      }
 
       const allIncoming: ChatMessage[] = [];
       const seen = new Set<string>();
 
       if (Array.isArray(firestoreMsgs)) {
         firestoreMsgs.forEach((m) => {
-          if (m && m.id && !seen.has(m.id) && !deletedMessageIdsRef.current.has(m.id)) {
+          if (m && m.id && !seen.has(m.id) && !currentDeleted.has(m.id)) {
             seen.add(m.id);
             allIncoming.push(m);
           }
         });
       }
-      if (Array.isArray(relayMsgs)) {
-        relayMsgs.forEach((m) => {
-          if (m && m.id && !seen.has(m.id) && !deletedMessageIdsRef.current.has(m.id)) {
+      if (Array.isArray(relaySyncResult.messages)) {
+        relaySyncResult.messages.forEach((m) => {
+          if (m && m.id && !seen.has(m.id) && !currentDeleted.has(m.id)) {
             seen.add(m.id);
             allIncoming.push(m);
           }
@@ -1088,12 +1130,17 @@ export default function App() {
       onDeleteMessages: (deletedIds) => {
         if (Array.isArray(deletedIds) && deletedIds.length > 0) {
           deletedIds.forEach((id) => deletedMessageIdsRef.current.add(id));
+          saveDeletedMessageIds(deletedMessageIdsRef.current);
           const idSet = new Set(deletedIds);
           setMessages((prev) => prev.filter((m) => !idSet.has(m.id)));
         }
       },
       onClearChat: () => {
-        setMessages([]);
+        setMessages((prev) => {
+          prev.forEach((m) => deletedMessageIdsRef.current.add(m.id));
+          saveDeletedMessageIds(deletedMessageIdsRef.current);
+          return [];
+        });
       },
       onPulse: (pulse) => {
         if (pulse && pulse.senderId !== activePartnerIdRef.current) {
@@ -1640,6 +1687,7 @@ export default function App() {
   const handleDeleteChatMessages = async (messageIds: string[]) => {
     if (!messageIds || messageIds.length === 0) return;
     messageIds.forEach((id) => deletedMessageIdsRef.current.add(id));
+    saveDeletedMessageIds(deletedMessageIdsRef.current);
     const idSet = new Set(messageIds);
     setMessages((prev) => prev.filter((m) => !idSet.has(m.id)));
 
@@ -1661,6 +1709,7 @@ export default function App() {
   const handleClearChat = async () => {
     if (messages.length === 0) return;
     messages.forEach((m) => deletedMessageIdsRef.current.add(m.id));
+    saveDeletedMessageIds(deletedMessageIdsRef.current);
     const allIds = messages.map((m) => m.id);
     setMessages([]);
 
@@ -2046,37 +2095,49 @@ export default function App() {
   const handleDeleteMemory = (memoryId: string) => {
     // Résolution robuste de l'ID (au cas où le préfixe mem- est présent ou manquant)
     const rawId = memoryId.replace(/^mem-/, '');
+    const canonicalId = memoryId.startsWith('mem-') ? memoryId : `mem-${memoryId}`;
     const mem = memories.find(
-      (m) => m.id === memoryId || m.id === rawId || m.id === `mem-${rawId}`
+      (m) => m.id === memoryId || m.id === rawId || m.id === canonicalId
     );
-    const targetId = mem ? mem.id : memoryId;
+    const targetId = mem ? mem.id : canonicalId;
 
     setDeleteTarget({
       title: 'Supprimer ce souvenir ?',
       itemType: 'souvenir',
       itemName: mem?.title,
       onConfirm: () => {
-        // 1. Ajouter définitivement aux identifiants supprimés (tombstones)
+        // 1. Ajouter définitivement aux identifiants supprimés (tombstones) toutes les variantes
         deletedMemoryIdsRef.current.add(targetId);
-        if (targetId !== memoryId) deletedMemoryIdsRef.current.add(memoryId);
+        deletedMemoryIdsRef.current.add(memoryId);
+        deletedMemoryIdsRef.current.add(canonicalId);
         if (rawId) deletedMemoryIdsRef.current.add(rawId);
         saveDeletedMemoryIds(deletedMemoryIdsRef.current);
 
         // 2. Mettre à jour l'état local immédiatement
         setMemories((prev) =>
-          prev.filter((m) => m.id !== targetId && m.id !== memoryId && m.id !== rawId)
+          prev.filter((m) => {
+            const mRaw = m.id.replace(/^mem-/, '');
+            const mCan = m.id.startsWith('mem-') ? m.id : `mem-${m.id}`;
+            return (
+              m.id !== targetId &&
+              m.id !== memoryId &&
+              m.id !== canonicalId &&
+              m.id !== rawId &&
+              mRaw !== rawId &&
+              mCan !== canonicalId
+            );
+          })
         );
         setEditingMemory(null);
 
         // 3. Relais serveur (mise à jour mémoire, fichier disque et broadcast SSE)
-        deleteMemoryViaRelay(targetId).catch((err) =>
-          console.warn('Erreur relais suppression souvenir:', err)
-        );
+        deleteMemoryViaRelay(canonicalId).catch(() => {});
+        if (rawId && rawId !== canonicalId) deleteMemoryViaRelay(rawId).catch(() => {});
 
         // 4. Firestore (suppression définitive dans le cloud)
-        deleteMemoryFromDb(targetId).catch((err) =>
-          console.warn('Erreur Firestore suppression souvenir:', err)
-        );
+        deleteMemoryFromDb(canonicalId).catch(() => {});
+        deleteMemoryFromDb(targetId).catch(() => {});
+        if (rawId && rawId !== targetId) deleteMemoryFromDb(rawId).catch(() => {});
       },
     });
   };

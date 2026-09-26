@@ -89,6 +89,30 @@ let pushSubscriptions: PushSubscriptionRecord[] = loadPushSubscriptions();
 
 // Chat Messages Store pour synchronisation directe & haute disponibilité
 const CHAT_MESSAGES_FILE = path.join(process.cwd(), "chat_messages_store.json");
+const DELETED_CHAT_MESSAGES_FILE = path.join(process.cwd(), "deleted_chat_messages_store.json");
+
+function loadDeletedChatMessages(): Set<string> {
+  try {
+    if (fs.existsSync(DELETED_CHAT_MESSAGES_FILE)) {
+      const data = fs.readFileSync(DELETED_CHAT_MESSAGES_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return new Set(parsed);
+    }
+  } catch (err) {
+    console.warn("Erreur lecture deleted_chat_messages_store.json:", err);
+  }
+  return new Set();
+}
+
+function saveDeletedChatMessages(ids: Set<string>) {
+  try {
+    fs.writeFileSync(DELETED_CHAT_MESSAGES_FILE, JSON.stringify(Array.from(ids), null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Erreur écriture deleted_chat_messages_store.json:", err);
+  }
+}
+
+const serverDeletedChatIds: Set<string> = loadDeletedChatMessages();
 
 function loadServerChatMessages(): any[] {
   try {
@@ -111,7 +135,7 @@ function saveServerChatMessages(messages: any[]) {
   }
 }
 
-let serverChatMessages: any[] = loadServerChatMessages();
+let serverChatMessages: any[] = loadServerChatMessages().filter((m) => !serverDeletedChatIds.has(m?.id));
 
 // Gallery Memories Store pour synchronisation durable & multi-appareils
 const GALLERY_MEMORIES_FILE = path.join(process.cwd(), "gallery_memories_store.json");
@@ -172,12 +196,18 @@ async function syncServerWithFirestore() {
 
     // 1. Purger les documents Firestore et le serveur qui ont été supprimés
     for (const docSnap of snap.docs) {
-      if (serverDeletedMemoryIds.has(docSnap.id)) {
+      const rawId = docSnap.id.replace(/^mem-/, "");
+      const canonicalId = docSnap.id.startsWith("mem-") ? docSnap.id : `mem-${docSnap.id}`;
+      if (
+        serverDeletedMemoryIds.has(docSnap.id) ||
+        serverDeletedMemoryIds.has(rawId) ||
+        serverDeletedMemoryIds.has(canonicalId)
+      ) {
         firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", docSnap.id)).catch(() => {});
         continue;
       }
       const data = { id: docSnap.id, ...docSnap.data() };
-      if (!idMap.has(docSnap.id)) {
+      if (!idMap.has(docSnap.id) && !idMap.has(rawId) && !idMap.has(canonicalId)) {
         serverMemories.push(data);
         idMap.set(docSnap.id, data);
         modified = true;
@@ -186,7 +216,16 @@ async function syncServerWithFirestore() {
 
     // 2. Nettoyer serverMemories si des souvenirs sont dans serverDeletedMemoryIds
     const beforeCount = serverMemories.length;
-    serverMemories = serverMemories.filter((m) => m && m.id && !serverDeletedMemoryIds.has(m.id));
+    serverMemories = serverMemories.filter((m) => {
+      if (!m || !m.id) return false;
+      const mRaw = m.id.replace(/^mem-/, "");
+      const mCan = m.id.startsWith("mem-") ? m.id : `mem-${m.id}`;
+      return (
+        !serverDeletedMemoryIds.has(m.id) &&
+        !serverDeletedMemoryIds.has(mRaw) &&
+        !serverDeletedMemoryIds.has(mCan)
+      );
+    });
     if (serverMemories.length !== beforeCount) {
       modified = true;
     }
@@ -584,14 +623,32 @@ async function startServer() {
   // Synchronisation bidirectionnelle des messages locaux et distants
   app.post("/api/chat/sync", (req, res) => {
     try {
-      const { localMessages } = req.body;
+      const { localMessages, deletedIds } = req.body;
+
+      // 1. Enregistrer les suppressions reçues du client
+      if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+        let changed = false;
+        deletedIds.forEach((id) => {
+          if (id && typeof id === "string" && !serverDeletedChatIds.has(id)) {
+            serverDeletedChatIds.add(id);
+            changed = true;
+          }
+        });
+        if (changed) {
+          saveDeletedChatMessages(serverDeletedChatIds);
+          serverChatMessages = serverChatMessages.filter((m) => !serverDeletedChatIds.has(m?.id));
+          saveServerChatMessages(serverChatMessages);
+        }
+      }
+
+      // 2. Fusionner les messages locaux non supprimés
       if (Array.isArray(localMessages) && localMessages.length > 0) {
         let modified = false;
         const idMap = new Map<string, any>();
         serverChatMessages.forEach((m) => idMap.set(m.id, m));
 
         localMessages.forEach((m) => {
-          if (m && m.id && !idMap.has(m.id)) {
+          if (m && m.id && !idMap.has(m.id) && !serverDeletedChatIds.has(m.id)) {
             idMap.set(m.id, m);
             serverChatMessages.push(m);
             modified = true;
@@ -613,7 +670,8 @@ async function startServer() {
 
       return res.json({
         success: true,
-        messages: serverChatMessages,
+        messages: serverChatMessages.filter((m) => !serverDeletedChatIds.has(m?.id)),
+        deletedIds: Array.from(serverDeletedChatIds),
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -629,12 +687,24 @@ async function startServer() {
       }
 
       const idSet = new Set(messageIds);
+      messageIds.forEach((id) => {
+        if (id && typeof id === "string") {
+          serverDeletedChatIds.add(id);
+        }
+      });
+      saveDeletedChatMessages(serverDeletedChatIds);
+
       const initialCount = serverChatMessages.length;
-      serverChatMessages = serverChatMessages.filter((m) => !idSet.has(m.id));
+      serverChatMessages = serverChatMessages.filter((m) => !idSet.has(m.id) && !serverDeletedChatIds.has(m?.id));
 
       if (serverChatMessages.length !== initialCount) {
         saveServerChatMessages(serverChatMessages);
       }
+
+      // Supprimer également de Firestore
+      messageIds.forEach((id) => {
+        firestoreDeleteDoc(firestoreDoc(serverFirestore, "chat_messages", id)).catch(() => {});
+      });
 
       // Diffuser instantanément l'événement de suppression à tous les clients connectés
       const payload = JSON.stringify({ type: "delete_messages", messageIds });
@@ -645,7 +715,7 @@ async function startServer() {
       });
 
       console.log(`[Relay] ${messageIds.length} message(s) supprimé(s). Messages restants: ${serverChatMessages.length}`);
-      return res.json({ success: true, remainingCount: serverChatMessages.length });
+      return res.json({ success: true, remainingCount: serverChatMessages.length, deletedIds: Array.from(serverDeletedChatIds) });
     } catch (err: any) {
       console.error("Erreur /api/chat/delete:", err);
       return res.status(500).json({ error: err.message });
@@ -655,6 +725,14 @@ async function startServer() {
   // Vider entièrement la discussion et diffuser l'effacement vers tous les appareils
   app.post("/api/chat/clear", (_req, res) => {
     try {
+      serverChatMessages.forEach((m) => {
+        if (m && m.id) {
+          serverDeletedChatIds.add(m.id);
+          firestoreDeleteDoc(firestoreDoc(serverFirestore, "chat_messages", m.id)).catch(() => {});
+        }
+      });
+      saveDeletedChatMessages(serverDeletedChatIds);
+
       serverChatMessages = [];
       saveServerChatMessages([]);
 
@@ -745,14 +823,35 @@ async function startServer() {
       if (Array.isArray(deletedIds) && deletedIds.length > 0) {
         let deletedModified = false;
         deletedIds.forEach((id) => {
-          if (id && typeof id === "string" && !serverDeletedMemoryIds.has(id)) {
-            serverDeletedMemoryIds.add(id);
-            deletedModified = true;
+          if (id && typeof id === "string") {
+            const rawId = id.replace(/^mem-/, "");
+            const canonicalId = id.startsWith("mem-") ? id : `mem-${id}`;
+            if (!serverDeletedMemoryIds.has(id)) {
+              serverDeletedMemoryIds.add(id);
+              deletedModified = true;
+            }
+            if (rawId && !serverDeletedMemoryIds.has(rawId)) {
+              serverDeletedMemoryIds.add(rawId);
+              deletedModified = true;
+            }
+            if (!serverDeletedMemoryIds.has(canonicalId)) {
+              serverDeletedMemoryIds.add(canonicalId);
+              deletedModified = true;
+            }
           }
         });
         if (deletedModified) {
           saveDeletedMemoryIds(serverDeletedMemoryIds);
-          serverMemories = serverMemories.filter((m) => !serverDeletedMemoryIds.has(m?.id));
+          serverMemories = serverMemories.filter((m) => {
+            if (!m || !m.id) return false;
+            const rId = m.id.replace(/^mem-/, "");
+            const cId = m.id.startsWith("mem-") ? m.id : `mem-${m.id}`;
+            return (
+              !serverDeletedMemoryIds.has(m.id) &&
+              !serverDeletedMemoryIds.has(rId) &&
+              !serverDeletedMemoryIds.has(cId)
+            );
+          });
           saveServerMemories(serverMemories);
         }
       }
@@ -764,7 +863,17 @@ async function startServer() {
         serverMemories.forEach((m) => idMap.set(m.id, m));
 
         localMemories.forEach((m) => {
-          if (m && m.id && !idMap.has(m.id) && !serverDeletedMemoryIds.has(m.id)) {
+          if (!m || !m.id) return;
+          const rId = m.id.replace(/^mem-/, "");
+          const cId = m.id.startsWith("mem-") ? m.id : `mem-${m.id}`;
+          if (
+            !idMap.has(m.id) &&
+            !idMap.has(rId) &&
+            !idMap.has(cId) &&
+            !serverDeletedMemoryIds.has(m.id) &&
+            !serverDeletedMemoryIds.has(rId) &&
+            !serverDeletedMemoryIds.has(cId)
+          ) {
             idMap.set(m.id, m);
             serverMemories.push(m);
             modified = true;
@@ -829,21 +938,33 @@ async function startServer() {
         return res.status(400).json({ error: "Identifiant memoryId requis" });
       }
 
-      // 1. Ajouter à la liste des identifiants supprimés (tombstone)
-      serverDeletedMemoryIds.add(memoryId);
+      const strId = String(memoryId);
+      const rawId = strId.replace(/^mem-/, "");
+      const canonicalId = strId.startsWith("mem-") ? strId : `mem-${strId}`;
+
+      // 1. Ajouter toutes les variantes à la liste des identifiants supprimés (tombstone)
+      serverDeletedMemoryIds.add(strId);
+      if (rawId) serverDeletedMemoryIds.add(rawId);
+      serverDeletedMemoryIds.add(canonicalId);
       saveDeletedMemoryIds(serverDeletedMemoryIds);
 
-      // 2. Retirer de la mémoire et du fichier serveur
-      serverMemories = serverMemories.filter((m) => m.id !== memoryId);
+      // 2. Retirer de la mémoire et du fichier serveur pour toutes les variantes
+      serverMemories = serverMemories.filter(
+        (m) => m && m.id !== strId && m.id !== rawId && m.id !== canonicalId
+      );
       saveServerMemories(serverMemories);
 
-      // 3. Supprimer de Firestore immédiatement
-      firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", memoryId)).catch(() => {});
+      // 3. Supprimer de Firestore immédiatement pour toutes les variantes
+      firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", strId)).catch(() => {});
+      if (rawId && rawId !== strId) {
+        firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", rawId)).catch(() => {});
+      }
+      firestoreDeleteDoc(firestoreDoc(serverFirestore, "memories", canonicalId)).catch(() => {});
 
       // 4. Diffuser à tous les clients connectés (SSE 0ms)
-      broadcastGalleryEvent("delete_memory", { memoryId });
-      console.log(`[Gallery Relay] Souvenir ${memoryId} supprimé avec succès. Restants: ${serverMemories.length}`);
-      return res.json({ success: true, memoryId, deletedIds: Array.from(serverDeletedMemoryIds) });
+      broadcastGalleryEvent("delete_memory", { memoryId: canonicalId, rawId });
+      console.log(`[Gallery Relay] Souvenir ${canonicalId} supprimé avec succès. Restants: ${serverMemories.length}`);
+      return res.json({ success: true, memoryId: canonicalId, deletedIds: Array.from(serverDeletedMemoryIds) });
     } catch (err: any) {
       console.error("Erreur /api/gallery/delete:", err);
       return res.status(500).json({ error: err.message });
