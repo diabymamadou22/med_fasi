@@ -343,3 +343,25 @@ export interface WeeklyLearningChallenge {
   isCustom?: boolean;
 }
 
+export interface MorpionGameSession {
+  id: string; // 'morpion_live'
+  board: (string | null)[]; // 9 cells
+  currentTurn: PartnerId; // 'p1' | 'p2'
+  p1Symbol: string; // '💖'
+  p2Symbol: string; // '🌹'
+  winner: PartnerId | 'tie' | null;
+  winningLine: number[] | null;
+  p1Wins: number;
+  p2Wins: number;
+  ties: number;
+  selectedPledge: string;
+  pledgeFulfilled: boolean;
+  lastMoveBy?: PartnerId | null;
+  lastMoveIndex?: number | null;
+  lastUpdated: string;
+  rematchRequestedBy?: PartnerId | null;
+  mode?: 'live' | 'local' | 'ai';
+  p1Active?: boolean;
+  p2Active?: boolean;
+}
+

@@ -54,6 +54,9 @@ service cloud.firestore {
     match /weekly_learning_challenges/{document} {
       allow read, write: if true;
     }
+    match /games/{document} {
+      allow read, write: if true;
+    }
     match /media_storage/{document=**} {
       allow read, write: if true;
     }

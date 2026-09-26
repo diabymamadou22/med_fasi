@@ -28,6 +28,7 @@ import {
   ChatMessage,
   EnglishLexiconItem,
   WeeklyLearningChallenge,
+  MorpionGameSession,
 } from '../types';
 import {
   sortChatMessagesChronologically,
@@ -54,6 +55,7 @@ const COLLECTIONS = {
   SETTINGS: 'couple_settings',
   LEXICON: 'couple_lexicon',
   WEEKLY_LEARNING_CHALLENGES: 'weekly_learning_challenges',
+  GAMES: 'games',
 };
 
 /**
@@ -871,6 +873,45 @@ export function subscribeChatTypingStatus(
     logFirestoreSyncIssue('Typing status attach', err);
     return () => {};
   }
+}
+
+export function subscribeMorpionGame(
+  onUpdate: (session: MorpionGameSession | null) => void,
+  onError?: (error: Error) => void
+) {
+  try {
+    const gameDocRef = doc(db, COLLECTIONS.GAMES, 'morpion_live');
+    return onSnapshot(
+      gameDocRef,
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate({ id: snap.id, ...snap.data() } as MorpionGameSession);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (err) => {
+        logFirestoreSyncIssue('Morpion game sync', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('Morpion game attach', err);
+    return () => {};
+  }
+}
+
+export async function saveMorpionGame(session: Partial<MorpionGameSession>): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const gameDocRef = doc(db, COLLECTIONS.GAMES, 'morpion_live');
+    const sanitized = sanitizeForFirestore({
+      ...session,
+      id: 'morpion_live',
+      lastUpdated: new Date().toISOString(),
+    });
+    await setDoc(gameDocRef, sanitized, { merge: true });
+    return true;
+  }, 'Save morpion game').then((res) => res !== null && res !== undefined);
 }
 
 export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };

@@ -230,9 +230,37 @@
         "isActive": { "type": "boolean" }
       },
       "required": ["id", "targetEnglish", "targetFrench", "pointsReward"]
+    },
+    "MorpionGameSession": {
+      "title": "MorpionGameSession",
+      "description": "Session synchronisée en temps réel du jeu Morpion des Gages Amoureux",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "board": { "type": "array" },
+        "currentTurn": { "type": "string" },
+        "p1Symbol": { "type": "string" },
+        "p2Symbol": { "type": "string" },
+        "winner": { "type": "string" },
+        "winningLine": { "type": "array" },
+        "p1Wins": { "type": "number" },
+        "p2Wins": { "type": "number" },
+        "ties": { "type": "number" },
+        "selectedPledge": { "type": "string" },
+        "pledgeFulfilled": { "type": "boolean" },
+        "lastMoveBy": { "type": "string" },
+        "lastMoveIndex": { "type": "number" },
+        "lastUpdated": { "type": "string" },
+        "rematchRequestedBy": { "type": "string" }
+      },
+      "required": ["id", "board", "currentTurn", "selectedPledge"]
     }
   },
   "firestore": {
+    "games": {
+      "schema": "MorpionGameSession",
+      "description": "Sessions de jeux synchronisées en direct entre les deux partenaires"
+    },
     "couple_profile": {
       "schema": "CoupleProfile",
       "description": "Profil et humeur du couple"

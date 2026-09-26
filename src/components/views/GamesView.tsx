@@ -341,13 +341,13 @@ export const GamesView: React.FC<GamesViewProps> = ({
     {
       id: 'tic_tac_toe',
       title: 'Morpion & Gages',
-      desc: 'Duel complice revisité avec gages romantiques & personnalisables',
+      desc: 'Duel complice en direct à deux avec gages romantiques & personnalisables',
       category: 'duo',
       categoryLabel: 'Défis & Duels',
-      tag: 'Duo 👥',
+      tag: 'En Direct ⚡',
       icon: <Grid3X3 className="w-5 h-5 text-rose-500" />,
       color: 'bg-rose-50/70 hover:bg-rose-100/80 border-rose-200/80',
-      badge: 'Gages 🌹',
+      badge: 'En Direct ⚡',
     },
     {
       id: 'puzzle',
