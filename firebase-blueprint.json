@@ -254,6 +254,52 @@
         "rematchRequestedBy": { "type": "string" }
       },
       "required": ["id", "board", "currentTurn", "selectedPledge"]
+    },
+    "WhoMostLikelySession": {
+      "title": "WhoMostLikelySession",
+      "description": "Session synchronisée du jeu Qui de nous deux",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "currentQuestionIndex": { "type": "number" },
+        "votes": { "type": "object" },
+        "revealed": { "type": "boolean" },
+        "scoreMatches": { "type": "number" },
+        "totalAnswered": { "type": "number" },
+        "customQuestions": { "type": "array" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["id", "currentQuestionIndex", "votes"]
+    },
+    "LoveRouletteSession": {
+      "title": "LoveRouletteSession",
+      "description": "Session synchronisée de la roulette des rencards et gages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "isSpinning": { "type": "boolean" },
+        "targetIndex": { "type": "number" },
+        "targetItem": { "type": "string" },
+        "category": { "type": "string" },
+        "spunBy": { "type": "string" },
+        "spinTimestamp": { "type": "number" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["id", "targetIndex", "targetItem", "spunBy"]
+    },
+    "LoveTouchSession": {
+      "title": "LoveTouchSession",
+      "description": "État du toucher connecté simultané entre partenaires",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "p1Touching": { "type": "boolean" },
+        "p2Touching": { "type": "boolean" },
+        "p1LastTouched": { "type": "string" },
+        "p2LastTouched": { "type": "string" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["id", "p1Touching", "p2Touching"]
     }
   },
   "firestore": {

@@ -21,6 +21,7 @@ import { ProfileModal } from './components/modals/ProfileModal';
 import { PinLockModal } from './components/modals/PinLockModal';
 import { PWAInstallModal } from './components/modals/PWAInstallModal';
 import { NotificationAlertModal } from './components/modals/NotificationAlertModal';
+import { LoveTouchModal } from './components/modals/LoveTouchModal';
 import { FloatingMessageAlert, FloatingAlertData } from './components/FloatingMessageAlert';
 import { soundEffects } from './lib/audio';
 import { triggerCelebrationConfetti } from './lib/confetti';
@@ -543,6 +544,7 @@ export default function App() {
   const [showAddBucketModal, setShowAddBucketModal] = useState(false);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showLoveTouchModal, setShowLoveTouchModal] = useState(false);
   const [isNotificationsActive, setIsNotificationsActive] = useState(false);
   const [floatingAlert, setFloatingAlert] = useState<FloatingAlertData | null>(null);
 
@@ -2628,6 +2630,7 @@ export default function App() {
           isNotificationsActive={isNotificationsActive}
           onRefresh={handleGlobalRefresh}
           isRefreshing={isGlobalRefreshing}
+          onOpenLoveTouch={() => setShowLoveTouchModal(true)}
         />
       )}
 
@@ -2702,6 +2705,8 @@ export default function App() {
                   setProfileFocusPartner(pId);
                   setShowProfileModal(true);
                 }}
+                onUpdateMood={(m) => handleUpdateMood(activePartnerId, m)}
+                onOpenLoveTouch={() => setShowLoveTouchModal(true)}
               />
             </div>
           )}
@@ -2974,6 +2979,14 @@ export default function App() {
             setShowNotificationModal(false);
             checkPushSubscription();
           }}
+          profile={profile}
+          activePartnerId={activePartnerId}
+        />
+
+        <LoveTouchModal
+          key="modal-love-touch"
+          isOpen={showLoveTouchModal}
+          onClose={() => setShowLoveTouchModal(false)}
           profile={profile}
           activePartnerId={activePartnerId}
         />

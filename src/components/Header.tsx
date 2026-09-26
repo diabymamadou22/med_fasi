@@ -35,6 +35,7 @@ interface HeaderProps {
   isNotificationsActive?: boolean;
   onRefresh?: () => Promise<void> | void;
   isRefreshing?: boolean;
+  onOpenLoveTouch?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({
@@ -53,6 +54,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   isNotificationsActive = false,
   onRefresh,
   isRefreshing = false,
+  onOpenLoveTouch,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pulseSending, setPulseSending] = useState<string | null>(null);
@@ -289,6 +291,26 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                       <X className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {/* Toucher Connecté Quick Launch */}
+                  {onOpenLoveTouch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        onOpenLoveTouch();
+                      }}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600 text-white font-bold text-xs shadow-xs hover:opacity-95 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Heart className="w-4 h-4 fill-white animate-pulse" />
+                        <span>Toucher Connecté en Direct</span>
+                      </div>
+                      <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-extrabold uppercase">
+                        À deux ✨
+                      </span>
+                    </button>
+                  )}
 
                   {/* Section 1: Active Partner Switcher */}
                   <div>

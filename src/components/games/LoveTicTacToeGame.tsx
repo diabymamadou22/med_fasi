@@ -424,45 +424,43 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
   };
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
-      {/* 1. Header Banner */}
-      <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600 rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="space-y-4 max-w-2xl mx-auto">
+      {/* 1. Header Banner Épuré */}
+      <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-xs relative overflow-hidden">
+        <div className="relative z-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Duel Amoureux & Gages Romantiques</span>
+            <div className="flex items-center gap-2">
+              <h2 className="font-serif-romantic text-xl sm:text-2xl font-bold tracking-tight">
+                Morpion & Gages
+              </h2>
               {gameMode === 'live' && (
-                <span className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full bg-emerald-400/90 text-stone-900 text-[10px] font-extrabold uppercase tracking-wide">
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-400 text-stone-900 text-[10px] font-extrabold uppercase tracking-wide">
                   <span className="w-1.5 h-1.5 rounded-full bg-stone-900 animate-pulse" />
                   En Direct
                 </span>
               )}
             </div>
-            <h2 className="font-serif-romantic text-2xl sm:text-3xl font-bold tracking-tight">
-              ⚔️ Le Morpion des Gages Amoureux
-            </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-xl">
-              Alignez 3 symboles d'amour ({p1Symbol} ou {p2Symbol}). Le vainqueur attribue un gage romantique au perdant !
+            <p className="text-white/90 text-xs mt-0.5">
+              Alignez 3 symboles complices pour remporter le gage
             </p>
           </div>
 
           {/* Mode Selector Dropdown / Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-black/20 p-1.5 rounded-2xl backdrop-blur-md">
+          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl backdrop-blur-md">
             <button
               onClick={() => {
                 setGameMode('live');
                 handleResetGame();
               }}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
                 gameMode === 'live'
-                  ? 'bg-white text-rose-600 shadow-xs scale-102'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
+                  ? 'bg-white text-rose-600 shadow-xs'
+                  : 'text-white/80 hover:text-white'
               }`}
-              title="Jouer en temps réel chacun sur son téléphone"
+              title="Jouer en temps réel en duo"
             >
-              <Radio className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-              <span>En Direct Duo</span>
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>En Direct</span>
             </button>
 
             <button
@@ -470,12 +468,12 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
                 setGameMode('local');
                 handleResetGame();
               }}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
                 gameMode === 'local'
-                  ? 'bg-white text-rose-600 shadow-xs scale-102'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
+                  ? 'bg-white text-rose-600 shadow-xs'
+                  : 'text-white/80 hover:text-white'
               }`}
-              title="Jouer sur le même téléphone côte à côte"
+              title="Jouer sur le même écran"
             >
               <Smartphone className="w-3.5 h-3.5" />
               <span>Même Écran</span>
@@ -486,15 +484,15 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
                 setGameMode('ai');
                 handleResetGame();
               }}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
                 gameMode === 'ai'
-                  ? 'bg-white text-rose-600 shadow-xs scale-102'
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
+                  ? 'bg-white text-rose-600 shadow-xs'
+                  : 'text-white/80 hover:text-white'
               }`}
-              title="S'entraîner contre l'IA Cupidon"
+              title="Jouer contre l'IA Cupidon"
             >
               <Bot className="w-3.5 h-3.5" />
-              <span>vs Cupidon IA</span>
+              <span>vs IA</span>
             </button>
           </div>
         </div>

@@ -365,3 +365,51 @@ export interface MorpionGameSession {
   p2Active?: boolean;
 }
 
+export interface WhoQuestion {
+  id: string;
+  text: string;
+  category: 'Quotidien' | 'Romance' | 'Fous rires' | 'Avenir' | 'Intime';
+  authorId?: PartnerId; // 'p1' | 'p2'
+  authorName?: string;
+  createdAt?: string;
+  isCustom?: boolean;
+  votes?: {
+    p1?: PartnerId;
+    p2?: PartnerId;
+  };
+}
+
+export interface WhoMostLikelySession {
+  id: string; // 'who_most_likely_live'
+  currentQuestionIndex: number;
+  votes: {
+    p1?: PartnerId;
+    p2?: PartnerId;
+  };
+  revealed: boolean;
+  scoreMatches: number;
+  totalAnswered: number;
+  lastUpdated: string;
+  customQuestions?: WhoQuestion[];
+}
+
+export interface LoveRouletteSession {
+  id: string; // 'love_roulette_live'
+  isSpinning: boolean;
+  targetIndex: number;
+  targetItem: string;
+  category: 'dates' | 'pledges' | 'sweet';
+  spunBy: PartnerId;
+  spinTimestamp: number;
+  lastUpdated: string;
+}
+
+export interface LoveTouchSession {
+  id: string; // 'love_touch_live'
+  p1Touching: boolean;
+  p2Touching: boolean;
+  p1LastTouched?: string;
+  p2LastTouched?: string;
+  lastUpdated: string;
+}
+

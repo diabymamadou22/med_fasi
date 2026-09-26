@@ -24,6 +24,7 @@ import {
   Trophy,
   X,
   Filter,
+  RotateCw,
 } from 'lucide-react';
 import {
   CoupleProfile,
@@ -50,6 +51,7 @@ import { LoveVoiceChallengeGame } from './games/LoveVoiceChallengeGame';
 import { RomanticMadLibsGame } from './games/RomanticMadLibsGame';
 import { SecretDateMissionsGame } from './games/SecretDateMissionsGame';
 import { LoveTicTacToeGame } from '../games/LoveTicTacToeGame';
+import { LoveRouletteGame } from '../games/LoveRouletteGame';
 import { CompatibilityQuizGame } from '../games/CompatibilityQuizGame';
 import { WhoMostLikelyGame } from '../games/WhoMostLikelyGame';
 import { WouldYouRatherGame } from '../games/WouldYouRatherGame';
@@ -60,6 +62,7 @@ import { INITIAL_WEEKLY_LEARNING_CHALLENGES } from '../../data/initialWeeklyChal
 import { useBackHandler } from '../../lib/backNavigation';
 
 export type EnglishGameTab =
+  | 'roulette'
   | 'wordle'
   | 'speed_match'
   | 'voice_coach'
@@ -335,13 +338,13 @@ export const GamesView: React.FC<GamesViewProps> = ({
   // Handle hardware / gesture back button to return to games catalog
   useBackHandler(Boolean(resolvedTab), () => setActiveTab(null), 'game-detail-view');
 
-  // Curated catalog of 18 romantic couple games & activities
+  // Curated catalog of romantic couple games & activities (punchy, clean, no long text)
   const gameCards: GameCardDef[] = [
     // 1. Défis & Duels
     {
       id: 'tic_tac_toe',
       title: 'Morpion & Gages',
-      desc: 'Duel complice en direct à deux avec gages romantiques & personnalisables',
+      desc: 'Alignez 3 cœurs & donnez des gages',
       category: 'duo',
       categoryLabel: 'Défis & Duels',
       tag: 'En Direct ⚡',
@@ -350,55 +353,63 @@ export const GamesView: React.FC<GamesViewProps> = ({
       badge: 'En Direct ⚡',
     },
     {
+      id: 'roulette',
+      title: 'Roulette Romantique',
+      desc: 'Tournez la roue du destin complice',
+      category: 'duo',
+      categoryLabel: 'Défis & Duels',
+      tag: 'En Direct ⚡',
+      icon: <RotateCw className="w-5 h-5 text-pink-500" />,
+      color: 'bg-pink-50/70 hover:bg-pink-100/80 border-pink-200/80',
+      badge: 'En Direct ⚡',
+    },
+    {
       id: 'puzzle',
       title: 'Puzzle Romantique',
-      desc: 'Reconstituez vos photos souvenirs pour déverrouiller un mot secret',
+      desc: 'Reconstituez vos photos souvenirs',
       category: 'duo',
       categoryLabel: 'Défis & Duels',
       tag: 'Photos 📷',
       icon: <Puzzle className="w-5 h-5 text-purple-500" />,
       color: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80',
-      badge: 'Souvenirs ✨',
     },
     {
       id: 'sixty_seconds',
       title: '60s Mots Doux',
-      desc: 'Écrivez le maximum de compliments et qualités en 1 minute chrono',
+      desc: 'Compliments tendres en 1 minute',
       category: 'duo',
       categoryLabel: 'Défis & Duels',
-      tag: 'Chrono ⏱️',
+      tag: 'Express ⏱️',
       icon: <Timer className="w-5 h-5 text-emerald-500" />,
       color: 'bg-emerald-50/70 hover:bg-emerald-100/80 border-emerald-200/80',
-      badge: 'Express ⚡',
     },
 
     // 2. Flirt & Intimité
     {
-      id: 'cards',
-      title: 'Cartes Intimes & Flirt',
-      desc: 'Questions intimes et confessions pour se redécouvrir et frissonner',
-      category: 'flirt',
-      categoryLabel: 'Flirt & Intimité',
-      tag: 'Intimité 💬',
-      icon: <Sparkles className="w-5 h-5 text-purple-500" />,
-      color: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80',
-      badge: 'Complicité ✨',
-    },
-    {
       id: 'who_most_likely',
       title: 'Qui de Nous Deux ?',
-      desc: 'Votez chacun et découvrez vos perceptions réciproques en temps réel',
+      desc: 'Votez et personnalisez vos questions',
       category: 'flirt',
       categoryLabel: 'Flirt & Intimité',
-      tag: 'Votes 🔮',
+      tag: 'En Direct ⚡',
       icon: <Users className="w-5 h-5 text-blue-500" />,
       color: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80',
-      badge: 'Duo 👥',
+      badge: 'Personnalisable ✍️',
+    },
+    {
+      id: 'cards',
+      title: 'Cartes Intimes',
+      desc: 'Questions & confessions douces',
+      category: 'flirt',
+      categoryLabel: 'Flirt & Intimité',
+      tag: 'Flirt 💬',
+      icon: <Sparkles className="w-5 h-5 text-purple-500" />,
+      color: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80',
     },
     {
       id: 'would_you_rather',
       title: 'Tu Préfères... ?',
-      desc: 'Dilemmes romantiques, fous rires et aventures à deux à débattre',
+      desc: 'Dilemmes complices & fous rires',
       category: 'flirt',
       categoryLabel: 'Flirt & Intimité',
       tag: 'Dilemmes 🤔',
@@ -408,18 +419,17 @@ export const GamesView: React.FC<GamesViewProps> = ({
     {
       id: 'affinity_quiz',
       title: 'Quiz de Connivence',
-      desc: 'Testez à quel point vous connaissez les secrets et goûts de l’autre',
+      desc: 'Testez votre complicité à deux',
       category: 'flirt',
       categoryLabel: 'Flirt & Intimité',
       tag: 'Score 🏆',
       icon: <Heart className="w-5 h-5 text-rose-500" />,
       color: 'bg-rose-50/70 hover:bg-rose-100/80 border-rose-200/80',
-      badge: 'Affinité 💖',
     },
     {
       id: 'roleplay',
-      title: 'Jeux de Rôles Amoureux',
-      desc: 'Scénarios amusants, premier date improvisé et flirts à réinventer',
+      title: 'Jeux de Rôles',
+      desc: 'Scénarios amusants à improviser',
       category: 'flirt',
       categoryLabel: 'Flirt & Intimité',
       tag: 'Impro 🎭',
@@ -431,29 +441,27 @@ export const GamesView: React.FC<GamesViewProps> = ({
     {
       id: 'wordle',
       title: 'Love Wordle',
-      desc: 'Devinez le mot doux secret en anglais en 6 essais avec indices',
+      desc: 'Devinez le mot doux en 6 essais',
       category: 'bilingual',
       categoryLabel: 'Bilingue & Mots',
       tag: 'Lettres 🔤',
       icon: <Heart className="w-5 h-5 text-pink-500" />,
       color: 'bg-pink-50/70 hover:bg-pink-100/80 border-pink-200/80',
-      badge: 'Anglais 🇬🇧',
     },
     {
       id: 'speed_match',
-      title: 'Speed Match Romance',
-      desc: 'Reliez le maximum de paires anglais-français sous tension bienveillante',
+      title: 'Speed Match',
+      desc: 'Associez les paires d’amour',
       category: 'bilingual',
       categoryLabel: 'Bilingue & Mots',
       tag: 'Mémoire ⚡',
       icon: <Zap className="w-5 h-5 text-amber-500" />,
       color: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80',
-      badge: '60s ⏱️',
     },
     {
       id: 'voice_coach',
-      title: 'Coach Vocal Romantique',
-      desc: 'Entraînez-vous à prononcer et murmurer les plus beaux mots doux en anglais',
+      title: 'Coach Vocal',
+      desc: 'Murmurez vos mots complices',
       category: 'bilingual',
       categoryLabel: 'Bilingue & Mots',
       tag: 'Audio 🎙️',
@@ -463,7 +471,7 @@ export const GamesView: React.FC<GamesViewProps> = ({
     {
       id: 'trivia',
       title: 'Blind Test Audio',
-      desc: 'Écoutez les phrases prononcées et devinez les expressions manquantes',
+      desc: 'Écoutez et retrouvez la réplique',
       category: 'bilingual',
       categoryLabel: 'Bilingue & Mots',
       tag: 'Écoute 🎧',
@@ -472,8 +480,8 @@ export const GamesView: React.FC<GamesViewProps> = ({
     },
     {
       id: 'mad_libs',
-      title: 'Mad Libs Romantiques',
-      desc: 'Complétez les blancs pour créer une histoire drôle ou enflammée à deux',
+      title: 'Mad Libs Amoureux',
+      desc: 'Histoires drôles à inventer',
       category: 'bilingual',
       categoryLabel: 'Bilingue & Mots',
       tag: 'Créatif ✍️',
@@ -482,8 +490,8 @@ export const GamesView: React.FC<GamesViewProps> = ({
     },
     {
       id: 'vault',
-      title: 'Notre Lexique & Mots Doux',
-      desc: `${effectiveLexicon.length} mots et expressions sauvegardés dans votre coffre complice`,
+      title: 'Lexique Complice',
+      desc: `${effectiveLexicon.length} mots doux enregistrés`,
       category: 'bilingual',
       categoryLabel: 'Bilingue & Mots',
       tag: 'Coffre 💎',
@@ -494,19 +502,18 @@ export const GamesView: React.FC<GamesViewProps> = ({
     // 4. Récompenses & Missions
     {
       id: 'vouchers',
-      title: "Bons d'Amour Privilège",
-      desc: 'Bons massage, petit-déjeuner au lit ou joker soirée à échanger entre vous',
+      title: 'Bons Privilège',
+      desc: 'Massages, câlins & jokers à offrir',
       category: 'rewards',
       categoryLabel: 'Récompenses',
       tag: 'Bons 🎁',
       icon: <Gift className="w-5 h-5 text-rose-500" />,
       color: 'bg-rose-50/70 hover:bg-rose-100/80 border-rose-200/80',
-      badge: 'Cadeaux 💝',
     },
     {
       id: 'date_missions',
-      title: 'Missions Date Secrètes',
-      desc: 'Missions coquines et romantiques à accomplir discrètement lors de vos sorties',
+      title: 'Missions Secrètes',
+      desc: 'Petits défis pour vos sorties',
       category: 'rewards',
       categoryLabel: 'Récompenses',
       tag: 'Missions 🎯',
@@ -515,8 +522,8 @@ export const GamesView: React.FC<GamesViewProps> = ({
     },
     {
       id: 'weekly_challenges',
-      title: 'Défis Complices de la Semaine',
-      desc: 'Petits rituels et phrases tendres à glisser dans vos conversations quotidiennes',
+      title: 'Défis Hebdo',
+      desc: 'Rituels complices du quotidien',
       category: 'rewards',
       categoryLabel: 'Récompenses',
       tag: 'Hebdo 🔥',
@@ -527,9 +534,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
 
   const categories: { id: GameCategory; label: string; icon: string; count: number }[] = [
     { id: 'all', label: 'Tous', icon: '🌟', count: gameCards.length },
-    { id: 'duo', label: 'Défis & Duels', icon: '🎲', count: gameCards.filter((g) => g.category === 'duo').length },
+    { id: 'duo', label: 'Duels & Gages', icon: '🎲', count: gameCards.filter((g) => g.category === 'duo').length },
     { id: 'flirt', label: 'Flirt & Intimité', icon: '💖', count: gameCards.filter((g) => g.category === 'flirt').length },
-    { id: 'bilingual', label: 'Bilingue & Mots', icon: '🇬🇧', count: gameCards.filter((g) => g.category === 'bilingual').length },
+    { id: 'bilingual', label: 'Mots Doux', icon: '🇬🇧', count: gameCards.filter((g) => g.category === 'bilingual').length },
     { id: 'rewards', label: 'Récompenses', icon: '🎁', count: gameCards.filter((g) => g.category === 'rewards').length },
   ];
 
@@ -587,132 +594,106 @@ export const GamesView: React.FC<GamesViewProps> = ({
       </AnimatePresence>
 
       {/* 1. Header Minimal & Réactif */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-4 sm:p-5 shadow-xs flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          {resolvedTab ? (
+      {resolvedTab ? (
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3 sm:p-4 shadow-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={() => {
                 soundEffects.playSoftTap();
                 setActiveTab(null);
               }}
-              className="p-2 -ml-1 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors flex items-center justify-center cursor-pointer"
-              title="Retour au menu des jeux"
+              className="p-2 -ml-0.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+              title="Retour aux jeux"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-          ) : (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-xs">
-              <Gamepad2 className="w-5 h-5" />
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold text-stone-900 font-serif-romantic tracking-tight truncate flex items-center gap-1.5">
+                <span>{currentGameDef?.title}</span>
+                {currentGameDef?.badge && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shrink-0">
+                    {currentGameDef.badge}
+                  </span>
+                )}
+              </h1>
+              <p className="text-xs text-stone-500 truncate">
+                {currentGameDef?.desc}
+              </p>
             </div>
-          )}
-
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-stone-900 font-serif-romantic tracking-tight flex items-center gap-2">
-              <span>{resolvedTab && currentGameDef ? currentGameDef.title : 'Jeux & Flirt à Deux'}</span>
-              {resolvedTab && currentGameDef?.badge && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white">
-                  {currentGameDef.badge}
-                </span>
-              )}
-            </h1>
-            <p className="text-xs text-stone-500">
-              {resolvedTab && currentGameDef
-                ? currentGameDef.desc
-                : `${coupleLevel.title} • ${xpPoints} XP`}
-            </p>
           </div>
-        </div>
 
-        {/* Action à droite */}
-        <div className="flex items-center gap-2">
-          {resolvedTab ? (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleRandomSurpriseGame}
-                disabled={isSurpriseRolling}
-                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-rose-200"
-                title="Lancer un autre jeu au hasard"
-              >
-                <Dices className={`w-3.5 h-3.5 ${isSurpriseRolling ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Autre jeu</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundEffects.playSoftTap();
-                  setActiveTab(null);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Tous les jeux
-              </button>
-            </div>
-          ) : (
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleRandomSurpriseGame}
               disabled={isSurpriseRolling}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-rose-200"
+              title="Autre jeu au hasard"
             >
               <Dices className={`w-3.5 h-3.5 ${isSurpriseRolling ? 'animate-spin' : ''}`} />
-              <span>Jeu Surprise !</span>
+              <span className="hidden sm:inline">Autre jeu</span>
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setActiveTab(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Tous les jeux
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* 2. Menu Enrichi : Progression Complicité, Filtres & Recherche (Quand aucun jeu n'est ouvert) */}
-      {!resolvedTab ? (
-        <div className="space-y-4">
-          {/* Card de Progression XP & Complicité */}
-          <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden">
-            <div className="relative z-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-                  <span>Niveau {coupleLevel.level} • {coupleLevel.title}</span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold font-serif-romantic tracking-tight">
-                  18 Expériences & Jeux pour Méd & Safi
-                </h2>
-                <p className="text-xs sm:text-sm text-white/90 max-w-lg">
-                  Relevez des défis, gagnez des points d’affinité et alimentez la flamme de votre couple au quotidien.
-                </p>
+      ) : (
+        /* Header Catalogue Jeux Unique & Épuré */
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+              <Gamepad2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-stone-900 font-serif-romantic tracking-tight truncate">
+                  Jeux & Flirt à Deux
+                </h1>
+                <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold shrink-0">
+                  {coupleLevel.title}
+                </span>
               </div>
-
-              {/* XP Gauge Card */}
-              <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl p-3.5 min-w-[190px] w-full sm:w-auto shrink-0 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold flex items-center gap-1">
-                    <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-                    <span>{xpPoints} XP</span>
-                  </span>
-                  <span className="text-[11px] text-white/80">
-                    Objectif : {coupleLevel.nextGoal} XP
-                  </span>
-                </div>
-                {/* Progress Bar */}
-                <div className="w-full h-2 rounded-full bg-white/20 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${levelProgress}%` }}
-                    transition={{ duration: 0.8 }}
-                    className="h-full rounded-full bg-gradient-to-r from-amber-300 to-white"
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[11px] font-bold text-stone-500 shrink-0">
+                  {xpPoints} XP
+                </span>
+                <div className="w-24 sm:w-32 h-1.5 rounded-full bg-stone-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-500"
+                    style={{ width: `${levelProgress}%` }}
                   />
                 </div>
-                <p className="text-[10px] text-white/80 text-center font-medium">
-                  {levelProgress}% vers le niveau supérieur !
-                </p>
               </div>
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={handleRandomSurpriseGame}
+            disabled={isSurpriseRolling}
+            className="px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shrink-0"
+          >
+            <Dices className={`w-3.5 h-3.5 ${isSurpriseRolling ? 'animate-spin' : ''}`} />
+            <span>Jeu Surprise !</span>
+          </button>
+        </div>
+      )}
+
+      {/* 2. Menu Enrichi : Filtres & Recherche (Quand aucun jeu n'est ouvert) */}
+      {!resolvedTab ? (
+        <div className="space-y-3">
           {/* Barre de Recherche & Filtres de Catégories */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-3 sm:p-4 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-2.5 sm:p-3 shadow-xs space-y-2.5">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
               {/* Filter Tabs */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 {categories.map((cat) => (
@@ -743,31 +724,31 @@ export const GamesView: React.FC<GamesViewProps> = ({
               </div>
 
               {/* Search Bar */}
-              <div className="relative min-w-[200px] shrink-0">
-                <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="relative min-w-[180px] shrink-0">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Rechercher un jeu..."
-                  className="w-full pl-9 pr-8 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
+                  className="w-full pl-8 pr-7 py-1.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-rose-400 focus:bg-white transition-all"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Grille des Cartes de Jeux */}
+          {/* Grille des Cartes de Jeux Épurées */}
           {filteredGameCards.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {filteredGameCards.map((game) => (
                 <button
                   key={game.id}
@@ -776,15 +757,15 @@ export const GamesView: React.FC<GamesViewProps> = ({
                     soundEffects.playNoteClick();
                     setActiveTab(game.id);
                   }}
-                  className={`p-4 sm:p-5 rounded-2xl border text-left transition-all active:scale-[0.99] hover:shadow-xs flex items-center justify-between gap-3.5 cursor-pointer ${game.color}`}
+                  className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all active:scale-[0.99] hover:shadow-xs flex items-center justify-between gap-3 cursor-pointer ${game.color}`}
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-12 h-12 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center shrink-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-white shadow-2xs border border-white/80 flex items-center justify-center shrink-0">
                       {game.icon}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-white/70 text-stone-600 border border-stone-200/50">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/80 text-stone-600">
                           {game.tag}
                         </span>
                         {game.badge && (
@@ -793,24 +774,24 @@ export const GamesView: React.FC<GamesViewProps> = ({
                           </span>
                         )}
                       </div>
-                      <h3 className="text-base font-bold text-stone-900 font-serif-romantic tracking-tight mt-1 truncate">
+                      <h3 className="text-sm sm:text-base font-bold text-stone-900 font-serif-romantic tracking-tight mt-0.5 truncate">
                         {game.title}
                       </h3>
-                      <p className="text-xs text-stone-600 mt-0.5 leading-snug line-clamp-2">
+                      <p className="text-xs text-stone-500 mt-0.5 truncate">
                         {game.desc}
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-stone-400 shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-stone-400 shrink-0" />
                 </button>
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-3xl p-10 text-center border border-stone-200 space-y-3">
-              <p className="text-3xl">🔍</p>
-              <h4 className="font-bold text-stone-800 text-sm">Aucun jeu ne correspond à votre recherche</h4>
-              <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                Essayez d'autres mots-clés ou réinitialisez les filtres pour afficher l'ensemble des jeux.
+            <div className="bg-white rounded-3xl p-8 text-center border border-stone-200 space-y-2">
+              <p className="text-2xl">🔍</p>
+              <h4 className="font-bold text-stone-800 text-sm">Aucun jeu trouvé</h4>
+              <p className="text-xs text-stone-500 max-w-xs mx-auto">
+                Réinitialisez les filtres pour afficher l'ensemble des jeux.
               </p>
               <button
                 type="button"
@@ -818,9 +799,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
                   setSearchQuery('');
                   setSelectedCategory('all');
                 }}
-                className="px-4 py-2 bg-stone-100 hover:bg-stone-200 rounded-xl text-xs font-bold text-stone-700"
+                className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-xl text-xs font-bold text-stone-700"
               >
-                Réinitialiser les filtres
+                Réinitialiser
               </button>
             </div>
           )}
@@ -938,6 +919,14 @@ export const GamesView: React.FC<GamesViewProps> = ({
 
           {resolvedTab === 'tic_tac_toe' && (
             <LoveTicTacToeGame
+              profile={profile}
+              activePartnerId={activePartnerId}
+              onSendChatMessage={onSendChatMessage}
+            />
+          )}
+
+          {resolvedTab === 'roulette' && (
+            <LoveRouletteGame
               profile={profile}
               activePartnerId={activePartnerId}
               onSendChatMessage={onSendChatMessage}

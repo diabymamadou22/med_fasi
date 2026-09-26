@@ -29,6 +29,10 @@ import {
   EnglishLexiconItem,
   WeeklyLearningChallenge,
   MorpionGameSession,
+  WhoMostLikelySession,
+  LoveRouletteSession,
+  LoveTouchSession,
+  PartnerId,
 } from '../types';
 import {
   sortChatMessagesChronologically,
@@ -912,6 +916,139 @@ export async function saveMorpionGame(session: Partial<MorpionGameSession>): Pro
     await setDoc(gameDocRef, sanitized, { merge: true });
     return true;
   }, 'Save morpion game').then((res) => res !== null && res !== undefined);
+}
+
+// -------------------------------------------------------------
+// WHO MOST LIKELY (QUI DE NOUS DEUX ?) LIVE DUO SYNCHRONISATION
+// -------------------------------------------------------------
+export function subscribeWhoMostLikely(
+  onUpdate: (session: WhoMostLikelySession | null) => void,
+  onError?: (error: Error) => void
+) {
+  try {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'who_most_likely_live');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate({ id: snap.id, ...snap.data() } as WhoMostLikelySession);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (err) => {
+        logFirestoreSyncIssue('WhoMostLikely sync', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('WhoMostLikely attach', err);
+    return () => {};
+  }
+}
+
+export async function saveWhoMostLikely(session: Partial<WhoMostLikelySession>): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'who_most_likely_live');
+    const sanitized = sanitizeForFirestore({
+      ...session,
+      id: 'who_most_likely_live',
+      lastUpdated: new Date().toISOString(),
+    });
+    await setDoc(docRef, sanitized, { merge: true });
+    return true;
+  }, 'Save WhoMostLikely game').then((res) => res !== null && res !== undefined);
+}
+
+// -------------------------------------------------------------
+// LOVE ROULETTE (ROULETTE MAGIQUE DES RENDEZ-VOUS & GAGES) LIVE
+// -------------------------------------------------------------
+export function subscribeLoveRoulette(
+  onUpdate: (session: LoveRouletteSession | null) => void,
+  onError?: (error: Error) => void
+) {
+  try {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'love_roulette_live');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate({ id: snap.id, ...snap.data() } as LoveRouletteSession);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (err) => {
+        logFirestoreSyncIssue('LoveRoulette sync', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('LoveRoulette attach', err);
+    return () => {};
+  }
+}
+
+export async function saveLoveRoulette(session: Partial<LoveRouletteSession>): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'love_roulette_live');
+    const sanitized = sanitizeForFirestore({
+      ...session,
+      id: 'love_roulette_live',
+      lastUpdated: new Date().toISOString(),
+    });
+    await setDoc(docRef, sanitized, { merge: true });
+    return true;
+  }, 'Save LoveRoulette spin').then((res) => res !== null && res !== undefined);
+}
+
+// -------------------------------------------------------------
+// LOVE TOUCH (TOUCHER CONNECTÉ SIMULTANÉ À DEUX) LIVE
+// -------------------------------------------------------------
+export function subscribeLoveTouch(
+  onUpdate: (session: LoveTouchSession | null) => void,
+  onError?: (error: Error) => void
+) {
+  try {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'love_touch_live');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate({ id: snap.id, ...snap.data() } as LoveTouchSession);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (err) => {
+        logFirestoreSyncIssue('LoveTouch sync', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('LoveTouch attach', err);
+    return () => {};
+  }
+}
+
+export async function setLoveTouchStatus(partnerId: PartnerId, isTouching: boolean): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'love_touch_live');
+    const nowIso = new Date().toISOString();
+    const updateData: Partial<LoveTouchSession> = {
+      id: 'love_touch_live',
+      lastUpdated: nowIso,
+    };
+    if (partnerId === 'p1') {
+      updateData.p1Touching = isTouching;
+      if (isTouching) updateData.p1LastTouched = nowIso;
+    } else {
+      updateData.p2Touching = isTouching;
+      if (isTouching) updateData.p2LastTouched = nowIso;
+    }
+    await setDoc(docRef, sanitizeForFirestore(updateData), { merge: true });
+    return true;
+  }, 'Set LoveTouch status').then((res) => res !== null && res !== undefined);
 }
 
 export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };

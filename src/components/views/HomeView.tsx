@@ -20,6 +20,7 @@ import {
 } from '../../types';
 import { PartnerAvatar } from '../PartnerAvatar';
 import { EnglishGameTab } from './GamesView';
+import { LoveMoodWidget } from '../home/LoveMoodWidget';
 
 interface HomeViewProps {
   profile: CoupleProfile;
@@ -33,6 +34,13 @@ interface HomeViewProps {
   messages?: ChatMessage[];
   memories?: TimelineMemory[];
   onOpenProfileModal?: (partnerId?: PartnerId) => void;
+  onUpdateMood?: (newMood: {
+    status: string;
+    need: string;
+    energy: number;
+    note?: string;
+  }) => void;
+  onOpenLoveTouch?: () => void;
 }
 
 // Citations d'amour poétiques et littéraires
@@ -68,9 +76,12 @@ export const HomeView: React.FC<HomeViewProps> = React.memo(({
   activePartnerId,
   onSwitchPartner,
   onNavigateToTab,
+  onSendMissYou,
   messages = [],
   memories = [],
   onOpenProfileModal,
+  onUpdateMood,
+  onOpenLoveTouch,
 }) => {
   const currentPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
   const otherPartner = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
@@ -255,6 +266,19 @@ export const HomeView: React.FC<HomeViewProps> = React.memo(({
           )}
         </div>
       </motion.section>
+
+      {/* ========================================================
+          1.5. MÉTÉO DU CŒUR & HUMEURS EN DIRECT DU COUPLE
+         ======================================================== */}
+      {onUpdateMood && (
+        <LoveMoodWidget
+          profile={profile}
+          activePartnerId={activePartnerId}
+          onUpdateMood={onUpdateMood}
+          onSendQuickVibe={onSendMissYou}
+          onOpenLoveTouch={onOpenLoveTouch}
+        />
+      )}
 
       {/* ========================================================
           2. ESPACES DU COUPLE (CARTE CHAT & ACCÈS DIRECTS ÉLÉGANTS)
