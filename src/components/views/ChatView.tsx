@@ -889,16 +889,56 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
   }, [messages, otherPartnerId]);
 
+  // Scroll strictly within chatContainerRef to avoid causing window scroll drift on mobile Safari / iPhone
+  const scrollToBottom = (smooth = true) => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+    }
+  };
+
   // Auto-scroll on new messages & initial mount (WhatsApp behavior)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom(true);
   }, [messages.length, isOtherPartnerTyping]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      scrollToBottom(false);
+      if (typeof window !== 'undefined' && window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
     }, 60);
     return () => clearTimeout(t);
+  }, []);
+
+  // Lock window scroll on mobile/iPhone so the chat header is always pinned and never disappears
+  useEffect(() => {
+    const resetWindowScroll = () => {
+      if (typeof window !== 'undefined' && window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+
+    window.addEventListener('scroll', resetWindowScroll, { passive: true });
+
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (vv) {
+      vv.addEventListener('resize', resetWindowScroll);
+      vv.addEventListener('scroll', resetWindowScroll);
+    }
+
+    resetWindowScroll();
+
+    return () => {
+      window.removeEventListener('scroll', resetWindowScroll);
+      if (vv) {
+        vv.removeEventListener('resize', resetWindowScroll);
+        vv.removeEventListener('scroll', resetWindowScroll);
+      }
+    };
   }, []);
 
   // Spawn heart burst animation
@@ -1697,7 +1737,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`px-3 sm:px-4 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] flex items-center justify-between border-b shadow-md z-20 shrink-0 ${
+            className={`sticky top-0 z-30 px-3 sm:px-4 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] flex items-center justify-between border-b shadow-md shrink-0 ${
               chatTheme === 'velvet-night'
                 ? 'bg-slate-900 border-rose-900/60 text-white'
                 : 'bg-gradient-to-r from-rose-600 via-rose-500 to-pink-600 border-rose-600 text-white shadow-rose-200/50'
@@ -1781,7 +1821,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             </div>
           </motion.div>
         ) : (
-          <div className={`${themeStyles.headerBg} px-3 sm:px-4 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] flex items-center justify-between border-b shadow-2xs z-20 shrink-0 transition-colors duration-300`}>
+          <div className={`sticky top-0 z-30 ${themeStyles.headerBg} px-3 sm:px-4 py-2.5 pt-[max(0.65rem,env(safe-area-inset-top,0px))] pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-[max(0.75rem,env(safe-area-inset-right,0px))] flex items-center justify-between border-b shadow-2xs shrink-0 transition-colors duration-300`}>
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Back Button (Phone & Fullscreen UI - returns to Journal/other tabs) */}
             {onBack && (
@@ -2577,17 +2617,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
               /* Warm Couple Welcome State */
               <div className="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto select-none max-w-md mx-auto">
                 <div className="relative mb-4 flex items-center justify-center">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-md ring-2 ring-rose-400 -mr-2.5 z-10 bg-rose-100 flex items-center justify-center font-bold text-rose-700 text-base">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-md ring-2 ring-rose-400 -mr-2 z-10 bg-rose-100 flex items-center justify-center font-bold text-rose-700 text-base">
                     {profile.partner1.avatarUrl ? (
                       <img src={profile.partner1.avatarUrl} alt={profile.partner1.name} className="w-full h-full object-cover" />
                     ) : (
                       profile.partner1.name.slice(0, 2).toUpperCase()
                     )}
                   </div>
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-500 text-white shadow-lg flex items-center justify-center text-sm z-20 animate-pulse border-2 border-white dark:border-slate-900">
-                    ❤️
-                  </div>
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-md ring-2 ring-pink-400 -ml-2.5 z-10 bg-pink-100 flex items-center justify-center font-bold text-pink-700 text-base">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-md ring-2 ring-pink-400 -ml-2 z-10 bg-pink-100 flex items-center justify-center font-bold text-pink-700 text-base">
                     {profile.partner2.avatarUrl ? (
                       <img src={profile.partner2.avatarUrl} alt={profile.partner2.name} className="w-full h-full object-cover" />
                     ) : (
@@ -2597,7 +2634,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 </div>
 
                 <h3 className="text-lg font-bold font-serif-romantic text-stone-900 dark:text-stone-100">
-                  Votre salon d'amoureux secret 💕
+                  Votre salon d'amoureux secret
                 </h3>
                 <p className="text-xs text-stone-500 dark:text-slate-400 mt-1.5 leading-relaxed max-w-sm">
                   {profile.partner1.name} & {profile.partner2.name}, cet espace intime est le vôtre. Tous vos mots doux, photos, vocaux et frissons sont synchronisés en temps réel.
@@ -3095,7 +3132,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           {/* Floating Scroll to Bottom Button */}
           {showScrollBottom && (
             <button
-              onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => scrollToBottom(true)}
               className={`absolute bottom-4 right-5 p-2.5 rounded-full shadow-lg border transition-all hover:scale-105 z-20 cursor-pointer ${
                 chatTheme === 'velvet-night'
                   ? 'bg-slate-800 text-slate-200 hover:text-rose-400 border-slate-700'
@@ -3474,6 +3511,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     setShowEmojiPicker(false);
                     setShowStickerPicker(false);
                     setShowAttachmentMenu(false);
+                    setTimeout(() => {
+                      if (typeof window !== 'undefined' && window.scrollY !== 0) {
+                        window.scrollTo(0, 0);
+                      }
+                      scrollToBottom(true);
+                    }, 120);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {

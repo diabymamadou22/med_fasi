@@ -162,9 +162,6 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 </span>
               </div>
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-rose-500 rounded-full flex items-center justify-center text-[8px] text-white shadow-2xs">
-              ❤️
-            </span>
           </div>
 
           <div className="min-w-0 flex flex-col justify-center">

@@ -2579,8 +2579,10 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen min-h-[100dvh] bg-[#FAF7F5] flex flex-col justify-between selection:bg-rose-200 ${
-        activeTab === 'chat' ? 'h-screen h-[100dvh] max-h-[100dvh] overflow-hidden no-scrollbar' : ''
+      className={`min-h-screen min-h-[100dvh] bg-[#FAF7F5] flex flex-col selection:bg-rose-200 ${
+        activeTab === 'chat'
+          ? 'h-screen h-[100dvh] max-h-[100dvh] overflow-hidden no-scrollbar justify-start'
+          : 'justify-between'
       }`}
     >
       {/* Floating real-time message alert if user is in another tab */}
@@ -2653,7 +2655,7 @@ export default function App() {
           }`}
         >
           {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden animate-fade-in">
+            <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden animate-fade-in fixed inset-0 sm:relative sm:inset-auto z-30 sm:z-auto bg-[#FAF7F5]">
               <ChatView
                 profile={profile}
                 activePartnerId={activePartnerId}
