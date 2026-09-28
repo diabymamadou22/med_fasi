@@ -1,7 +1,9 @@
 import express from "express";
+import http from "http";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
+import WebSocket, { WebSocketServer } from "ws";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import webpush from "web-push";
@@ -312,14 +314,62 @@ setInterval(() => {
   syncServerChatWithFirestore().catch(() => {});
 }, 60000);
 
-// Server-Sent Events (SSE) pour communication instantanée sans latence
+// ==========================================
+// REAL-TIME WEBSOCKETS & SSE MULTI-CHANNEL
+// ==========================================
+
+interface WsClientRecord {
+  id: string;
+  partnerId: string;
+  ws: WebSocket;
+  isAlive: boolean;
+}
+
+let wsClients: WsClientRecord[] = [];
+
+// Ping heartbeat WebSocket toutes les 20 secondes pour préserver la connexion mobile/PWA
+setInterval(() => {
+  wsClients = wsClients.filter((client) => {
+    if (!client.isAlive) {
+      try {
+        client.ws.terminate();
+      } catch {}
+      return false;
+    }
+    client.isAlive = false;
+    try {
+      client.ws.ping();
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}, 20000);
+
+function broadcastWs(data: any, excludeWs?: WebSocket) {
+  const payload = JSON.stringify(data);
+  wsClients.forEach((client) => {
+    if (client.ws !== excludeWs && client.ws.readyState === WebSocket.OPEN) {
+      try {
+        client.ws.send(payload);
+      } catch (err) {
+        console.warn("[WS Broadcast Error]:", err);
+      }
+    }
+  });
+}
+
+// Server-Sent Events (SSE) avec auto-flush pour compatibilité proxies & iframes
 let sseClients: { id: string; partnerId: string; res: express.Response }[] = [];
 
-// Heartbeat keep-alive toutes les 15 secondes pour maintenir ouvertes les connexions mobiles et proxies
+// Heartbeat keep-alive toutes les 15 secondes
 setInterval(() => {
   sseClients = sseClients.filter((client) => {
     try {
       client.res.write(": keepalive\n\n");
+      if (typeof (client.res as any).flush === "function") {
+        (client.res as any).flush();
+      }
       return true;
     } catch {
       return false;
@@ -327,11 +377,14 @@ setInterval(() => {
   });
 }, 15000);
 
-function broadcastChatMessage(msg: any) {
-  const data = JSON.stringify({ type: "new_message", message: msg });
+function broadcastSse(payload: any) {
+  const data = JSON.stringify(payload);
   sseClients = sseClients.filter((client) => {
     try {
       client.res.write(`data: ${data}\n\n`);
+      if (typeof (client.res as any).flush === "function") {
+        (client.res as any).flush();
+      }
       return true;
     } catch {
       return false;
@@ -339,16 +392,16 @@ function broadcastChatMessage(msg: any) {
   });
 }
 
+function broadcastChatMessage(msg: any) {
+  const payload = { type: "new_message", message: msg };
+  broadcastWs(payload);
+  broadcastSse(payload);
+}
+
 function broadcastGalleryEvent(eventType: string, payload: any) {
-  const data = JSON.stringify({ type: eventType, ...payload });
-  sseClients = sseClients.filter((client) => {
-    try {
-      client.res.write(`data: ${data}\n\n`);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  const fullPayload = { type: eventType, ...payload };
+  broadcastWs(fullPayload);
+  broadcastSse(fullPayload);
 }
 
 const presenceState: Record<string, { partnerId: string; isTyping: boolean; isOnline: boolean; lastSeen: string; updatedAt: string }> = {
@@ -357,12 +410,9 @@ const presenceState: Record<string, { partnerId: string; isTyping: boolean; isOn
 };
 
 function broadcastPresence() {
-  const data = JSON.stringify({ type: "presence", presence: presenceState });
-  sseClients.forEach((client) => {
-    try {
-      client.res.write(`data: ${data}\n\n`);
-    } catch {}
-  });
+  const payload = { type: "presence", presence: presenceState };
+  broadcastWs(payload);
+  broadcastSse(payload);
 }
 
 async function sendPushToPartner(
@@ -805,13 +855,10 @@ async function startServer() {
         firestoreDeleteDoc(firestoreDoc(serverFirestore, "chat_messages", id)).catch(() => {});
       });
 
-      // Diffuser instantanément l'événement de suppression à tous les clients connectés
-      const payload = JSON.stringify({ type: "delete_messages", messageIds });
-      sseClients.forEach((client) => {
-        try {
-          client.res.write(`data: ${payload}\n\n`);
-        } catch {}
-      });
+      // Diffuser instantanément l'événement de suppression à tous les clients connectés (WS + SSE)
+      const payload = { type: "delete_messages", messageIds };
+      broadcastWs(payload);
+      broadcastSse(payload);
 
       console.log(`[Relay] ${messageIds.length} message(s) supprimé(s). Messages restants: ${serverChatMessages.length}`);
       return res.json({ success: true, remainingCount: serverChatMessages.length, deletedIds: Array.from(serverDeletedChatIds) });
@@ -835,12 +882,9 @@ async function startServer() {
       serverChatMessages = [];
       saveServerChatMessages([]);
 
-      const payload = JSON.stringify({ type: "clear_chat" });
-      sseClients.forEach((client) => {
-        try {
-          client.res.write(`data: ${payload}\n\n`);
-        } catch {}
-      });
+      const payload = { type: "clear_chat" };
+      broadcastWs(payload);
+      broadcastSse(payload);
 
       console.log("[Relay] Conversation entièrement effacée");
       return res.json({ success: true });
@@ -1070,23 +1114,30 @@ async function startServer() {
     }
   });
 
-  // Flux temps-réel Server-Sent Events (SSE)
+  // Flux temps-réel Server-Sent Events (SSE) avec zéro mise en cache
   app.get("/api/chat/events", (req, res) => {
     const partnerId = (req.query.partnerId as string) || "p1";
     const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": "*",
     });
-    res.flushHeaders?.();
+    if (typeof (res as any).flushHeaders === "function") {
+      (res as any).flushHeaders();
+    }
 
     const client = { id: clientId, partnerId, res };
     sseClients.push(client);
 
     // Poignée de main initiale avec l'état de présence
     res.write(`data: ${JSON.stringify({ type: "handshake", presence: presenceState })}\n\n`);
+    if (typeof (res as any).flush === "function") {
+      (res as any).flush();
+    }
 
     req.on("close", () => {
       sseClients = sseClients.filter((c) => c.id !== clientId);
@@ -1135,13 +1186,10 @@ async function startServer() {
         return res.status(400).json({ error: "Impulsion invalide" });
       }
 
-      // Diffusion instantanée vers les clients connectés
-      const data = JSON.stringify({ type: "pulse", pulse });
-      sseClients.forEach((client) => {
-        try {
-          client.res.write(`data: ${data}\n\n`);
-        } catch {}
-      });
+      // Diffusion instantanée vers tous les clients connectés (WS + SSE)
+      const payload = { type: "pulse", pulse };
+      broadcastWs(payload);
+      broadcastSse(payload);
 
       // Notification Push
       sendPushToPartner(
@@ -1307,8 +1355,145 @@ Renvoie un JSON strict :
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Serveur Nid d'Amour actif sur http://0.0.0.0:${PORT}`);
+  const httpServer = http.createServer(app);
+
+  // Serveur WebSocket natif pour communication instantanée sans latence ni buffering
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws/chat" });
+
+  wss.on("connection", (ws: WebSocket, req: http.IncomingMessage) => {
+    try {
+      const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
+      const partnerId = url.searchParams.get("partnerId") || "p1";
+      const clientId = `ws_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      const clientRecord: WsClientRecord = { id: clientId, partnerId, ws, isAlive: true };
+      wsClients.push(clientRecord);
+
+      // Heartbeat ping-pong
+      ws.on("pong", () => {
+        clientRecord.isAlive = true;
+      });
+
+      // Poignée de main immédiate
+      ws.send(JSON.stringify({ type: "handshake", presence: presenceState }));
+
+      ws.on("message", (raw) => {
+        try {
+          const payload = JSON.parse(raw.toString());
+          if (!payload || !payload.type) return;
+
+          if (payload.type === "ping") {
+            ws.send(JSON.stringify({ type: "pong", timestamp: Date.now() }));
+            return;
+          }
+
+          if (payload.type === "typing") {
+            const { partnerId: pId, isTyping } = payload;
+            if (pId === "p1" || pId === "p2") {
+              const now = new Date().toISOString();
+              presenceState[pId] = {
+                ...presenceState[pId],
+                isTyping: Boolean(isTyping),
+                isOnline: true,
+                lastSeen: now,
+                updatedAt: now,
+              };
+              broadcastPresence();
+            }
+            return;
+          }
+
+          if (payload.type === "presence") {
+            const { partnerId: pId, isOnline } = payload;
+            if (pId === "p1" || pId === "p2") {
+              const now = new Date().toISOString();
+              presenceState[pId] = {
+                ...presenceState[pId],
+                isOnline: Boolean(isOnline),
+                isTyping: isOnline ? presenceState[pId]?.isTyping : false,
+                lastSeen: now,
+                updatedAt: now,
+              };
+              broadcastPresence();
+            }
+            return;
+          }
+
+          if (payload.type === "chat_message") {
+            const { message, senderName } = payload;
+            if (message && message.id) {
+              const existingIdx = serverChatMessages.findIndex((m) => m.id === message.id);
+              if (existingIdx >= 0) {
+                serverChatMessages[existingIdx] = { ...serverChatMessages[existingIdx], ...message };
+              } else {
+                serverChatMessages.push(message);
+              }
+              if (serverChatMessages.length > 600) {
+                serverChatMessages = serverChatMessages.slice(-600);
+              }
+              saveServerChatMessages(serverChatMessages);
+
+              broadcastChatMessage(message);
+
+              setImmediate(() => {
+                firestoreSetDoc(
+                  firestoreDoc(serverFirestore, "chat_messages", message.id),
+                  sanitizeForFirestore(message),
+                  { merge: true }
+                ).catch(() => {});
+
+                sendPushToPartner(
+                  message.senderId,
+                  senderName || (message.senderId === "p1" ? "Med" : "Safi"),
+                  message.content,
+                  message.mediaType
+                ).catch(() => {});
+              });
+            }
+            return;
+          }
+
+          if (payload.type === "pulse") {
+            const { pulse, senderName } = payload;
+            if (pulse && pulse.senderId) {
+              broadcastWs({ type: "pulse", pulse });
+              broadcastSse({ type: "pulse", pulse });
+              setImmediate(() => {
+                firestoreSetDoc(
+                  firestoreDoc(serverFirestore, "pulses", pulse.id),
+                  sanitizeForFirestore(pulse),
+                  { merge: true }
+                ).catch(() => {});
+
+                sendPushToPartner(
+                  pulse.senderId,
+                  senderName || (pulse.senderId === "p1" ? "Med" : "Safi"),
+                  pulse.message || "Tu me manques tellement ! 💓",
+                  "pulse"
+                ).catch(() => {});
+              });
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn("[WS Error parsing message]:", err);
+        }
+      });
+
+      ws.on("close", () => {
+        wsClients = wsClients.filter((c) => c.id !== clientId);
+      });
+
+      ws.on("error", () => {
+        wsClients = wsClients.filter((c) => c.id !== clientId);
+      });
+    } catch (err) {
+      console.warn("[WS connection error]:", err);
+    }
+  });
+
+  httpServer.listen(PORT, "0.0.0.0", () => {
+    console.log(`Serveur Nid d'Amour actif avec WebSockets & SSE sur http://0.0.0.0:${PORT}`);
   });
 }
 

@@ -357,7 +357,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = getSupportedAudioMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType: mimeType as unknown as string } : undefined);
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
@@ -434,7 +434,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             mediaUrl: res.serverUrl,
             videoUrl: res.serverUrl,
             videoDuration: res.duration,
-            videoThumbnail: res.thumbnail,
+            videoThumbnail: (res as any).thumbnail || res.serverUrl,
           });
         } catch {
           console.warn('Erreur envoi vidéo');
@@ -443,9 +443,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
         try {
           setUploadStatusText(`Envoi photo ${i + 1}/${files.length}...`);
           const compressed = await compressImageWithStats(file, {
-            maxWidth: 1600,
-            maxHeight: 1600,
-            quality: 0.85,
+            maxDimension: 1600,
+            initialQuality: 0.85,
           });
           onSendMessage({
             senderId: activePartnerId,
@@ -1427,3 +1426,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     </div>
   );
 };
+
+export const WhatsAppChatView = ChatView;
+export type WhatsAppChatViewProps = ChatViewProps;
+

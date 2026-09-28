@@ -27,5 +27,35 @@
     "status": "sent",
     "readStatus": "sent",
     "mediaType": "text"
+  },
+  {
+    "id": "msg_1790619901000_gtafd",
+    "readStatus": "sent",
+    "senderId": "p2",
+    "mediaType": "text",
+    "content": "saliu",
+    "status": "sent",
+    "timestamp": "2026-09-28T18:25:01.000Z",
+    "timestampMs": 1790619901000
+  },
+  {
+    "id": "msg_1790619902000_x1k3r",
+    "readStatus": "sent",
+    "senderId": "p2",
+    "mediaType": "text",
+    "content": "tu va bien",
+    "status": "sent",
+    "timestamp": "2026-09-28T18:25:02.000Z",
+    "timestampMs": 1790619902000
+  },
+  {
+    "id": "msg_test_realtime_1790620659836",
+    "senderId": "p1",
+    "content": "Test message temps reel",
+    "timestamp": "2026-09-28T18:37:39.836Z",
+    "timestampMs": 1790620659837,
+    "status": "sent",
+    "readStatus": "sent",
+    "mediaType": "text"
   }
 ]
