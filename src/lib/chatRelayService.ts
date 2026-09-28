@@ -20,6 +20,7 @@ export interface ChatEventsOptions {
   onNewMessage?: (msg: ChatMessage) => void;
   onDeleteMessages?: (messageIds: string[]) => void;
   onClearChat?: () => void;
+  onMessagesRead?: (messageIds: string[], readAt?: string) => void;
   onPresence?: (presence: ChatPresenceState) => void;
   onPulse?: (pulse: MissYouPulse) => void;
   onNewMemory?: (memory: TimelineMemory) => void;
@@ -193,6 +194,12 @@ class RealtimeHub {
           sub.onDeleteMessages(payload.messageIds);
         } else if (payload.type === 'clear_chat' && sub.onClearChat) {
           sub.onClearChat();
+        } else if (
+          (payload.type === 'messages_read' || payload.type === 'read_receipt') &&
+          Array.isArray(payload.messageIds) &&
+          sub.onMessagesRead
+        ) {
+          sub.onMessagesRead(payload.messageIds, payload.readAt);
         } else if (payload.type === 'presence' && payload.presence && sub.onPresence) {
           sub.onPresence(payload.presence);
         } else if (payload.type === 'handshake' && payload.presence && sub.onPresence) {
@@ -430,4 +437,34 @@ export async function clearChatViaRelay(): Promise<boolean> {
  */
 export function connectChatEvents(options: ChatEventsOptions): () => void {
   return realtimeHub.subscribe(options);
+}
+
+/**
+ * Diffuse instantanément un accusé de réception / lecture aux deux appareils (latence 0ms)
+ */
+export async function sendReadReceiptViaRelay(messageIds: string[], readBy: string): Promise<boolean> {
+  if (!Array.isArray(messageIds) || messageIds.length === 0) return true;
+  const now = new Date().toISOString();
+
+  // 1. Tenter l'envoi immédiat via WebSocket
+  const ws = realtimeHub.getWebSocket();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify({ type: 'messages_read', messageIds, readBy, readAt: now }));
+      return true;
+    } catch {}
+  }
+
+  // 2. Fallback HTTP POST
+  try {
+    const res = await fetch('/api/chat/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageIds, readBy }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Chat Relay] Erreur diffusion accusé de lecture:', err);
+    return false;
+  }
 }

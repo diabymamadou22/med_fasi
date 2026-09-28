@@ -1160,6 +1160,18 @@ export default function App() {
           return [];
         });
       },
+      onMessagesRead: (readIds, readAt) => {
+        if (!Array.isArray(readIds) || readIds.length === 0) return;
+        const readSet = new Set(readIds);
+        const resolvedReadAt = readAt || new Date().toISOString();
+        setMessages((prev) =>
+          prev.map((m) =>
+            readSet.has(m.id)
+              ? { ...m, status: 'read', readStatus: 'read', readAt: resolvedReadAt }
+              : m
+          )
+        );
+      },
       onPulse: (pulse) => {
         if (pulse && pulse.senderId !== activePartnerIdRef.current) {
           setActiveMissYouPulse(pulse);

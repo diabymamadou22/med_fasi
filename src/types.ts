@@ -199,6 +199,7 @@ export interface ChatMessage {
   };
   status?: 'sent' | 'delivered' | 'read';
   readStatus?: 'sent' | 'delivered' | 'read' | 'unread' | boolean;
+  readAt?: string; // Date et heure de lecture par le partenaire
   isEdited?: boolean;
   editedAt?: string;
   isLearningChallengeValidation?: boolean;

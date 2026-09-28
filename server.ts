@@ -894,6 +894,47 @@ async function startServer() {
     }
   });
 
+  // Marquer des messages comme lus et diffuser instantanément aux deux partenaires (latence 0ms)
+  app.post("/api/chat/read", (req, res) => {
+    try {
+      const { messageIds, readBy } = req.body;
+      if (!Array.isArray(messageIds) || messageIds.length === 0) {
+        return res.status(400).json({ error: "Liste messageIds invalide" });
+      }
+
+      const now = new Date().toISOString();
+      const idSet = new Set(messageIds);
+      let updatedCount = 0;
+
+      serverChatMessages.forEach((m) => {
+        if (m && idSet.has(m.id)) {
+          m.status = "read";
+          m.readStatus = "read";
+          m.readAt = now;
+          updatedCount++;
+          firestoreSetDoc(
+            firestoreDoc(serverFirestore, "chat_messages", m.id),
+            { status: "read", readStatus: "read", readAt: now },
+            { merge: true }
+          ).catch(() => {});
+        }
+      });
+
+      if (updatedCount > 0) {
+        saveServerChatMessages(serverChatMessages);
+      }
+
+      const payload = { type: "messages_read", messageIds, readBy, readAt: now };
+      broadcastWs(payload);
+      broadcastSse(payload);
+
+      return res.json({ success: true, updatedCount, readAt: now });
+    } catch (err: any) {
+      console.error("Erreur /api/chat/read:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ==========================================
   // DIRECT GALLERY RELAY & REAL-TIME EVENT STREAM
   // ==========================================
@@ -1472,6 +1513,35 @@ Renvoie un JSON strict :
                   "pulse"
                 ).catch(() => {});
               });
+            }
+            return;
+          }
+
+          if (payload.type === "messages_read" || payload.type === "read_receipt") {
+            const { messageIds, readBy } = payload;
+            if (Array.isArray(messageIds) && messageIds.length > 0) {
+              const now = new Date().toISOString();
+              const idSet = new Set(messageIds);
+              let updatedCount = 0;
+              serverChatMessages.forEach((m) => {
+                if (m && idSet.has(m.id)) {
+                  m.status = "read";
+                  m.readStatus = "read";
+                  m.readAt = now;
+                  updatedCount++;
+                  firestoreSetDoc(
+                    firestoreDoc(serverFirestore, "chat_messages", m.id),
+                    { status: "read", readStatus: "read", readAt: now },
+                    { merge: true }
+                  ).catch(() => {});
+                }
+              });
+              if (updatedCount > 0) {
+                saveServerChatMessages(serverChatMessages);
+              }
+              const outPayload = { type: "messages_read", messageIds, readBy, readAt: now };
+              broadcastWs(outPayload);
+              broadcastSse(outPayload);
             }
             return;
           }
