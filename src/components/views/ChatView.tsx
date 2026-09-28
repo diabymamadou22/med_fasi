@@ -1878,7 +1878,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onSwitchPartner(otherPartnerId)}
-                  className={`hidden md:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all border cursor-pointer ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium transition-all border cursor-pointer ${
                     chatTheme === 'velvet-night'
                       ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-rose-500/60 hover:text-white'
                       : 'bg-stone-50 border-stone-200/80 text-stone-700 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700'
@@ -2083,6 +2083,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
                         </span>
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                        const partnerLink = `${origin}/?tab=chat&partner=${otherPartnerId}`;
+                        if (navigator.clipboard) {
+                          navigator.clipboard.writeText(partnerLink).catch(() => {});
+                        }
+                        soundEffects.playSoftTap();
+                        setShowMoreMenu(false);
+                        setChatToastFeedback(`Lien copié pour ${otherPartner.name} ! Envoyez-lui par WhatsApp/SMS 💕`);
+                        setTimeout(() => setChatToastFeedback(null), 4000);
+                      }}
+                      className="w-full mt-1.5 flex items-center justify-between p-2 rounded-xl border border-stone-200/80 dark:border-slate-700 bg-white/70 dark:bg-slate-800/70 hover:bg-stone-50 dark:hover:bg-slate-700/60 text-xs font-semibold text-stone-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      title={`Copier le lien direct pour connecter ${otherPartner.name}`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Copy className="w-4 h-4 text-rose-500 shrink-0" />
+                        <span className="truncate">Lien direct pour {otherPartner.name}</span>
+                      </div>
+                      <span className="text-[10px] text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                        Copier
+                      </span>
+                    </button>
                   </div>
 
                   {/* Section: Actions Discussion (Clear Chat & Export) */}

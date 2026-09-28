@@ -208,8 +208,16 @@ const STORAGE_KEYS = {
 };
 
 export default function App() {
-  // Active partner (p1 or p2)
+  // Active partner (p1 or p2) - avec prise en charge du paramètre URL (?partner=p2 ou ?p=p2)
   const [activePartnerId, setActivePartnerId] = useState<PartnerId>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const pParam = params.get('partner') || params.get('p') || params.get('as');
+      if (pParam === 'p1' || pParam === 'p2') {
+        safeSetLocalStorage(STORAGE_KEYS.ACTIVE_PARTNER, pParam);
+        return pParam;
+      }
+    }
     const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_PARTNER);
     return (saved as PartnerId) || 'p1';
   });
@@ -410,6 +418,11 @@ export default function App() {
       return [];
     }
   });
+
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Notre Lexique d'anglais personnalisé
   const [lexicon, setLexicon] = useState<EnglishLexiconItem[]>(() => {
@@ -638,41 +651,43 @@ export default function App() {
   // Gestionnaire unifié de réception des messages avec alertes sonores et visuelles
   const handleIncomingChatMessages = useCallback(
     (incomingList: ChatMessage[], _source = 'unknown') => {
-      if (!Array.isArray(incomingList)) return;
+      if (!Array.isArray(incomingList) || incomingList.length === 0) return;
 
+      const currentDeleted = deletedMessageIdsRef.current;
       // Filtrer immédiatement les messages déjà supprimés
       const validIncoming = incomingList.filter(
-        (m) => m && m.id && !deletedMessageIdsRef.current.has(m.id)
+        (m) => m && m.id && !currentDeleted.has(m.id)
       );
 
-      setMessages((prev) => {
-        // Si la source est le flux direct Firestore (authoritatif):
-        // La liste reçue reflète l'état actuel exact de la base Cloud Firestore.
-        // Si des messages ont été supprimés sur un appareil, ils ne sont plus dans incomingList.
-        if (_source === 'firestore-stream') {
-          const incomingIds = new Set(validIncoming.map((m) => m.id));
-          const now = Date.now();
-          const merged: ChatMessage[] = [...validIncoming];
+      if (validIncoming.length === 0) return;
 
-          // On conserve uniquement les messages locaux très récents (moins de 15s) envoyés par l'utilisateur actif
-          // et qui seraient encore en cours d'envoi.
-          prev.forEach((m) => {
-            if (!incomingIds.has(m.id) && !deletedMessageIdsRef.current.has(m.id)) {
-              const msgTime = m.timestampMs || new Date(m.timestamp || 0).getTime();
-              if (now - msgTime < 15000 && m.senderId === activePartnerIdRef.current) {
-                merged.push(m);
-              }
-            }
-          });
-          return sortChatMessagesChronologically(merged);
-        }
+      setMessages((prev) => {
+        const idMap = new Map<string, ChatMessage>();
+        prev.forEach((m) => {
+          if (!currentDeleted.has(m.id)) {
+            idMap.set(m.id, m);
+          }
+        });
 
         const prevIds = new Set(prev.map((m) => m.id));
-        const newFromPartner = validIncoming.filter(
-          (m) => !prevIds.has(m.id) && m.senderId !== activePartnerIdRef.current
-        );
+        const newFromPartner: ChatMessage[] = [];
 
-        if (prev.length > 0 && newFromPartner.length > 0) {
+        validIncoming.forEach((m) => {
+          if (m && m.id && !currentDeleted.has(m.id)) {
+            const existing = idMap.get(m.id);
+            if (!existing) {
+              if (m.senderId !== activePartnerIdRef.current) {
+                newFromPartner.push(m);
+              }
+              idMap.set(m.id, m);
+            } else {
+              idMap.set(m.id, { ...existing, ...m });
+            }
+          }
+        });
+
+        // Déclencher les alertes sonores, vibrations et notifications pour les nouveaux messages reçus du partenaire
+        if (newFromPartner.length > 0) {
           const lastMsg = newFromPartner[newFromPartner.length - 1];
           soundEffects.playMessageReceived();
           triggerVibration([250, 100, 250, 100, 250]);
@@ -713,19 +728,6 @@ export default function App() {
           }
         }
 
-        // Fusionner avec déduplication stricte pour ne jamais perdre de message
-        const idMap = new Map<string, ChatMessage>();
-        prev.forEach((m) => {
-          if (!deletedMessageIdsRef.current.has(m.id)) {
-            idMap.set(m.id, m);
-          }
-        });
-        validIncoming.forEach((m) => {
-          if (m && m.id && !deletedMessageIdsRef.current.has(m.id)) {
-            const existing = idMap.get(m.id);
-            idMap.set(m.id, existing ? { ...existing, ...m } : m);
-          }
-        });
         const nextList = sortChatMessagesChronologically(Array.from(idMap.values()));
         if (
           nextList.length === prev.length &&
@@ -750,9 +752,14 @@ export default function App() {
   const runUnifiedChatSync = useCallback(async () => {
     try {
       const currentDeleted = deletedMessageIdsRef.current;
+      // Transmettre les messages locaux récents non supprimés pour synchroniser le serveur et le partenaire
+      const localRecent = (messagesRef.current || [])
+        .filter((m) => m && m.id && !currentDeleted.has(m.id))
+        .slice(-60);
+
       const [relaySyncResult, firestoreMsgs] = await Promise.all([
         syncLocalMessagesWithRelay(
-          [],
+          localRecent,
           Array.from(currentDeleted)
         ).catch(() => ({ messages: [] as ChatMessage[], deletedIds: [] as string[] })),
         fetchFirestoreChatMessages().catch(() => [] as ChatMessage[]),
@@ -1079,7 +1086,7 @@ export default function App() {
     const disconnectSse = connectChatEvents({
       partnerId: activePartnerId,
       onNewMessage: (newMsg) => {
-        if (!newMsg || !newMsg.id) return;
+        if (!newMsg || !newMsg.id || deletedMessageIdsRef.current.has(newMsg.id)) return;
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) {
             return prev;
@@ -1425,7 +1432,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isInitialRemoteLoaded) return;
-    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
+    safeSetLocalStorage(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
   }, [messages, isInitialRemoteLoaded]);
 
   // Update PWA Home Screen App Badge for unread chat messages
@@ -1508,6 +1515,8 @@ export default function App() {
   // Actions
   const handleSwitchPartner = (id: PartnerId) => {
     setActivePartnerId(id);
+    safeSetLocalStorage(STORAGE_KEYS.ACTIVE_PARTNER, id);
+    soundEffects.playSoftTap();
   };
 
   const handleUpdateMood = (

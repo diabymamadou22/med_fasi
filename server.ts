@@ -244,27 +244,96 @@ async function syncServerWithFirestore() {
   }
 }
 
-// Lancer la première synchronisation Firestore au démarrage
+// Synchronisation bidirectionnelle des messages de discussion avec Cloud Firestore
+async function syncServerChatWithFirestore() {
+  try {
+    const snap = await firestoreGetDocs(firestoreCollection(serverFirestore, "chat_messages"));
+    let modified = false;
+    const idMap = new Map<string, any>();
+    serverChatMessages.forEach((m) => idMap.set(m.id, m));
+
+    for (const docSnap of snap.docs) {
+      if (serverDeletedChatIds.has(docSnap.id)) {
+        firestoreDeleteDoc(firestoreDoc(serverFirestore, "chat_messages", docSnap.id)).catch(() => {});
+        continue;
+      }
+      const data = { id: docSnap.id, ...docSnap.data() };
+      if (!idMap.has(docSnap.id)) {
+        serverChatMessages.push(data);
+        idMap.set(docSnap.id, data);
+        modified = true;
+      }
+    }
+
+    // Nettoyer si des messages locaux sont dans serverDeletedChatIds
+    const beforeCount = serverChatMessages.length;
+    serverChatMessages = serverChatMessages.filter((m) => !serverDeletedChatIds.has(m?.id));
+    if (serverChatMessages.length !== beforeCount) {
+      modified = true;
+    }
+
+    if (modified) {
+      serverChatMessages.sort((a, b) => {
+        const tA = a.timestampMs || new Date(a.timestamp || 0).getTime();
+        const tB = b.timestampMs || new Date(b.timestamp || 0).getTime();
+        return tA - tB;
+      });
+      if (serverChatMessages.length > 600) {
+        serverChatMessages = serverChatMessages.slice(-600);
+      }
+      saveServerChatMessages(serverChatMessages);
+      console.log(`[Server Chat Sync] Synchro effectuée. Total messages actifs: ${serverChatMessages.length}`);
+    }
+  } catch (err: any) {
+    console.warn("[Server Chat Sync] Erreur synchro Firestore:", err?.message || err);
+  }
+}
+
+// Lancer les premières synchronisations Firestore au démarrage
 syncServerWithFirestore().catch(() => {});
+syncServerChatWithFirestore().catch(() => {});
+
+// Synchronisation périodique de fond (toutes les 60 secondes)
+setInterval(() => {
+  syncServerChatWithFirestore().catch(() => {});
+}, 60000);
 
 // Server-Sent Events (SSE) pour communication instantanée sans latence
 let sseClients: { id: string; partnerId: string; res: express.Response }[] = [];
 
+// Heartbeat keep-alive toutes les 15 secondes pour maintenir ouvertes les connexions mobiles et proxies
+setInterval(() => {
+  sseClients = sseClients.filter((client) => {
+    try {
+      client.res.write(": keepalive\n\n");
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}, 15000);
+
 function broadcastChatMessage(msg: any) {
   const data = JSON.stringify({ type: "new_message", message: msg });
-  sseClients.forEach((client) => {
+  sseClients = sseClients.filter((client) => {
     try {
       client.res.write(`data: ${data}\n\n`);
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   });
 }
 
 function broadcastGalleryEvent(eventType: string, payload: any) {
   const data = JSON.stringify({ type: eventType, ...payload });
-  sseClients.forEach((client) => {
+  sseClients = sseClients.filter((client) => {
     try {
       client.res.write(`data: ${data}\n\n`);
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   });
 }
 
@@ -605,6 +674,15 @@ async function startServer() {
       // Diffusion instantanée vers tous les clients SSE connectés (0ms de latence)
       broadcastChatMessage(message);
 
+      // Persistance Cloud Firestore en direct depuis le serveur pour redondance totale
+      firestoreSetDoc(
+        firestoreDoc(serverFirestore, "chat_messages", message.id),
+        message,
+        { merge: true }
+      ).catch((err) => {
+        console.warn("[Chat Relay] Sauvegarde Firestore du message différée:", err?.message || err);
+      });
+
       // Déclencher la notification Push vers l'autre partenaire en tâche de fond
       sendPushToPartner(
         message.senderId,
@@ -652,6 +730,11 @@ async function startServer() {
             idMap.set(m.id, m);
             serverChatMessages.push(m);
             modified = true;
+            firestoreSetDoc(
+              firestoreDoc(serverFirestore, "chat_messages", m.id),
+              m,
+              { merge: true }
+            ).catch(() => {});
           }
         });
 

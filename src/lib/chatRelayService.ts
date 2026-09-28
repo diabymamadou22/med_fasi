@@ -229,10 +229,27 @@ export function connectChatEvents(options: {
     }
   }
 
+  const handleWakeReconnect = () => {
+    if (isClosed) return;
+    if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      connect();
+    }
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', handleWakeReconnect);
+    document.addEventListener('visibilitychange', handleWakeReconnect);
+  }
+
   connect();
 
   return () => {
     isClosed = true;
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', handleWakeReconnect);
+      document.removeEventListener('visibilitychange', handleWakeReconnect);
+    }
     if (reconnectTimeout) clearTimeout(reconnectTimeout);
     if (eventSource) {
       eventSource.close();
