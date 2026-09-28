@@ -137,6 +137,20 @@ function saveServerChatMessages(messages: any[]) {
 
 let serverChatMessages: any[] = loadServerChatMessages().filter((m) => !serverDeletedChatIds.has(m?.id));
 
+// Helper pour nettoyer récursivement les données Firestore (supprime les undefined)
+function sanitizeForFirestore(data: any): any {
+  if (data === null || data === undefined) return null;
+  if (Array.isArray(data)) return data.filter((i) => i !== undefined).map(sanitizeForFirestore);
+  if (typeof data === "object" && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== undefined) cleaned[k] = sanitizeForFirestore(v);
+    }
+    return cleaned;
+  }
+  return data;
+}
+
 // Gallery Memories Store pour synchronisation durable & multi-appareils
 const GALLERY_MEMORIES_FILE = path.join(process.cwd(), "gallery_memories_store.json");
 const DELETED_MEMORIES_FILE = path.join(process.cwd(), "deleted_memories_store.json");
@@ -362,12 +376,12 @@ async function sendPushToPartner(
 
   if (targets.length === 0) return 0;
 
-  let previewText = content || "Nouveau mot doux de votre amour !";
+  let previewText = content || "Nouveau message";
   let targetTab = "chat";
   if (mediaType === "image") {
-    previewText = "📷 Vous a envoyé une nouvelle photo dans le chat";
+    previewText = "📷 Vous a envoyé une photo";
   } else if (mediaType === "audio") {
-    previewText = "🎵 Vous a envoyé une note vocale d'amour";
+    previewText = "🎵 Vous a envoyé un message vocal";
   } else if (mediaType === "video") {
     previewText = "🎬 Vous a envoyé une vidéo";
   } else if (mediaType === "gallery_photo" || mediaType === "memory") {
@@ -380,14 +394,14 @@ async function sendPushToPartner(
   }
 
   const payload = JSON.stringify({
-    title: `${senderName || "Votre amour"} ❤️`,
+    title: `${senderName || "Votre partenaire"}`,
     body: previewText,
     icon: "/pwa-192x192.png",
     badge: "/favicon.png",
     tag: `nid-damour-${targetTab}-${Date.now()}`,
     timestamp: Date.now(),
     data: {
-      url: `/?tab=${targetTab}`,
+      url: `/?tab=${targetTab}&partner=${targetId}`,
       tab: targetTab,
       senderId,
     },
@@ -674,24 +688,26 @@ async function startServer() {
       // Diffusion instantanée vers tous les clients SSE connectés (0ms de latence)
       broadcastChatMessage(message);
 
-      // Persistance Cloud Firestore en direct depuis le serveur pour redondance totale
-      firestoreSetDoc(
-        firestoreDoc(serverFirestore, "chat_messages", message.id),
-        message,
-        { merge: true }
-      ).catch((err) => {
-        console.warn("[Chat Relay] Sauvegarde Firestore du message différée:", err?.message || err);
+      // Répondre immédiatement au client pour zéro latence
+      res.json({ success: true, message });
+
+      // Persistance Cloud Firestore et Push en tâche de fond (non bloquantes)
+      setImmediate(() => {
+        firestoreSetDoc(
+          firestoreDoc(serverFirestore, "chat_messages", message.id),
+          sanitizeForFirestore(message),
+          { merge: true }
+        ).catch((err) => {
+          console.warn("[Chat Relay] Sauvegarde Firestore du message différée:", err?.message || err);
+        });
+
+        sendPushToPartner(
+          message.senderId,
+          senderName || (message.senderId === "p1" ? "Med" : "Safi"),
+          message.content,
+          message.mediaType
+        ).catch(() => {});
       });
-
-      // Déclencher la notification Push vers l'autre partenaire en tâche de fond
-      sendPushToPartner(
-        message.senderId,
-        senderName || (message.senderId === "p1" ? "Med" : "Safi"),
-        message.content,
-        message.mediaType
-      ).catch(() => {});
-
-      return res.json({ success: true, message });
     } catch (err: any) {
       console.error("Erreur /api/chat/send:", err);
       return res.status(500).json({ error: err.message });
@@ -732,7 +748,7 @@ async function startServer() {
             modified = true;
             firestoreSetDoc(
               firestoreDoc(serverFirestore, "chat_messages", m.id),
-              m,
+              sanitizeForFirestore(m),
               { merge: true }
             ).catch(() => {});
           }

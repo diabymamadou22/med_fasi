@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "id": "test_sanitized_msg",
+    "content": "Hello from sanitized test",
+    "timestamp": "2026-09-28T18:01:38.980Z",
+    "timestampMs": 1790618498980,
+    "readStatus": "sent",
+    "senderId": "p2",
+    "status": "sent"
+  },
+  {
+    "id": "test_safi_1",
+    "senderId": "p2",
+    "content": "Coucou mon amour, tu me reçois bien ?",
+    "timestamp": "2026-09-28T18:15:00.000Z",
+    "timestampMs": 1790619300000,
+    "status": "sent",
+    "readStatus": "sent",
+    "mediaType": "text"
+  },
+  {
+    "id": "test_partner_live_2",
+    "senderId": "p2",
+    "content": "Coucou mon cœur, je teste le nouveau chat épuré !",
+    "timestamp": "2026-09-28T18:25:00.000Z",
+    "timestampMs": 1790619900000,
+    "status": "sent",
+    "readStatus": "sent",
+    "mediaType": "text"
+  }
+]

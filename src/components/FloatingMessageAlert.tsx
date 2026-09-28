@@ -39,7 +39,7 @@ export const FloatingMessageAlert: React.FC<FloatingMessageAlertProps> = ({
 
   const partner = alert.senderId === 'p1' ? profile.partner1 : profile.partner2;
 
-  let preview = alert.content || 'Nouveau mot doux reçu';
+  let preview = alert.content || 'Nouveau message reçu';
   if (alert.mediaType === 'image') {
     preview = '📷 Vous a envoyé une photo';
   } else if (alert.mediaType === 'audio') {

@@ -757,11 +757,12 @@ export default function App() {
         .filter((m) => m && m.id && !currentDeleted.has(m.id))
         .slice(-60);
 
-      const [relaySyncResult, firestoreMsgs] = await Promise.all([
+      const [relaySyncResult, directServerMsgs, firestoreMsgs] = await Promise.all([
         syncLocalMessagesWithRelay(
           localRecent,
           Array.from(currentDeleted)
         ).catch(() => ({ messages: [] as ChatMessage[], deletedIds: [] as string[] })),
+        fetchChatMessagesFromRelay().catch(() => [] as ChatMessage[]),
         fetchFirestoreChatMessages().catch(() => [] as ChatMessage[]),
       ]);
 
@@ -782,8 +783,8 @@ export default function App() {
       const allIncoming: ChatMessage[] = [];
       const seen = new Set<string>();
 
-      if (Array.isArray(firestoreMsgs)) {
-        firestoreMsgs.forEach((m) => {
+      if (Array.isArray(directServerMsgs)) {
+        directServerMsgs.forEach((m) => {
           if (m && m.id && !seen.has(m.id) && !currentDeleted.has(m.id)) {
             seen.add(m.id);
             allIncoming.push(m);
@@ -792,6 +793,14 @@ export default function App() {
       }
       if (Array.isArray(relaySyncResult.messages)) {
         relaySyncResult.messages.forEach((m) => {
+          if (m && m.id && !seen.has(m.id) && !currentDeleted.has(m.id)) {
+            seen.add(m.id);
+            allIncoming.push(m);
+          }
+        });
+      }
+      if (Array.isArray(firestoreMsgs)) {
+        firestoreMsgs.forEach((m) => {
           if (m && m.id && !seen.has(m.id) && !currentDeleted.has(m.id)) {
             seen.add(m.id);
             allIncoming.push(m);
@@ -807,14 +816,14 @@ export default function App() {
     }
   }, [handleIncomingChatMessages]);
 
-  // Synchronisation périodique et sur reprise de focus
+  // Synchronisation périodique ultra-rapide (2.5s en chat actif, 5s en arrière-plan)
   useEffect(() => {
     runUnifiedChatSync();
     const pollInterval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && (typeof navigator === 'undefined' || navigator.onLine)) {
         runUnifiedChatSync();
       }
-    }, 5000);
+    }, activeTab === 'chat' ? 2500 : 5000);
 
     const handleSyncOnVisible = () => {
       if (document.visibilityState === 'visible') {
@@ -1671,7 +1680,7 @@ export default function App() {
     const senderPartner = activePartnerId === 'p1' ? profile.partner1 : profile.partner2;
 
     // 1. Relais direct serveur (immédiat, SSE instantané vers le partenaire, non bloqué par les quotas)
-    sendChatMessageViaRelay(newMsg, senderPartner.name || 'Votre amour').catch((err) => {
+    sendChatMessageViaRelay(newMsg, senderPartner.name || 'Votre partenaire').catch((err) => {
       console.warn('Relais serveur différé:', err);
     });
 
@@ -1683,7 +1692,7 @@ export default function App() {
       // Trigger Web Push alert to partner device asynchronously
       notifyPartnerViaPush({
         senderId: activePartnerId,
-        senderName: senderPartner.name || 'Votre amour',
+        senderName: senderPartner.name || 'Votre partenaire',
         content: newMsg.content,
         mediaType: newMsg.mediaType,
         targetPartnerId,
@@ -2667,7 +2676,7 @@ export default function App() {
           }`}
         >
           {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden animate-fade-in fixed inset-0 sm:relative sm:inset-auto z-30 sm:z-auto bg-[#FAF7F5]">
+            <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden animate-fade-in fixed inset-0 sm:relative sm:inset-auto z-30 sm:z-auto bg-slate-100 dark:bg-slate-950">
               <ChatView
                 profile={profile}
                 activePartnerId={activePartnerId}
