@@ -244,6 +244,15 @@ export default function App() {
 
   useEffect(() => {
     activeTabRef.current = activeTab;
+    if (typeof document !== 'undefined') {
+      if (activeTab === 'chat') {
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+          document.body.style.overflow = prevOverflow;
+        };
+      }
+    }
   }, [activeTab]);
   const deletedMessageIdsRef = useRef<Set<string>>(loadDeletedMessageIds());
   const [lastNonChatTab, setLastNonChatTab] = useState<MainTab>('home');
@@ -2684,11 +2693,11 @@ export default function App() {
         {/* Views */}
         <div
           className={`relative ${
-            activeTab === 'chat' ? 'flex-1 flex flex-col min-h-0 h-full overflow-hidden' : ''
+            activeTab === 'chat' ? 'fixed inset-0 z-30 flex flex-col h-full w-full overflow-hidden overscroll-none' : 'flex-1 flex flex-col min-h-0'
           }`}
         >
           {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col min-h-0 h-full overflow-hidden animate-fade-in fixed inset-0 sm:relative sm:inset-auto z-30 sm:z-auto bg-slate-100 dark:bg-slate-950">
+            <div className="flex-1 flex flex-col min-h-0 h-full w-full overflow-hidden animate-fade-in bg-slate-100 dark:bg-slate-950">
               <ChatView
                 profile={profile}
                 activePartnerId={activePartnerId}

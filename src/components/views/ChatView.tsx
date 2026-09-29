@@ -649,7 +649,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full bg-slate-100/90 dark:bg-slate-950 select-none overflow-hidden relative font-sans">
+    <div className="flex-1 flex flex-col h-full max-h-full w-full bg-slate-100/90 dark:bg-slate-950 select-none overflow-hidden relative font-sans overscroll-none">
       {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
@@ -675,7 +675,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-slate-900/95 dark:bg-white/95 text-white dark:text-slate-900 text-xs font-semibold rounded-full shadow-xl pointer-events-none flex items-center gap-2 border border-white/10"
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-slate-900/95 dark:bg-white/95 text-white dark:text-slate-900 text-xs font-semibold rounded-full shadow-xl pointer-events-none flex items-center gap-2 border border-white/10"
           >
             <Check className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
             <span>{chatToastFeedback}</span>
@@ -685,14 +685,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       {/* Uploading progress indicator */}
       {isUploadingMedia && (
-        <div className="bg-slate-800 text-white text-xs px-4 py-1.5 flex items-center justify-center gap-2 shadow-sm shrink-0 z-30">
+        <div className="bg-slate-800 text-white text-xs px-4 py-1.5 flex items-center justify-center gap-2 shadow-sm shrink-0 z-30 sticky top-0">
           <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
           <span>{uploadStatusText}</span>
         </div>
       )}
 
-      {/* 1. TOP APP BAR - MODERN, CLEAN, SPACIOUS MESSENGER STYLE */}
-      <header className="h-14 sm:h-16 px-3 sm:px-4 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 z-30 shadow-xs">
+      {/* 1. TOP APP BAR - IMMOVABLE & STICKY ON SCROLL */}
+      <header className="sticky top-0 z-40 h-14 sm:h-16 px-3 sm:px-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 shadow-xs select-none overscroll-none">
         {isSelectionMode ? (
           /* SELECTION MODE HEADER */
           <div className="flex items-center justify-between w-full">
@@ -990,7 +990,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       {/* 2. DEVICE IDENTITY PROMPT (IF UNCONFIRMED - DISMISSIBLE) */}
       {!hasConfirmedPartner && (
-        <div className="bg-slate-900 text-white px-3.5 py-2 text-xs flex items-center justify-between gap-2 shrink-0 z-20 border-b border-slate-800">
+        <div className="sticky top-14 sm:top-16 z-30 shrink-0 bg-slate-900 text-white px-3.5 py-2 text-xs flex items-center justify-between gap-2 border-b border-slate-800">
           <div className="flex items-center gap-2 min-w-0">
             <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span className="truncate">Votre profil sur cet appareil :</span>
@@ -1037,7 +1037,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="px-3.5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-2 shrink-0 z-20 shadow-xs"
+            className="sticky top-14 sm:top-16 z-30 shrink-0 px-3.5 py-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-col gap-2 shadow-xs"
           >
             <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl text-xs">
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
@@ -1104,7 +1104,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* 4. MESSAGES FEED */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto no-scrollbar p-3.5 sm:p-5 space-y-2.5 relative z-10"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain no-scrollbar p-3.5 sm:p-5 space-y-2.5 relative z-10"
         onScroll={(e) => {
           const el = e.currentTarget;
           const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
@@ -1429,7 +1429,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </AnimatePresence>
 
       {/* 6. BOTTOM INPUT BAR (MINIMALIST & SLEEK) */}
-      <footer className="p-2 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 z-20">
+      <footer className="sticky bottom-0 z-30 shrink-0 p-2 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 overscroll-none pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
         {/* Reply Quote Banner */}
         {replyingTo && (
           <div className="mb-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-between text-xs border border-slate-200 dark:border-slate-700">
