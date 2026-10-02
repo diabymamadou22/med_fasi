@@ -271,58 +271,46 @@ export const LoveRouletteGame: React.FC<LoveRouletteGameProps> = ({
   };
 
   return (
-    <div className="space-y-5 max-w-2xl mx-auto">
-      {/* 1. Header Banner */}
-      <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Roue du Destin Amoureux</span>
-              {gameMode === 'live' && (
-                <span className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full bg-emerald-400 text-stone-900 text-[10px] font-extrabold uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-stone-900 animate-pulse" />
-                  En Direct
-                </span>
-              )}
-            </div>
-            <h2 className="font-serif-romantic text-2xl sm:text-3xl font-bold tracking-tight">
-              🎡 La Roulette des Rencards & Gages
-            </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-xl">
-              Tournez la roue en direct ! Elle s'arrête exactement sur le même résultat sur vos deux téléphones.
-            </p>
-          </div>
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* 1. Header Minimal & Sélecteur de Mode */}
+      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base sm:text-lg">🎡</span>
+          <span className="font-bold text-xs sm:text-sm text-stone-800 truncate">Roulette Romantique</span>
+          {gameMode === 'live' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Direct
+            </span>
+          )}
+        </div>
 
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-1.5 bg-black/20 p-1.5 rounded-2xl backdrop-blur-md">
-            <button
-              onClick={() => setGameMode('live')}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                gameMode === 'live'
-                  ? 'bg-white text-rose-600 shadow-xs'
-                  : 'text-white/80 hover:text-white'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-              <span>En Direct Duo</span>
-            </button>
-            <button
-              onClick={() => setGameMode('local')}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-                gameMode === 'local'
-                  ? 'bg-white text-rose-600 shadow-xs'
-                  : 'text-white/80 hover:text-white'
-              }`}
-            >
-              <span>Même Écran</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl shrink-0">
+          <button
+            onClick={() => setGameMode('live')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+              gameMode === 'live'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            Direct
+          </button>
+          <button
+            onClick={() => setGameMode('local')}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+              gameMode === 'local'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            1 Écran
+          </button>
         </div>
       </div>
 
-      {/* 2. Category Selector Tabs */}
-      <div className="flex items-center justify-center gap-2 flex-wrap">
+      {/* 2. Onglets Catégories Épurés */}
+      <div className="flex items-center justify-center gap-1.5 flex-wrap">
         {ROULETTE_CATEGORIES.map((cat) => (
           <button
             key={cat.id}
@@ -333,7 +321,7 @@ export const LoveRouletteGame: React.FC<LoveRouletteGameProps> = ({
               soundEffects.playSoftTap();
             }}
             disabled={isSpinning}
-            className={`px-3.5 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               selectedCatId === cat.id
                 ? 'bg-rose-500 text-white shadow-xs scale-102 ring-2 ring-rose-200'
                 : 'bg-white border border-stone-200 text-stone-600 hover:bg-rose-50'

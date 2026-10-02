@@ -273,34 +273,31 @@ export const WouldYouRatherGame: React.FC<WouldYouRatherGameProps> = ({
   const percentMatch = totalAnswered > 0 ? Math.round((totalMatches / totalAnswered) * 100) : 0;
 
   return (
-    <div className="space-y-6">
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-pink-600 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Dilemmes de Couple & Rires</span>
-            </div>
-            <h2 className="font-serif-romantic text-2xl sm:text-3xl font-bold tracking-tight">
-              💌 Tu préfères... ? (Édition Amour)
-            </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-xl">
-              Choisissez entre deux options surprenantes ou romantiques et comparez vos visions !
-            </p>
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* 1. Header Minimal & Score d'Alignement */}
+      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base sm:text-lg">🤔</span>
+          <div className="min-w-0">
+            <span className="font-bold text-xs sm:text-sm text-stone-800 truncate block">Tu préfères... ?</span>
+            <span className="text-[10px] text-stone-500 truncate block">
+              {totalAnswered > 0 ? `${totalMatches} choix identiques (${percentMatch}%)` : 'Votez et comparez'}
+            </span>
           </div>
+        </div>
 
-          <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl p-3.5 flex items-center gap-3.5 shrink-0 self-stretch sm:self-auto">
-            <div className="w-12 h-12 rounded-xl bg-white text-rose-600 flex items-center justify-center font-bold text-lg shadow-sm">
-              {percentMatch}%
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/80 font-semibold">Alignement</p>
-              <p className="text-xs font-bold text-white">
-                {totalMatches} choix identiques sur {totalAnswered}
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200">
+            {percentMatch}% accord
+          </span>
+          <button
+            type="button"
+            onClick={handleRandom}
+            className="p-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 transition-colors"
+            title="Dilemme au hasard"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

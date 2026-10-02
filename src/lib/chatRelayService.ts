@@ -87,7 +87,10 @@ class RealtimeHub {
     this.isConnecting = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
 
-    // 1. Tenter la connexion WebSocket (prioritaire, 0ms latence)
+    // 1. Connexion SSE garantie (toujours active en arrière-plan)
+    this.connectSse();
+
+    // 2. Connexion WebSocket ultra-rapide (0ms)
     if (typeof WebSocket !== 'undefined') {
       try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -99,13 +102,8 @@ class RealtimeHub {
 
         ws.onopen = () => {
           this.isConnecting = false;
-          // Arrêter SSE si WebSocket actif
-          if (this.sse) {
-            this.sse.close();
-            this.sse = null;
-          }
 
-          // Démarrer ping régulier
+          // Démarrer ping régulier pour maintenir la liaison mobile
           if (this.pingInterval) clearInterval(this.pingInterval);
           this.pingInterval = setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -113,7 +111,7 @@ class RealtimeHub {
                 this.ws.send(JSON.stringify({ type: 'ping' }));
               } catch {}
             }
-          }, 18000);
+          }, 12000);
         };
 
         ws.onmessage = (event) => {
@@ -131,27 +129,15 @@ class RealtimeHub {
         };
 
         ws.onerror = () => {
-          // Si le WebSocket échoue, basculer sur SSE
+          this.isConnecting = false;
           if (!this.sse) {
             this.connectSse();
           }
         };
-
-        // Si après 3.5s le WS n'est pas ouvert, ouvrir aussi SSE en backup
-        setTimeout(() => {
-          if (this.subscribers.size > 0 && (!this.ws || this.ws.readyState !== WebSocket.OPEN) && !this.sse) {
-            this.connectSse();
-          }
-        }, 3500);
-
-        return;
       } catch (err) {
         console.warn('[Realtime Hub] Erreur init WS, fallback SSE:', err);
       }
     }
-
-    // 2. Fallback SSE
-    this.connectSse();
   }
 
   private connectSse() {

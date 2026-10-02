@@ -1,61 +1,134 @@
 [
   {
-    "id": "test_sanitized_msg",
-    "content": "Hello from sanitized test",
-    "timestamp": "2026-09-28T18:01:38.980Z",
-    "timestampMs": 1790618498980,
+    "id": "msg_1790712399714_ytids",
+    "senderId": "p1",
+    "mediaType": "text",
+    "content": "Gfb",
+    "timestamp": "2026-09-29T20:06:39.714Z",
+    "timestampMs": 1790712399714,
+    "readStatus": "read",
+    "status": "read"
+  },
+  {
+    "id": "msg_1790712596791_xhv6f",
+    "content": "Vf",
+    "timestampMs": 1790712596791,
+    "mediaType": "text",
+    "senderId": "p1",
+    "status": "read",
+    "readStatus": "read",
+    "timestamp": "2026-09-29T20:09:56.791Z"
+  },
+  {
+    "id": "msg_1790712615022_rx4iz",
+    "status": "read",
+    "timestampMs": 1790712615022,
+    "timestamp": "2026-09-29T20:10:15.022Z",
+    "readStatus": "read",
+    "senderId": "p1",
+    "mediaType": "text",
+    "content": "Vv"
+  },
+  {
+    "id": "msg_1790712868082_zd1mi",
+    "readStatus": "read",
+    "status": "read",
+    "senderId": "p1",
+    "text": "⚔️ *Morpion des Gages : Victoire de ST !* 👑\nLe gage amoureux pour MD est :\n« Offrir 10 baisers doux et lents dans le cou ou sur les joues » 🌹",
+    "type": "text",
+    "timestamp": "2026-09-29T20:14:28.082Z",
+    "timestampMs": 1790712868082
+  },
+  {
+    "id": "msg_1790712905281_9vj8z",
+    "timestamp": "2026-09-29T20:15:05.281Z",
+    "timestampMs": 1790712905281,
+    "status": "sent",
     "readStatus": "sent",
     "senderId": "p2",
+    "text": "⚔️ *Morpion des Gages : Victoire de ST !* 👑\nLe gage amoureux pour MD est :\n« Offrir 10 baisers doux et lents dans le cou ou sur les joues » 🌹",
+    "type": "text"
+  },
+  {
+    "id": "msg_1790712933677_ykkgx",
+    "timestamp": "2026-09-29T20:15:33.677Z",
+    "timestampMs": 1790712933677,
+    "status": "sent",
+    "readStatus": "sent",
+    "senderId": "p2",
+    "text": "⚔️ *Morpion des Gages : Victoire de ST !* 👑\nLe gage amoureux pour MD est :\n« JE TAIME » 🌹",
+    "type": "text"
+  },
+  {
+    "id": "msg_1790713326067_yhftp",
+    "timestamp": "2026-09-29T20:22:06.067Z",
+    "senderId": "p2",
+    "readStatus": "read",
+    "mediaType": "text",
+    "timestampMs": 1790713326067,
+    "content": "Cc",
+    "status": "read"
+  },
+  {
+    "id": "msg_1790713329305_f3tzp",
+    "senderId": "p2",
+    "mediaType": "text",
+    "content": "Cc",
+    "timestamp": "2026-09-29T20:22:09.305Z",
+    "readStatus": "sent",
+    "timestampMs": 1790713329305,
     "status": "sent"
   },
   {
-    "id": "test_safi_1",
-    "senderId": "p2",
-    "content": "Coucou mon amour, tu me reçois bien ?",
-    "timestamp": "2026-09-28T18:15:00.000Z",
-    "timestampMs": 1790619300000,
-    "status": "sent",
-    "readStatus": "sent",
-    "mediaType": "text"
-  },
-  {
-    "id": "test_partner_live_2",
-    "senderId": "p2",
-    "content": "Coucou mon cœur, je teste le nouveau chat épuré !",
-    "timestamp": "2026-09-28T18:25:00.000Z",
-    "timestampMs": 1790619900000,
-    "status": "sent",
-    "readStatus": "sent",
-    "mediaType": "text"
-  },
-  {
-    "id": "msg_1790619901000_gtafd",
-    "readStatus": "sent",
-    "senderId": "p2",
+    "id": "msg_1790713342342_sqjvf",
     "mediaType": "text",
-    "content": "saliu",
-    "status": "sent",
-    "timestamp": "2026-09-28T18:25:01.000Z",
-    "timestampMs": 1790619901000
-  },
-  {
-    "id": "msg_1790619902000_x1k3r",
-    "readStatus": "sent",
-    "senderId": "p2",
-    "mediaType": "text",
-    "content": "tu va bien",
-    "status": "sent",
-    "timestamp": "2026-09-28T18:25:02.000Z",
-    "timestampMs": 1790619902000
-  },
-  {
-    "id": "msg_test_realtime_1790620659836",
+    "status": "read",
     "senderId": "p1",
-    "content": "Test message temps reel",
-    "timestamp": "2026-09-28T18:37:39.836Z",
-    "timestampMs": 1790620659837,
-    "status": "sent",
-    "readStatus": "sent",
-    "mediaType": "text"
+    "readStatus": "read",
+    "content": "Va dans jeux",
+    "timestampMs": 1790713342342,
+    "timestamp": "2026-09-29T20:22:22.342Z"
+  },
+  {
+    "id": "msg_1790713364595_gz4tm",
+    "senderId": "p1",
+    "mediaType": "text",
+    "content": "Le premier jeu",
+    "timestamp": "2026-09-29T20:22:44.595Z",
+    "timestampMs": 1790713364595,
+    "readStatus": "read",
+    "status": "read"
+  },
+  {
+    "id": "msg_1790713565625_8yy93",
+    "senderId": "p2",
+    "mediaType": "text",
+    "content": "J te re viens",
+    "timestamp": "2026-09-29T20:26:05.625Z",
+    "timestampMs": 1790713565625,
+    "readStatus": "read",
+    "status": "read"
+  },
+  {
+    "id": "msg_1790713586382_056df",
+    "senderId": "p1",
+    "mediaType": "text",
+    "content": "C'est bon je t'aime 🤣",
+    "timestamp": "2026-09-29T20:26:26.382Z",
+    "timestampMs": 1790713586382,
+    "readStatus": "read",
+    "status": "read"
+  },
+  {
+    "id": "test_rt_1790713964602",
+    "senderId": "p1",
+    "content": "Test direct real-time",
+    "timestamp": "2026-09-29T20:32:44.602Z"
+  },
+  {
+    "id": "msg_final_check_1790714161863",
+    "senderId": "p2",
+    "content": "Coucou mon cœur ! Message test temps réel réussi !",
+    "timestamp": "2026-09-29T20:36:01.863Z"
   }
 ]

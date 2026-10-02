@@ -143,35 +143,22 @@ export const SixtySecondsLoveGame: React.FC<SixtySecondsLoveGameProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold mb-2">
-              <Timer className="w-3.5 h-3.5" />
-              <span>Chrono Express de Tendresse</span>
-            </div>
-            <h2 className="font-serif-romantic text-2xl sm:text-3xl font-bold tracking-tight">
-              ⏱️ 60 Secondes pour Me Faire Craquer
-            </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-xl">
-              Vous avez 60 secondes pour taper un maximum de compliments, de souvenirs ou de qualités que vous aimez chez votre partenaire !
-            </p>
-          </div>
-
-          <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl p-3.5 flex items-center gap-3.5 shrink-0 self-stretch sm:self-auto">
-            <div className="w-12 h-12 rounded-xl bg-white text-rose-600 flex items-center justify-center font-bold text-xl shadow-sm">
-              {words.length}
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/80 font-semibold">Mots d'Amour</p>
-              <p className="text-xs font-bold text-white">
-                Pour {targetPartner.name}
-              </p>
-            </div>
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* 1. Header Minimal */}
+      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base sm:text-lg">⏱️</span>
+          <div className="min-w-0">
+            <span className="font-bold text-xs sm:text-sm text-stone-800 truncate block">60s de Mots Doux</span>
+            <span className="text-[10px] text-stone-500 truncate block">
+              Pour <strong className="text-rose-600">{targetPartner.name}</strong> • 1 minute pour complimenter
+            </span>
           </div>
         </div>
+
+        <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+          {words.length} mots trouvés
+        </span>
       </div>
 
       {/* Main Game Interface */}

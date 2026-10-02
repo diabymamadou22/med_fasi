@@ -195,46 +195,41 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Banner */}
-      <div className="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Casse-tête & Billet Doux Secret</span>
-            </div>
-            <h2 className="font-serif-romantic text-2xl sm:text-3xl font-bold tracking-tight">
-              🧩 Le Puzzle Photo Surprise
-            </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-xl">
-              Reconstituez la photo souvenir pour déverrouiller le message secret d'amour caché dessous !
-            </p>
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* 1. Header Minimal */}
+      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base sm:text-lg">🧩</span>
+          <div className="min-w-0">
+            <span className="font-bold text-xs sm:text-sm text-stone-800 truncate block">Puzzle Romantique</span>
+            <span className="text-[10px] text-stone-500 truncate block">
+              Reconstituez la photo pour dévoiler le mot secret
+            </span>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white font-bold text-xs backdrop-blur-md flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              <span>Utiliser notre photo</span>
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleCustomUpload}
-              accept="image/*"
-              className="hidden"
-            />
-            <button
-              onClick={() => setShowCustomModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-white text-rose-700 hover:bg-rose-50 font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Mail className="w-4 h-4" />
-              <span>Changer le mot doux</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-2.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Upload className="w-3.5 h-3.5 text-stone-500" />
+            <span className="hidden sm:inline">Notre photo</span>
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleCustomUpload}
+            accept="image/*"
+            className="hidden"
+          />
+          <button
+            onClick={() => setShowCustomModal(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors border border-rose-200"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Mot secret</span>
+          </button>
         </div>
       </div>
 

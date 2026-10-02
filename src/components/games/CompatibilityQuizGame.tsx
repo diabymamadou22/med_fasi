@@ -172,37 +172,29 @@ export const CompatibilityQuizGame: React.FC<CompatibilityQuizGameProps> = ({
   const badge = getBadge(scorePercent);
 
   return (
-    <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-pink-600 via-rose-500 to-amber-500 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="relative z-1 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold mb-2">
-              <Award className="w-3.5 h-3.5" />
-              <span>Quiz de Connaissance Réciproque</span>
-            </div>
-            <h2 className="font-serif-romantic text-2xl sm:text-3xl font-bold tracking-tight">
-              🎯 Est-ce que tu me connais vraiment ?
-            </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-xl">
-              L'un des partenaires choisit secrètement sa réponse, et l'autre doit deviner la vérité !
-            </p>
-          </div>
-
-          {/* Switch target partner */}
-          <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl p-3 flex items-center gap-2">
-            <span className="text-xs font-semibold text-white/90">Sujet du Quiz :</span>
-            <button
-              onClick={() => {
-                setTargetPartnerId(targetPartnerId === 'p1' ? 'p2' : 'p1');
-                soundEffects.playSoftTap();
-              }}
-              className="px-3 py-1.5 rounded-xl bg-white text-rose-700 font-bold text-xs shadow-xs hover:bg-rose-50 cursor-pointer transition-colors"
-            >
-              Sur {targetPartner.name} (Changer ⇄)
-            </button>
+    <div className="space-y-4 max-w-xl mx-auto">
+      {/* 1. Header Minimal & Sélecteur du Sujet */}
+      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base sm:text-lg">🎯</span>
+          <div className="min-w-0">
+            <span className="font-bold text-xs sm:text-sm text-stone-800 truncate block">Tu me connais vraiment ?</span>
+            <span className="text-[10px] text-stone-500 truncate block">
+              Sujet : <strong className="text-rose-600">{targetPartner.name}</strong> • Devin : {guesserPartner.name}
+            </span>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setTargetPartnerId(targetPartnerId === 'p1' ? 'p2' : 'p1');
+            soundEffects.playSoftTap();
+          }}
+          className="px-2.5 py-1.5 rounded-xl bg-stone-100 hover:bg-rose-50 hover:text-rose-600 text-stone-700 font-bold text-[11px] transition-colors cursor-pointer shrink-0 border border-stone-200"
+        >
+          Sujet : {targetPartner.name} ⇄
+        </button>
       </div>
 
       {!showResults ? (

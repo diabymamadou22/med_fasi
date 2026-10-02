@@ -691,8 +691,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
         </div>
       )}
 
-      {/* 1. TOP APP BAR - IMMOVABLE & STICKY ON SCROLL */}
-      <header className="sticky top-0 z-40 h-14 sm:h-16 px-3 sm:px-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 shadow-xs select-none overscroll-none">
+      {/* 1. TOP APP BAR - IMMOVABLE & LOCKED FIRMLY ON SCROLL */}
+      <header className="flex-none shrink-0 w-full h-14 sm:h-16 px-3 sm:px-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between z-40 shadow-xs select-none overscroll-none touch-none pt-[env(safe-area-inset-top,0px)]">
         {isSelectionMode ? (
           /* SELECTION MODE HEADER */
           <div className="flex items-center justify-between w-full">
@@ -810,9 +810,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     </span>
                   )}
                   <span className="text-slate-300 dark:text-slate-700 select-none">·</span>
-                  <span className="text-slate-400 dark:text-slate-500 text-[11px] truncate">
-                    Moi : {currentPartner.name}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSwitchPartner(otherPartnerId);
+                      setChatToastFeedback(`Profil actif : ${otherPartner.name}`);
+                      setTimeout(() => setChatToastFeedback(null), 2500);
+                    }}
+                    className="text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 text-[11px] truncate flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Changer de profil sur cet appareil"
+                  >
+                    <span>Moi : {currentPartner.name}</span>
+                    <ArrowLeftRight className="w-2.5 h-2.5 opacity-60" />
+                  </button>
                 </p>
               </div>
             </div>
@@ -1105,6 +1115,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       <div
         ref={chatContainerRef}
         className="flex-1 min-h-0 overflow-y-auto overscroll-contain no-scrollbar p-3.5 sm:p-5 space-y-2.5 relative z-10"
+        style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         onScroll={(e) => {
           const el = e.currentTarget;
           const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;

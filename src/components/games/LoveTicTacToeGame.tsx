@@ -424,172 +424,109 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
   };
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
-      {/* 1. Header Banner Épuré */}
-      <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-xs relative overflow-hidden">
-        <div className="relative z-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-serif-romantic text-xl sm:text-2xl font-bold tracking-tight">
-                Morpion & Gages
-              </h2>
-              {gameMode === 'live' && (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-400 text-stone-900 text-[10px] font-extrabold uppercase tracking-wide">
-                  <span className="w-1.5 h-1.5 rounded-full bg-stone-900 animate-pulse" />
-                  En Direct
-                </span>
-              )}
-            </div>
-            <p className="text-white/90 text-xs mt-0.5">
-              Alignez 3 symboles complices pour remporter le gage
-            </p>
-          </div>
-
-          {/* Mode Selector Dropdown / Buttons */}
-          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-xl backdrop-blur-md">
-            <button
-              onClick={() => {
-                setGameMode('live');
-                handleResetGame();
-              }}
-              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
-                gameMode === 'live'
-                  ? 'bg-white text-rose-600 shadow-xs'
-                  : 'text-white/80 hover:text-white'
-              }`}
-              title="Jouer en temps réel en duo"
-            >
-              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span>En Direct</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setGameMode('local');
-                handleResetGame();
-              }}
-              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
-                gameMode === 'local'
-                  ? 'bg-white text-rose-600 shadow-xs'
-                  : 'text-white/80 hover:text-white'
-              }`}
-              title="Jouer sur le même écran"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Même Écran</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setGameMode('ai');
-                handleResetGame();
-              }}
-              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 transition-all cursor-pointer ${
-                gameMode === 'ai'
-                  ? 'bg-white text-rose-600 shadow-xs'
-                  : 'text-white/80 hover:text-white'
-              }`}
-              title="Jouer contre l'IA Cupidon"
-            >
-              <Bot className="w-3.5 h-3.5" />
-              <span>vs IA</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Live Status Badge & Partner Roles */}
-      {gameMode === 'live' && (
-        <div className="bg-white/95 rounded-2xl p-3 border border-rose-100 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+    <div className="space-y-3.5 max-w-lg mx-auto">
+      {/* 1. Header Minimal & Sélecteur de Mode */}
+      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base sm:text-lg">💖</span>
+          <span className="font-bold text-xs sm:text-sm text-stone-800 truncate">Morpion & Gages</span>
+          {gameMode === 'live' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Direct
             </span>
-            <span className="font-semibold text-stone-700">
-              Session en direct synchronisée avec <strong>{otherPartner.name}</strong>
-            </span>
-            {isSyncing && (
-              <RefreshCw className="w-3 h-3 text-rose-500 animate-spin ml-1" />
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 font-medium border border-rose-200/80 flex items-center gap-1.5">
-              <span className="opacity-70">Moi :</span>
-              <strong>{currentPartner.name}</strong>
-              <span className="text-sm">{mySymbol}</span>
-            </div>
-            <span className="text-stone-300">vs</span>
-            <div className="px-2.5 py-1 rounded-xl bg-purple-50 text-purple-700 font-medium border border-purple-200/80 flex items-center gap-1.5">
-              <strong>{otherPartner.name}</strong>
-              <span className="text-sm">{otherPartnerId === 'p1' ? p1Symbol : p2Symbol}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Score Tracker */}
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        <div className={`p-3 rounded-2xl bg-white border text-center transition-all ${
-          currentTurn === 'p1' && !winner ? 'border-rose-400 ring-2 ring-rose-200/80 shadow-xs' : 'border-rose-100'
-        }`}>
-          <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-rose-600 truncate">
-            <span>{p1Symbol}</span>
-            <span className="truncate">{profile.partner1.name}</span>
-            {activePartnerId === 'p1' && <span className="text-[10px] text-stone-400 font-normal">(Moi)</span>}
-          </div>
-          <p className="text-2xl font-black text-stone-900 mt-0.5">{p1Wins}</p>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-white border border-stone-200 text-center">
-          <span className="text-[11px] font-bold text-stone-500">Matchs Nuls</span>
-          <p className="text-2xl font-black text-stone-600 mt-0.5">{ties}</p>
-        </div>
-
-        <div className={`p-3 rounded-2xl bg-white border text-center transition-all ${
-          currentTurn === 'p2' && !winner ? 'border-purple-400 ring-2 ring-purple-200/80 shadow-xs' : 'border-purple-100'
-        }`}>
-          <div className="flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-purple-600 truncate">
-            <span>{p2Symbol}</span>
-            <span className="truncate">{gameMode === 'ai' ? 'Cupidon' : profile.partner2.name}</span>
-            {gameMode !== 'ai' && activePartnerId === 'p2' && <span className="text-[10px] text-stone-400 font-normal">(Moi)</span>}
-          </div>
-          <p className="text-2xl font-black text-stone-900 mt-0.5">{p2Wins}</p>
-        </div>
-      </div>
-
-      {/* 4. Current Turn Banner */}
-      {!winner && (
-        <div className="text-center">
-          {gameMode === 'live' ? (
-            isMyTurn ? (
-              <motion.div
-                initial={{ scale: 0.96 }}
-                animate={{ scale: 1 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md text-xs font-bold"
-              >
-                <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
-                <span>C'est à votre tour de jouer, {currentPartner.name} ! Déposez votre {mySymbol}</span>
-              </motion.div>
-            ) : (
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-600">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span>En attente du coup de {otherPartner.name} ({otherPartnerId === 'p1' ? p1Symbol : p2Symbol})...</span>
-              </div>
-            )
-          ) : (
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800">
-              <span>Tour de :</span>
-              <strong className="text-sm">
-                {currentTurn === 'p1'
-                  ? `${profile.partner1.name} (${p1Symbol})`
-                  : `${gameMode === 'ai' ? 'Cupidon IA' : profile.partner2.name} (${p2Symbol})`}
-              </strong>
-            </div>
           )}
         </div>
-      )}
+
+        <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl shrink-0">
+          <button
+            onClick={() => {
+              setGameMode('live');
+              handleResetGame();
+            }}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+              gameMode === 'live'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            Direct
+          </button>
+          <button
+            onClick={() => {
+              setGameMode('local');
+              handleResetGame();
+            }}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+              gameMode === 'local'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            1 Écran
+          </button>
+          <button
+            onClick={() => {
+              setGameMode('ai');
+              handleResetGame();
+            }}
+            className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+              gameMode === 'ai'
+                ? 'bg-white text-rose-600 shadow-xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            vs IA
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Barre de Scores Épurée & Tour de Jeu */}
+      <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all ${
+          currentTurn === 'p1' && !winner ? 'bg-rose-50 ring-1 ring-rose-300' : 'bg-stone-50'
+        }`}>
+          <span className="text-sm">{p1Symbol}</span>
+          <div className="leading-tight">
+            <span className="font-bold text-xs text-stone-800 block truncate max-w-[90px]">
+              {profile.partner1.name}
+            </span>
+            <span className="text-[10px] text-stone-500 font-semibold">{p1Wins} victoires</span>
+          </div>
+        </div>
+
+        <div className="text-center px-2">
+          {!winner ? (
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full inline-block ${
+              gameMode === 'live' && isMyTurn
+                ? 'bg-emerald-500 text-white shadow-xs animate-pulse'
+                : 'bg-stone-100 text-stone-600'
+            }`}>
+              {gameMode === 'live'
+                ? isMyTurn
+                  ? 'À vous !'
+                  : `Tour de ${otherPartner.name}`
+                : currentTurn === 'p1'
+                ? `Tour de ${profile.partner1.name}`
+                : `Tour de ${gameMode === 'ai' ? 'Cupidon' : profile.partner2.name}`}
+            </span>
+          ) : (
+            <span className="text-[10px] text-stone-400 font-semibold">Match terminé</span>
+          )}
+        </div>
+
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all ${
+          currentTurn === 'p2' && !winner ? 'bg-purple-50 ring-1 ring-purple-300' : 'bg-stone-50'
+        }`}>
+          <span className="text-sm">{p2Symbol}</span>
+          <div className="leading-tight text-right">
+            <span className="font-bold text-xs text-stone-800 block truncate max-w-[90px]">
+              {gameMode === 'ai' ? 'Cupidon' : profile.partner2.name}
+            </span>
+            <span className="text-[10px] text-stone-500 font-semibold">{p2Wins} victoires</span>
+          </div>
+        </div>
+      </div>
 
       {/* 5. 3x3 Grid Board */}
       <div className="flex flex-col items-center justify-center">
