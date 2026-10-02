@@ -44,7 +44,19 @@ export const FlirtCardsGame: React.FC<FlirtCardsGameProps> = ({
   const [selectedModuleId, setSelectedModuleId] = useState<string>(ENGLISH_MODULES[1]?.id || ENGLISH_MODULES[0].id);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
-  const [gameMode, setGameMode] = useState<'deck' | 'grid'>('deck');
+  const [gameMode, setGameMode] = useState<'four_pieces' | 'deck' | 'grid'>('four_pieces');
+
+  // Mode 4-Pièces State
+  const [fourPiecesIndices, setFourPiecesIndices] = useState<number[]>([0, 1, 2, 3]);
+  const [revealedPieces, setRevealedPieces] = useState<number[]>([]);
+
+  const handleDealFourPieces = () => {
+    soundEffects.playHeartPulse();
+    setRevealedPieces([]);
+    const len = currentModule.items.length;
+    const pool = Array.from({ length: len }, (_, i) => i).sort(() => Math.random() - 0.5);
+    setFourPiecesIndices(pool.slice(0, Math.min(4, len)));
+  };
 
   const currentModule = ENGLISH_MODULES.find((m) => m.id === selectedModuleId) || ENGLISH_MODULES[0];
   const currentCard = currentModule.items[activeCardIndex] || currentModule.items[0];
@@ -134,24 +146,240 @@ export const FlirtCardsGame: React.FC<FlirtCardsGameProps> = ({
         <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl shrink-0 w-full sm:w-auto">
           <button
             type="button"
-            onClick={() => setGameMode('deck')}
+            onClick={() => {
+              setGameMode('four_pieces');
+              soundEffects.playSoftTap();
+            }}
+            className={`flex-1 sm:flex-initial px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center min-h-[38px] touch-manipulation flex items-center justify-center gap-1.5 ${
+              gameMode === 'four_pieces' ? 'bg-white text-rose-600 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <span>🎴 Mode 4-Pièces</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[9px] font-extrabold">Duo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setGameMode('deck');
+              soundEffects.playSoftTap();
+            }}
             className={`flex-1 sm:flex-initial px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center min-h-[38px] touch-manipulation ${
               gameMode === 'deck' ? 'bg-white text-rose-600 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            🃏 Jeu de Pioche
+            🃏 Pioche
           </button>
           <button
             type="button"
-            onClick={() => setGameMode('grid')}
+            onClick={() => {
+              setGameMode('grid');
+              soundEffects.playSoftTap();
+            }}
             className={`flex-1 sm:flex-initial px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center min-h-[38px] touch-manipulation ${
               gameMode === 'grid' ? 'bg-white text-rose-600 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
             }`}
           >
-            📋 Grille Complète
+            📋 Grille
           </button>
         </div>
       </div>
+
+      {/* Sub-view 0: Interactive 4-Pieces Mode */}
+      {gameMode === 'four_pieces' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-rose-50 via-white to-amber-50 p-3 sm:p-4 rounded-2xl border border-rose-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg">🎴</span>
+                <h4 className="font-bold text-xs sm:text-sm text-stone-900 font-serif-romantic">
+                  Jeu des 4 Pièces Romantiques
+                </h4>
+                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">
+                  {revealedPieces.length}/4 révélées
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-600">
+                Piochées pour {profile.partner1.name} & {profile.partner2.name} • Touchez chaque carte pour la retourner !
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleDealFourPieces}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all active:scale-95"
+              >
+                <Shuffle className="w-3.5 h-3.5 text-amber-600" />
+                <span>Nouvelles 4 pièces</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSuccessSparkle();
+                  setRevealedPieces([0, 1, 2, 3]);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold shadow-2xs cursor-pointer transition-all active:scale-95"
+              >
+                Tout révéler ✨
+              </button>
+            </div>
+          </div>
+
+          {/* 2x2 Grid of 4 Cards (4 Pièces) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {fourPiecesIndices.map((itemIndex, slotIdx) => {
+              const item = currentModule.items[itemIndex] || currentModule.items[0];
+              const isRevealedCard = revealedPieces.includes(slotIdx);
+              const isMastered = masteredIds.includes(item.id);
+
+              return (
+                <motion.div
+                  key={`four-piece-${slotIdx}-${item.id}-${isRevealedCard}`}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setRevealedPieces((prev) => {
+                      const next = prev.includes(slotIdx)
+                        ? prev.filter((i) => i !== slotIdx)
+                        : [...prev, slotIdx];
+                      if (next.length === 4 && prev.length < 4) {
+                        soundEffects.playVictoryChime();
+                        triggerCelebrationConfetti();
+                        onAddXp(25);
+                      }
+                      return next;
+                    });
+                  }}
+                  className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 transition-all cursor-pointer min-h-[220px] flex flex-col justify-between relative overflow-hidden active:scale-[0.99] shadow-xs ${
+                    isRevealedCard
+                      ? 'bg-white border-rose-300 ring-2 ring-rose-200/50'
+                      : 'bg-gradient-to-br from-rose-500 via-rose-600 to-pink-600 border-rose-400 text-white hover:border-amber-300'
+                  }`}
+                >
+                  {!isRevealedCard ? (
+                    // Face-down mystery card
+                    <div className="my-auto flex flex-col items-center justify-center text-center space-y-3 py-6">
+                      <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-2xl shadow-inner border border-white/30 animate-pulse">
+                        💖
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-rose-100">
+                          Pièce {slotIdx + 1} sur 4
+                        </span>
+                        <h4 className="font-serif-romantic text-base font-extrabold text-white mt-0.5">
+                          Carte Secrète Complice
+                        </h4>
+                      </div>
+                      <span className="px-3 py-1 rounded-full bg-white/20 text-white text-[11px] font-bold border border-white/30 inline-flex items-center gap-1">
+                        <span>Toucher pour retourner 🔄</span>
+                      </span>
+                    </div>
+                  ) : (
+                    // Face-up revealed card content
+                    <div className="space-y-3 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 border-b border-rose-100 pb-2">
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-extrabold">
+                            Pièce {slotIdx + 1} • {item.category}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleMastered(item.id);
+                            }}
+                            className={`p-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                              isMastered
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            }`}
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>{isMastered ? 'Acquis' : 'À retenir'}</span>
+                          </button>
+                        </div>
+
+                        <div className="pt-2 space-y-1">
+                          <h4 className="text-lg sm:text-xl font-bold text-stone-900 font-serif-romantic leading-snug break-words">
+                            "{item.english}"
+                          </h4>
+                          <p className="text-[11px] font-mono text-rose-600 font-semibold">
+                            {item.phonetic}
+                          </p>
+                          <div className="pt-1 flex items-center gap-1.5">
+                            <span className="text-sm">🇫🇷</span>
+                            <p className="text-sm font-extrabold text-rose-700 font-serif-romantic">
+                              {item.french}
+                            </p>
+                          </div>
+                        </div>
+
+                        {item.contextOrTip && (
+                          <p className="text-[11px] text-stone-600 bg-amber-50/70 p-2 rounded-xl border border-amber-100 mt-2 leading-relaxed">
+                            💡 {item.contextOrTip}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Controls inside card */}
+                      <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlayAudio(item.english);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Écouter</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendToChat(item);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-rose-600 font-bold text-xs flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Au Chat</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {revealedPieces.length === 4 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex items-center justify-between gap-3 text-emerald-900"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold">
+                  Bravo ! Les 4 pièces complices ont été révélées (+25 XP duo) ! 🎉
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDealFourPieces}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-all active:scale-95"
+              >
+                Rejouer 4 pièces 🎴
+              </button>
+            </motion.div>
+          )}
+        </div>
+      )}
 
       {/* Sub-view 1: Interactive Mystery Card Deck Mode */}
       {gameMode === 'deck' && currentCard && (

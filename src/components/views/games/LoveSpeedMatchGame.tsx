@@ -86,6 +86,7 @@ export const LoveSpeedMatchGame: React.FC<LoveSpeedMatchGameProps> = ({
   const partnerOther = activePartnerId === 'p1' ? profile.partner2 : profile.partner1;
 
   // Game state
+  const [pairsCount, setPairsCount] = useState<4 | 6>(4);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(60);
   const [score, setScore] = useState<number>(0);
@@ -111,10 +112,10 @@ export const LoveSpeedMatchGame: React.FC<LoveSpeedMatchGameProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Shuffle a fresh round of 6 pairs (12 cards)
+  // Shuffle a fresh round of pairs according to pairsCount
   const generateNewRound = useCallback(() => {
     const shuffledPool = [...SPEED_VOCAB_POOL].sort(() => 0.5 - Math.random());
-    const roundPairs = shuffledPool.slice(0, 6);
+    const roundPairs = shuffledPool.slice(0, pairsCount);
 
     const roundCards: CardItem[] = [];
     roundPairs.forEach((pair) => {
@@ -326,6 +327,35 @@ export const LoveSpeedMatchGame: React.FC<LoveSpeedMatchGameProps> = ({
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-100/70 border border-amber-200 rounded-full text-xs font-bold text-amber-900">
             <Trophy className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
             <span>Record personnel : {highScore} pts</span>
+          </div>
+
+          {/* Format Selector: 4 Pièces vs 6 Paires */}
+          <div className="flex items-center justify-center gap-1.5 pt-1">
+            <span className="text-xs font-bold text-stone-600">Mode :</span>
+            <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200">
+              <button
+                type="button"
+                onClick={() => setPairsCount(4)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  pairsCount === 4
+                    ? 'bg-rose-500 text-white shadow-2xs'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                ⚡ 4 Pièces (Express)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPairsCount(6)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  pairsCount === 6
+                    ? 'bg-rose-500 text-white shadow-2xs'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                🏆 6 Paires (Standard)
+              </button>
+            </div>
           </div>
 
           <div>

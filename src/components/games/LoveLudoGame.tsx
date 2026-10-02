@@ -1,20 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Sparkles,
-  Trophy,
   RotateCcw,
   MessageCircle,
-  Volume2,
-  Crown,
-  Heart,
-  Bot,
-  Users,
-  Radio,
   Dices,
   Flame,
-  CheckCircle2,
-  Share2,
+  Settings2,
+  Trophy,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, LudoToken, LudoGameSession } from '../../types';
 import { soundEffects } from '../../lib/audio';
@@ -99,7 +91,7 @@ const P2_HOME_STRETCH: [number, number][] = [
   [9, 7],  // 55
 ];
 
-// Yard base coordinates (visual positions inside the 6x6 corner box)
+// Yard base coordinates
 const P1_YARD_SPOTS: [number, number][] = [
   [1.5, 10.5],
   [4.5, 10.5],
@@ -114,7 +106,6 @@ const P2_YARD_SPOTS: [number, number][] = [
   [13.5, 4.5],
 ];
 
-// Default romantic pledges
 const LUDO_PLEDGES = [
   'Offrir un massage relaxant de 10 minutes à son partenaire',
   'Préparer le petit-déjeuner au lit le week-end prochain avec un mot doux',
@@ -131,7 +122,7 @@ interface LoveLudoGameProps {
   onSendChatMessage?: (msgData: {
     senderId: PartnerId;
     content: string;
-    mediaType?: 'image' | 'audio' | 'video';
+    mediaType?: 'image' | 'audio' | 'video' | 'text';
   }) => void;
 }
 
@@ -143,9 +134,10 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const p1 = profile.partner1;
   const p2 = profile.partner2;
 
-  // Settings
-  const [tokensPerPlayer, setTokensPerPlayer] = useState<2 | 4>(2);
-  const [gameMode, setGameMode] = useState<'live' | 'local' | 'ai'>('live');
+  // Settings (Default: 4 pieces as requested, pass-and-play local)
+  const [tokensPerPlayer, setTokensPerPlayer] = useState<2 | 4>(4);
+  const [gameMode, setGameMode] = useState<'local' | 'live' | 'ai'>('local');
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // Core Game State
   const [currentTurn, setCurrentTurn] = useState<PartnerId>('p1');
@@ -156,7 +148,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const [p1Wins, setP1Wins] = useState<number>(0);
   const [p2Wins, setP2Wins] = useState<number>(0);
   const [selectedPledge, setSelectedPledge] = useState<string>(LUDO_PLEDGES[0]);
-  const [lastEventText, setLastEventText] = useState<string>('Lancez le dé pour commencer la partie !');
+  const [lastEventText, setLastEventText] = useState<string>('À Med de lancer le dé !');
   const [sentToChatToast, setSentToChatToast] = useState<boolean>(false);
 
   // Tokens state
@@ -189,7 +181,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   // Synchronisation BroadcastChannel
   useEffect(() => {
     try {
-      channelRef.current = new BroadcastChannel('ludo_king_channel');
+      channelRef.current = new BroadcastChannel('ludo_ms_channel');
       channelRef.current.onmessage = (event) => {
         if (event.data && gameMode === 'live') {
           handleIncomingSession(event.data);
@@ -219,16 +211,16 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
   const handleIncomingSession = (session: LudoGameSession) => {
     isSyncingFromRemote.current = true;
-    setCurrentTurn(session.currentTurn);
-    setDiceValue(session.diceValue);
-    setIsRolling(session.isRolling);
-    setConsecutiveSixes(session.consecutiveSixes);
-    setWinner(session.winner);
+    if (session.currentTurn) setCurrentTurn(session.currentTurn);
+    setDiceValue(session.diceValue ?? null);
+    setIsRolling(Boolean(session.isRolling));
+    setConsecutiveSixes(session.consecutiveSixes || 0);
+    setWinner(session.winner || null);
     if (typeof session.p1Wins === 'number') setP1Wins(session.p1Wins);
     if (typeof session.p2Wins === 'number') setP2Wins(session.p2Wins);
     if (session.selectedPledge) setSelectedPledge(session.selectedPledge);
     if (session.lastMoveText) setLastEventText(session.lastMoveText);
-    if (session.tokensPerPlayer) setTokensPerPlayer(session.tokensPerPlayer);
+    if (session.tokensPerPlayer) setTokensPerPlayer(session.tokensPerPlayer as 2 | 4);
 
     if (session.tokens?.p1) setTokensP1(session.tokens.p1);
     if (session.tokens?.p2) setTokensP2(session.tokens.p2);
@@ -298,7 +290,6 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         if (t.state === 'yard') {
           return roll === 6; // Requires a 6 to exit yard
         }
-        // If on path or home stretch, cannot overshoot 56
         return t.step + roll <= 56;
       });
     },
@@ -309,27 +300,18 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     return getPlayableTokens(currentTurn, diceValue);
   }, [currentTurn, diceValue, getPlayableTokens]);
 
-  // Turn management helper
   const nextTurnPlayer = (player: PartnerId) => (player === 'p1' ? 'p2' : 'p1');
 
   // Handle dice rolling
   const handleRollDice = () => {
     if (isRolling || winner) return;
 
-    // Turn check for live mode
-    if (gameMode === 'live' && currentTurn !== activePartnerId) {
-      soundEffects.playSoftTap();
-      return;
-    }
-
-    // AI turn check
     if (gameMode === 'ai' && currentTurn === 'p2') return;
 
     soundEffects.playDiceRoll();
     setIsRolling(true);
     setDiceValue(null);
 
-    // Random roll
     const finalRoll = Math.floor(Math.random() * 6) + 1;
 
     setTimeout(() => {
@@ -341,11 +323,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
       const rollingPartnerName = currentTurn === 'p1' ? p1.name : p2.name;
 
-      // 3 consecutive 6s rule -> pass turn!
+      // 3 consecutive 6s rule -> pass turn
       if (nextSixCount >= 3) {
         soundEffects.playSoftTap();
         const nextPlayer = nextTurnPlayer(currentTurn);
-        const text = `3 fois 6 d'affilée pour ${rollingPartnerName} ! Le tour passe à ${nextPlayer === 'p1' ? p1.name : p2.name}.`;
+        const text = `3 fois 6 d'affilée ! Le tour passe à ${nextPlayer === 'p1' ? p1.name : p2.name}.`;
         setLastEventText(text);
         setCurrentTurn(nextPlayer);
         setDiceValue(null);
@@ -363,12 +345,10 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       const availableMoves = getPlayableTokens(currentTurn, finalRoll);
 
       if (availableMoves.length === 0) {
-        // No moves possible -> automatic turn pass
         const nextPlayer = nextTurnPlayer(currentTurn);
         const text = `${rollingPartnerName} a fait un ${finalRoll}. Aucun coup possible !`;
         setLastEventText(text);
 
-        // If not a 6, pass turn
         if (finalRoll !== 6) {
           setTimeout(() => {
             setCurrentTurn(nextPlayer);
@@ -378,9 +358,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               diceValue: null,
               lastMoveText: text,
             });
-          }, 1200);
+          }, 1100);
         } else {
-          // Rolled 6 with no moves (all finished or overshooting), player gets to roll again!
           setLastEventText(`${rollingPartnerName} a fait un 6 ! Rejouez.`);
           syncSessionToCloud({
             diceValue: finalRoll,
@@ -388,19 +367,18 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           });
         }
       } else if (availableMoves.length === 1) {
-        // Exactly one move -> auto execute after brief visual feedback
         const text = `${rollingPartnerName} a fait un ${finalRoll} !`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
         setTimeout(() => {
           handleMoveToken(availableMoves[0], finalRoll);
-        }, 600);
+        }, 500);
       } else {
-        const text = `${rollingPartnerName} a fait un ${finalRoll} ! Choisissez un pion à déplacer.`;
+        const text = `Fait un ${finalRoll} ! Choisissez un pion à déplacer.`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
       }
-    }, 600);
+    }, 450);
   };
 
   // Move token logic
@@ -423,17 +401,16 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       if (roll !== 6) return;
       newState = 'path';
       newStep = 0;
-      gotBonusTurn = true; // Rolling a 6 gives another roll
+      gotBonusTurn = true;
     } else {
-      // 2. Advancing along path / home run
       newStep = token.step + roll;
-      if (newStep > 56) return; // Overshoot guard
+      if (newStep > 56) return;
 
       if (newStep === 56) {
         newState = 'finished';
         soundEffects.playSuccessSparkle();
         triggerHeartConfetti();
-        gotBonusTurn = true; // Reaching home gives bonus turn
+        gotBonusTurn = true;
       } else if (newStep >= 51) {
         newState = 'home_run';
       } else {
@@ -441,7 +418,6 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       }
     }
 
-    // Compute board track index if on main path
     const movingTrackIndex =
       newState === 'path'
         ? movingPlayer === 'p1'
@@ -449,7 +425,6 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           : (26 + newStep) % 52
         : null;
 
-    // Check for CAPTURE of opponent's token!
     let nextP1Tokens = [...tokensP1];
     let nextP2Tokens = [...tokensP2];
 
@@ -464,9 +439,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       });
 
       if (capturedIdx >= 0) {
-        // KNOCKOUT / CAPTURE !
         capturedOpponent = true;
-        gotBonusTurn = true; // Capturing gives another roll
+        gotBonusTurn = true;
         soundEffects.playVictoryChime();
         triggerHeartConfetti();
 
@@ -484,7 +458,6 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       }
     }
 
-    // Apply token move
     const updatedMoverToken: LudoToken = {
       ...token,
       step: newStep,
@@ -520,7 +493,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       soundEffects.playVictoryChime();
       triggerCelebrationConfetti();
 
-      const winText = `🏆 VICTOIRE ÉCLATANTE DE ${winnerName.toUpperCase()} AU LUDO ! 🎉`;
+      const winText = `🏆 VICTOIRE DE ${winnerName.toUpperCase()} ! 🎉`;
       setLastEventText(winText);
 
       syncSessionToCloud({
@@ -533,20 +506,18 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       return;
     }
 
-    // Event text
     const moverName = movingPlayer === 'p1' ? p1.name : p2.name;
     let moveMsg = `${moverName} a avancé son pion !`;
     if (newState === 'finished') {
-      moveMsg = `🎉 ${moverName} a rentré un pion à la maison ! Rejouez !`;
+      moveMsg = `🎉 ${moverName} a rentré un pion ! Rejouez !`;
     } else if (capturedOpponent) {
-      moveMsg = `💥 BINGO ! ${moverName} a capturé un pion adverse ! Rejouez !`;
+      moveMsg = `💥 Pion adverse capturé ! Rejouez !`;
     } else if (roll === 6) {
       moveMsg = `🎲 Un 6 ! ${moverName} rejoue !`;
     }
 
     setLastEventText(moveMsg);
 
-    // Next turn determination: rolling a 6, capturing, or reaching home grants an extra roll
     if (gotBonusTurn || roll === 6) {
       setDiceValue(null);
       syncSessionToCloud({
@@ -579,12 +550,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       } else {
         const moves = getPlayableTokens('p2', diceValue);
         if (moves.length > 0) {
-          // AI strategy: Prioritize capturing > moving home > advancing
           const chosen = moves[Math.floor(Math.random() * moves.length)];
           handleMoveToken(chosen, diceValue);
         }
       }
-    }, 1000);
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [gameMode, currentTurn, diceValue, winner, isRolling, getPlayableTokens]);
@@ -612,7 +582,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     setIsRolling(false);
     setConsecutiveSixes(0);
     setCurrentTurn('p1');
-    setLastEventText('Nouvelle partie lancée ! À toi de jouer.');
+    setLastEventText('Nouvelle partie ! À Med de lancer.');
 
     syncSessionToCloud({
       tokens: { p1: freshP1, p2: freshP2 },
@@ -631,7 +601,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     const winnerName = winner === 'p1' ? p1.name : p2.name;
     const loserName = winner === 'p1' ? p2.name : p1.name;
 
-    const summary = `🎲 *Ludo King Complice : Victoire de ${winnerName} !* 👑\nScore de la session : ${p1.name} ${p1Wins} - ${p2Wins} ${p2.name}\n\n🌹 Le gage amoureux pour ${loserName} :\n« ${selectedPledge} » ❤️`;
+    const summary = `🎲 *Ludo MS : Victoire de ${winnerName} !* 👑\nScore : ${p1.name} ${p1Wins} - ${p2Wins} ${p2.name}\n\n🌹 Gage amoureux pour ${loserName} :\n« ${selectedPledge} » ❤️`;
 
     onSendChatMessage({
       senderId: activePartnerId,
@@ -657,8 +627,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
     // 2. Finished in Home Center
     if (token.state === 'finished') {
-      // Offset slightly inside finish triangle
-      const offset = (indexInPlayer - 1.5) * 20;
+      const offset = (indexInPlayer - 1.5) * 22;
       if (isP1) {
         return { x: 700, y: 750 + offset };
       }
@@ -675,213 +644,348 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     // 4. On main track (0..50)
     const trackIndex = isP1 ? token.step : (26 + token.step) % 52;
     const coord = TRACK_COORDINATES[trackIndex] || [1, 8];
-    return { x: coord[0] * 100 + 50, y: coord[1] * 100 + 50 };
+
+    // Check multiple tokens on same square to offset cleanly
+    const allSamePlayerTokens = isP1 ? tokensP1 : tokensP2;
+    const sameSquareTokens = allSamePlayerTokens.filter(
+      (t) => t.state === token.state && t.step === token.step
+    );
+    let offsetX = 0;
+    let offsetY = 0;
+    if (sameSquareTokens.length > 1) {
+      const idxInSame = sameSquareTokens.findIndex((t) => t.id === token.id);
+      const offsets = [
+        [-10, -10],
+        [10, -10],
+        [-10, 10],
+        [10, 10],
+      ];
+      offsetX = offsets[idxInSame % 4][0];
+      offsetY = offsets[idxInSame % 4][1];
+    }
+
+    return { x: coord[0] * 100 + 50 + offsetX, y: coord[1] * 100 + 50 + offsetY };
   };
 
-  const isMyTurn = gameMode === 'local' || (gameMode === 'live' && currentTurn === activePartnerId) || (gameMode === 'ai' && currentTurn === 'p1');
+  const p1HomeCount = activeTokensP1.filter((t) => t.state === 'finished').length;
+  const p2HomeCount = activeTokensP2.filter((t) => t.state === 'finished').length;
+  const isP1 = currentTurn === 'p1';
 
   return (
-    <div className="space-y-3.5 max-w-xl mx-auto box-border select-none">
-      {/* 1. Header Minimal & Sélecteur de Mode */}
-      <div className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-            🎲
-          </div>
-          <div className="min-w-0">
-            <h2 className="font-bold text-xs sm:text-sm text-stone-900 truncate flex items-center gap-1.5 font-serif-romantic">
-              <span>Ludo King à Deux</span>
-              {gameMode === 'live' && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Direct
-                </span>
-              )}
-            </h2>
-            <p className="text-[10px] text-stone-500 truncate">
-              {p1.name} (Rouge) vs {p2.name} (Vert)
-            </p>
-          </div>
+    <div className="w-full max-w-md mx-auto box-border select-none flex flex-col items-center gap-2 overflow-hidden px-1">
+      {/* 1. Header Ultra-Compact & Élégant (Sans fioritures) */}
+      <div className="w-full flex items-center justify-between py-1 px-2 bg-white/90 backdrop-blur-xs rounded-xl border border-stone-200/70 shadow-2xs">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base">🎲</span>
+          <span className="font-bold text-xs text-stone-900 tracking-tight">Ludo MS</span>
+          <span className="text-[10px] text-stone-400 font-medium truncate">
+            {p1Wins}-{p2Wins}
+          </span>
         </div>
 
-        {/* Mode Selector */}
-        <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl shrink-0">
+        {/* Action icons: Settings & Reset */}
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setGameMode('live')}
-            className={`px-2 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-              gameMode === 'live' ? 'bg-white text-rose-600 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-1 rounded-lg text-stone-500 hover:text-stone-800 transition-colors cursor-pointer ${
+              showSettings ? 'bg-stone-200 text-stone-900' : 'hover:bg-stone-100'
             }`}
+            title="Options du jeu"
           >
-            Direct ⚡
+            <Settings2 className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
-            onClick={() => setGameMode('local')}
-            className={`px-2 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-              gameMode === 'local' ? 'bg-white text-rose-600 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
-            }`}
+            onClick={handleResetGame}
+            className="p-1 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors cursor-pointer"
+            title="Recommencer"
           >
-            Local 👥
-          </button>
-          <button
-            type="button"
-            onClick={() => setGameMode('ai')}
-            className={`px-2 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-              gameMode === 'ai' ? 'bg-white text-rose-600 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            IA Cupidon 🤖
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* 2. Top Player HUD: Safi (Player 2 - Vert/Emeraude) */}
-      <div
-        className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between gap-2 shadow-2xs ${
-          currentTurn === 'p2'
-            ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-400/50'
-            : 'bg-white border-stone-200/80 opacity-80'
-        }`}
-      >
-        <div className="flex items-center gap-2 min-w-0">
+      {/* Settings popdown (hidden by default to avoid screen overflow) */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="w-full overflow-hidden bg-white rounded-xl p-2 border border-stone-200 shadow-xs flex flex-wrap items-center justify-between gap-2 text-xs"
+          >
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-stone-500 font-semibold">Mode :</span>
+              <button
+                type="button"
+                onClick={() => setGameMode('local')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  gameMode === 'local' ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                }`}
+              >
+                1 Écran
+              </button>
+              <button
+                type="button"
+                onClick={() => setGameMode('live')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  gameMode === 'live' ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                }`}
+              >
+                Direct ⚡
+              </button>
+              <button
+                type="button"
+                onClick={() => setGameMode('ai')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  gameMode === 'ai' ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                }`}
+              >
+                IA 🤖
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-stone-500 font-semibold">Pions :</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setTokensPerPlayer(4);
+                  handleResetGame();
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  tokensPerPlayer === 4 ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                }`}
+              >
+                4
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTokensPerPlayer(2);
+                  handleResetGame();
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  tokensPerPlayer === 2 ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                }`}
+              >
+                2
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Barre de Duel Intégrée (Ultra-plate, affiche les deux joueurs et le tour) */}
+      <div className="w-full flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-stone-200/80 shadow-2xs gap-2">
+        {/* Med (Rouge) */}
+        <div
+          className={`flex items-center gap-1.5 transition-all ${
+            isP1 ? 'font-bold text-rose-600' : 'text-stone-400 opacity-70'
+          }`}
+        >
           <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center text-sm shadow-xs border-2 border-white overflow-hidden">
+            <div className="w-6 h-6 rounded-full bg-rose-500 text-white font-bold flex items-center justify-center text-[10px] overflow-hidden border border-white shadow-2xs">
+              {p1.avatar ? (
+                <img src={p1.avatar} alt={p1.name} className="w-full h-full object-cover" />
+              ) : (
+                <span>{p1.name.charAt(0)}</span>
+              )}
+            </div>
+            {isP1 && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-1 ring-white animate-pulse" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs truncate block max-w-[70px]">{p1.name}</span>
+            <span className="text-[9px] text-stone-500 font-semibold block leading-none">
+              {p1HomeCount}/{tokensPerPlayer} 🏠
+            </span>
+          </div>
+        </div>
+
+        {/* Statut Tour au centre */}
+        <div className="flex flex-col items-center text-center px-1">
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-2xs ${
+              isP1 ? 'bg-rose-500 text-white' : 'bg-emerald-600 text-white'
+            }`}
+          >
+            {isP1 ? `Tour de ${p1.name}` : `Tour de ${gameMode === 'ai' ? 'Cupidon' : p2.name}`}
+          </span>
+          <span className="text-[9px] text-stone-400 truncate max-w-[130px] mt-0.5">
+            {isRolling
+              ? '🎲 Roulement...'
+              : diceValue
+              ? `Dé : ${diceValue} ${diceValue === 6 ? '🔥 Rejoue' : ''}`
+              : 'Touchez le dé'}
+          </span>
+        </div>
+
+        {/* Safi (Vert) */}
+        <div
+          className={`flex items-center gap-1.5 flex-row-reverse text-right transition-all ${
+            !isP1 ? 'font-bold text-emerald-600' : 'text-stone-400 opacity-70'
+          }`}
+        >
+          <div className="relative">
+            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center text-[10px] overflow-hidden border border-white shadow-2xs">
               {p2.avatar ? (
                 <img src={p2.avatar} alt={p2.name} className="w-full h-full object-cover" />
               ) : (
                 <span>{p2.name.charAt(0)}</span>
               )}
             </div>
-            {currentTurn === 'p2' && (
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] shadow-xs">
-                ★
-              </span>
+            {!isP1 && (
+              <span className="absolute -top-1 -left-1 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white animate-pulse" />
             )}
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-xs sm:text-sm text-stone-900 truncate">{p2.name}</span>
-              <span className="px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
-                Vert 🟢
-              </span>
-            </div>
-            <p className="text-[10px] text-stone-500">
-              {activeTokensP2.filter((t) => t.state === 'finished').length} / {tokensPerPlayer} pions rentrés
-            </p>
+            <span className="text-xs truncate block max-w-[70px]">
+              {gameMode === 'ai' ? 'Cupidon' : p2.name}
+            </span>
+            <span className="text-[9px] text-stone-500 font-semibold block leading-none">
+              {p2HomeCount}/{tokensPerPlayer} 🏠
+            </span>
           </div>
-        </div>
-
-        {/* Dice Tray for Player 2 */}
-        <div className="flex items-center gap-2 shrink-0">
-          {currentTurn === 'p2' && diceValue && (
-            <div className="w-9 h-9 rounded-xl bg-white border-2 border-emerald-400 text-emerald-600 font-black text-lg flex items-center justify-center shadow-xs animate-bounce">
-              {diceValue}
-            </div>
-          )}
-          <button
-            type="button"
-            disabled={currentTurn !== 'p2' || isRolling || (!isMyTurn && gameMode === 'live')}
-            onClick={handleRollDice}
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold transition-all shadow-xs cursor-pointer ${
-              currentTurn === 'p2'
-                ? 'bg-gradient-to-tr from-emerald-500 to-teal-500 text-white ring-2 ring-emerald-300 active:scale-95 animate-pulse'
-                : 'bg-stone-100 text-stone-400 cursor-not-allowed'
-            }`}
-          >
-            {isRolling && currentTurn === 'p2' ? (
-              <Dices className="w-5 h-5 animate-spin" />
-            ) : diceValue && currentTurn === 'p2' ? (
-              <span>{diceValue}</span>
-            ) : (
-              <span>🎲</span>
-            )}
-          </button>
         </div>
       </div>
 
-      {/* 3. The Authentic 15x15 Ludo King SVG Board */}
-      <div className="relative w-full aspect-square bg-[#FAF6F0] rounded-3xl p-1.5 sm:p-2.5 border-4 border-amber-800/80 shadow-md box-border overflow-hidden">
+      {/* 3. Plateau SVG Ludo MS : Équilibré et Proportionné (Ne déborde JAMAIS de l'écran) */}
+      <div className="relative w-full max-w-[min(82vw,46vh,380px)] aspect-square bg-[#FAF7F2] rounded-2xl p-1 border border-stone-200/90 shadow-xs box-border overflow-hidden">
         <svg
           viewBox="0 0 1500 1500"
           className="w-full h-full select-none"
           style={{ touchAction: 'manipulation' }}
         >
-          {/* Base Grid Background */}
-          <rect x="0" y="0" width="1500" height="1500" fill="#FFFDF8" />
+          {/* Surface */}
+          <rect x="0" y="0" width="1500" height="1500" fill="#FAF7F2" rx="30" />
 
-          {/* 1. Player 1 Yard (Bottom-Left: Rows 9..14, Cols 0..5 -> Red/Rose) */}
-          <rect x="0" y="900" width="600" height="600" fill="#F43F5E" />
-          <rect x="60" y="960" width="480" height="480" rx="30" fill="#FFF1F2" />
-          <text x="300" y="1030" fill="#E11D48" fontSize="32" fontWeight="bold" textAnchor="middle">
-            {p1.name} (Rouge)
+          {/* 1. Base Joueur 1 (Bas-Gauche : Rouge poudré) */}
+          <rect x="0" y="900" width="600" height="600" fill="#FFE4E6" />
+          <rect
+            x="50"
+            y="950"
+            width="500"
+            height="500"
+            rx="30"
+            fill="#FFF1F3"
+            stroke="#FECDD3"
+            strokeWidth="3"
+          />
+          <text x="300" y="1015" fill="#E11D48" fontSize="28" fontWeight="bold" textAnchor="middle">
+            {p1.name} 🔴
           </text>
           {P1_YARD_SPOTS.map((s, idx) => (
             <circle
               key={`p1_spot_${idx}`}
               cx={s[0] * 100 + 50}
               cy={s[1] * 100 + 50}
-              r="40"
-              fill="#F43F5E"
-              opacity="0.25"
+              r="38"
+              fill="#FFE4E6"
+              stroke="#FDA4AF"
+              strokeWidth="2.5"
+              strokeDasharray="4 4"
             />
           ))}
 
-          {/* 2. Player 2 Yard (Top-Right: Rows 0..5, Cols 9..14 -> Green/Emerald) */}
-          <rect x="900" y="0" width="600" height="600" fill="#10B981" />
-          <rect x="960" y="60" width="480" height="480" rx="30" fill="#ECFDF5" />
-          <text x="1200" y="130" fill="#047857" fontSize="32" fontWeight="bold" textAnchor="middle">
-            {p2.name} (Vert)
+          {/* 2. Base Joueur 2 (Haut-Droit : Menthe poudré) */}
+          <rect x="900" y="0" width="600" height="600" fill="#D1FAE5" />
+          <rect
+            x="950"
+            y="50"
+            width="500"
+            height="500"
+            rx="30"
+            fill="#F0FDF4"
+            stroke="#A7F3D0"
+            strokeWidth="3"
+          />
+          <text x="1200" y="115" fill="#059669" fontSize="28" fontWeight="bold" textAnchor="middle">
+            {p2.name} 🟢
           </text>
           {P2_YARD_SPOTS.map((s, idx) => (
             <circle
               key={`p2_spot_${idx}`}
               cx={s[0] * 100 + 50}
               cy={s[1] * 100 + 50}
-              r="40"
-              fill="#10B981"
-              opacity="0.25"
+              r="38"
+              fill="#D1FAE5"
+              stroke="#6EE7B7"
+              strokeWidth="2.5"
+              strokeDasharray="4 4"
             />
           ))}
 
-          {/* 3. Decorative Top-Left Yard (Yellow/Amber) */}
-          <rect x="0" y="0" width="600" height="600" fill="#F59E0B" />
-          <rect x="60" y="60" width="480" height="480" rx="30" fill="#FEF3C7" />
-          <text x="300" y="290" fill="#D97706" fontSize="48" textAnchor="middle">
+          {/* 3. Cadran Haut-Gauche neutre et apaisant */}
+          <rect x="0" y="0" width="600" height="600" fill="#F5EFEB" />
+          <rect
+            x="50"
+            y="50"
+            width="500"
+            height="500"
+            rx="30"
+            fill="#FAF8F5"
+            stroke="#EAE4DC"
+            strokeWidth="2"
+          />
+          <text x="300" y="280" fill="#B8AEA3" fontSize="38" textAnchor="middle">
             👑
           </text>
-          <text x="300" y="360" fill="#B45309" fontSize="30" fontWeight="bold" textAnchor="middle">
-            Ludo King
+          <text
+            x="300"
+            y="350"
+            fill="#8C8275"
+            fontSize="26"
+            fontWeight="bold"
+            letterSpacing="2"
+            textAnchor="middle"
+          >
+            Ludo MS
           </text>
 
-          {/* 4. Decorative Bottom-Right Yard (Blue/Indigo) */}
-          <rect x="900" y="900" width="600" height="600" fill="#3B82F6" />
-          <rect x="960" y="960" width="480" height="480" rx="30" fill="#EFF6FF" />
-          <text x="1200" y="1190" fill="#2563EB" fontSize="48" textAnchor="middle">
-            💖
+          {/* 4. Cadran Bas-Droit neutre et apaisant */}
+          <rect x="900" y="900" width="600" height="600" fill="#F5EFEB" />
+          <rect
+            x="950"
+            y="950"
+            width="500"
+            height="500"
+            rx="30"
+            fill="#FAF8F5"
+            stroke="#EAE4DC"
+            strokeWidth="2"
+          />
+          <text x="1200" y="1180" fill="#B8AEA3" fontSize="38" textAnchor="middle">
+            ❤️
           </text>
-          <text x="1200" y="1260" fill="#1D4ED8" fontSize="28" fontWeight="bold" textAnchor="middle">
-            Med & Safi
+          <text
+            x="1200"
+            y="1250"
+            fill="#8C8275"
+            fontSize="24"
+            fontWeight="bold"
+            letterSpacing="1"
+            textAnchor="middle"
+          >
+            {p1.name} & {p2.name}
           </text>
 
-          {/* 5. Center Home Finish Triangles (Cols 6..8, Rows 6..8) */}
-          <rect x="600" y="600" width="300" height="300" fill="#FFFFFF" />
-          {/* P1 Red Finish Triangle */}
-          <polygon points="600,600 750,750 600,900" fill="#F43F5E" />
-          {/* P2 Green Finish Triangle */}
-          <polygon points="900,600 750,750 900,900" fill="#10B981" />
-          {/* Top Yellow Finish Triangle */}
-          <polygon points="600,600 750,750 900,600" fill="#F59E0B" />
-          {/* Bottom Blue Finish Triangle */}
-          <polygon points="600,900 750,750 900,900" fill="#3B82F6" />
+          {/* 5. Centre d'Arrivée (Triangles) */}
+          <rect x="600" y="600" width="300" height="300" fill="#FAF7F2" />
+          <polygon points="600,600 750,750 600,900" fill="#FB7185" />
+          <polygon points="900,600 750,750 900,900" fill="#34D399" />
+          <polygon points="600,600 750,750 900,600" fill="#EDE7DF" />
+          <polygon points="600,900 750,750 900,900" fill="#EDE7DF" />
 
-          {/* Central Gold Trophy / Crown */}
-          <circle cx="750" cy="750" r="38" fill="#FBBF24" stroke="#D97706" strokeWidth="4" />
-          <text x="750" y="763" fill="#78350F" fontSize="30" textAnchor="middle">
-            🏆
+          {/* Cercle central */}
+          <circle cx="750" cy="750" r="36" fill="#FEF3C7" stroke="#F59E0B" strokeWidth="3" />
+          <text x="750" y="763" fill="#B45309" fontSize="26" textAnchor="middle">
+            👑
           </text>
 
-          {/* 6. Perimeter Path Squares & Home Stretches */}
+          {/* 6. Cases du parcours */}
           {TRACK_COORDINATES.map((c, idx) => {
             const isP1Start = idx === 0;
             const isP2Start = idx === 26;
@@ -900,14 +1004,15 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                   height="100"
                   fill={fill}
                   stroke="#E2E8F0"
-                  strokeWidth="2"
+                  strokeWidth="1.5"
+                  rx="6"
                 />
                 {isSafe && (
                   <text
                     x={c[0] * 100 + 50}
                     y={c[1] * 100 + 64}
-                    fill={isP1Start ? '#E11D48' : isP2Start ? '#059669' : '#94A3B8'}
-                    fontSize="36"
+                    fill={isP1Start ? '#E11D48' : isP2Start ? '#059669' : '#D97706'}
+                    fontSize="32"
                     textAnchor="middle"
                   >
                     ★
@@ -917,7 +1022,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             );
           })}
 
-          {/* P1 Red Home Stretch (Cols 1..5, Row 7) */}
+          {/* Coulées d'arrivée sécurisées */}
           {P1_HOME_STRETCH.map((c, idx) => (
             <rect
               key={`p1_home_${idx}`}
@@ -925,13 +1030,13 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               y={c[1] * 100}
               width="100"
               height="100"
-              fill="#F43F5E"
-              stroke="#BE123C"
-              strokeWidth="2"
+              fill="#FDA4AF"
+              stroke="#F43F5E"
+              strokeWidth="1.5"
+              rx="6"
             />
           ))}
 
-          {/* P2 Green Home Stretch (Cols 9..13, Row 7) */}
           {P2_HOME_STRETCH.map((c, idx) => (
             <rect
               key={`p2_home_${idx}`}
@@ -939,14 +1044,14 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               y={c[1] * 100}
               width="100"
               height="100"
-              fill="#10B981"
-              stroke="#047857"
-              strokeWidth="2"
+              fill="#6EE7B7"
+              stroke="#10B981"
+              strokeWidth="1.5"
+              rx="6"
             />
           ))}
 
-          {/* 7. Animated Playable Tokens */}
-          {/* Player 1 Tokens (Red) */}
+          {/* 7. Pions Joueur 1 (Rouge) */}
           {activeTokensP1.map((t, idx) => {
             const pos = getTokenPosition(t, idx);
             const isPlayable = playableTokens.some((pt) => pt.id === t.id);
@@ -955,48 +1060,53 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <g
                 key={t.id}
                 onClick={() => isPlayable && handleMoveToken(t)}
+                onTouchEnd={(e) => {
+                  if (isPlayable) {
+                    e.preventDefault();
+                    handleMoveToken(t);
+                  }
+                }}
                 className={isPlayable ? 'cursor-pointer' : ''}
               >
-                {/* Glow ring if playable */}
+                <circle cx={pos.x} cy={pos.y} r="46" fill="transparent" />
                 {isPlayable && (
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r="44"
+                    r="42"
                     fill="none"
-                    stroke="#FBBF24"
-                    strokeWidth="6"
-                    className="animate-ping"
-                    opacity="0.8"
+                    stroke="#F59E0B"
+                    strokeWidth="5"
+                    className="animate-pulse"
+                    opacity="0.9"
                   />
                 )}
-                {/* Token Outer Shadow & Base */}
-                <circle cx={pos.x} cy={pos.y + 3} r="32" fill="#9F1239" opacity="0.3" />
+                <circle cx={pos.x} cy={pos.y + 3} r="30" fill="#881337" opacity="0.3" />
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r="30"
+                  r="28"
                   fill="#E11D48"
                   stroke="#FFFFFF"
-                  strokeWidth="4"
+                  strokeWidth="3.5"
                   className={isPlayable ? 'animate-bounce' : ''}
                 />
-                <circle cx={pos.x} cy={pos.y} r="18" fill="#FFF1F2" />
+                <circle cx={pos.x} cy={pos.y} r="16" fill="#FFF1F2" />
                 <text
                   x={pos.x}
-                  y={pos.y + 6}
+                  y={pos.y + 5.5}
                   fill="#9F1239"
-                  fontSize="18"
+                  fontSize="16"
                   fontWeight="900"
                   textAnchor="middle"
                 >
-                  {p1.name.charAt(0) || 'M'}
+                  M{idx + 1}
                 </text>
               </g>
             );
           })}
 
-          {/* Player 2 Tokens (Green) */}
+          {/* 8. Pions Joueur 2 (Vert) */}
           {activeTokensP2.map((t, idx) => {
             const pos = getTokenPosition(t, idx);
             const isPlayable = playableTokens.some((pt) => pt.id === t.id);
@@ -1005,41 +1115,47 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <g
                 key={t.id}
                 onClick={() => isPlayable && handleMoveToken(t)}
+                onTouchEnd={(e) => {
+                  if (isPlayable) {
+                    e.preventDefault();
+                    handleMoveToken(t);
+                  }
+                }}
                 className={isPlayable ? 'cursor-pointer' : ''}
               >
-                {/* Glow ring if playable */}
+                <circle cx={pos.x} cy={pos.y} r="46" fill="transparent" />
                 {isPlayable && (
                   <circle
                     cx={pos.x}
                     cy={pos.y}
-                    r="44"
+                    r="42"
                     fill="none"
-                    stroke="#FBBF24"
-                    strokeWidth="6"
-                    className="animate-ping"
-                    opacity="0.8"
+                    stroke="#F59E0B"
+                    strokeWidth="5"
+                    className="animate-pulse"
+                    opacity="0.9"
                   />
                 )}
-                <circle cx={pos.x} cy={pos.y + 3} r="32" fill="#065F46" opacity="0.3" />
+                <circle cx={pos.x} cy={pos.y + 3} r="30" fill="#064E3B" opacity="0.3" />
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r="30"
+                  r="28"
                   fill="#059669"
                   stroke="#FFFFFF"
-                  strokeWidth="4"
+                  strokeWidth="3.5"
                   className={isPlayable ? 'animate-bounce' : ''}
                 />
-                <circle cx={pos.x} cy={pos.y} r="18" fill="#ECFDF5" />
+                <circle cx={pos.x} cy={pos.y} r="16" fill="#ECFDF5" />
                 <text
                   x={pos.x}
-                  y={pos.y + 6}
+                  y={pos.y + 5.5}
                   fill="#065F46"
-                  fontSize="18"
+                  fontSize="16"
                   fontWeight="900"
                   textAnchor="middle"
                 >
-                  {p2.name.charAt(0) || 'S'}
+                  S{idx + 1}
                 </text>
               </g>
             );
@@ -1047,126 +1163,79 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         </svg>
       </div>
 
-      {/* 4. Bottom Player HUD: Med (Player 1 - Rouge/Rose) */}
-      <div
-        className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between gap-2 shadow-2xs ${
-          currentTurn === 'p1'
-            ? 'bg-rose-50/90 border-rose-300 ring-2 ring-rose-400/50'
-            : 'bg-white border-stone-200/80 opacity-80'
-        }`}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-rose-500 text-white font-bold flex items-center justify-center text-sm shadow-xs border-2 border-white overflow-hidden">
-              {p1.avatar ? (
-                <img src={p1.avatar} alt={p1.name} className="w-full h-full object-cover" />
-              ) : (
-                <span>{p1.name.charAt(0)}</span>
-              )}
-            </div>
-            {currentTurn === 'p1' && (
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] shadow-xs">
-                ★
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-xs sm:text-sm text-stone-900 truncate">{p1.name}</span>
-              <span className="px-1.5 py-0.2 rounded-md bg-rose-100 text-rose-800 text-[10px] font-extrabold">
-                Rouge 🔴
-              </span>
-            </div>
-            <p className="text-[10px] text-stone-500">
-              {activeTokensP1.filter((t) => t.state === 'finished').length} / {tokensPerPlayer} pions rentrés
-            </p>
-          </div>
-        </div>
-
-        {/* Dice Tray for Player 1 */}
-        <div className="flex items-center gap-2 shrink-0">
-          {currentTurn === 'p1' && diceValue && (
-            <div className="w-9 h-9 rounded-xl bg-white border-2 border-rose-400 text-rose-600 font-black text-lg flex items-center justify-center shadow-xs animate-bounce">
-              {diceValue}
-            </div>
-          )}
+      {/* 4. Console de Lancer Unique et Compacte (Tout-en-un, zéro encombrement) */}
+      <div className="w-full flex flex-col items-center gap-1.5 px-2">
+        <div className="flex items-center justify-center gap-3">
+          {/* Dé interactif tactile */}
           <button
             type="button"
-            disabled={currentTurn !== 'p1' || isRolling || (!isMyTurn && gameMode === 'live')}
+            disabled={isRolling || (gameMode === 'ai' && currentTurn === 'p2')}
             onClick={handleRollDice}
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl font-bold transition-all shadow-xs cursor-pointer ${
-              currentTurn === 'p1'
-                ? 'bg-gradient-to-tr from-rose-500 to-pink-500 text-white ring-2 ring-rose-300 active:scale-95 animate-pulse'
-                : 'bg-stone-100 text-stone-400 cursor-not-allowed'
+            className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black shadow-xs transition-all cursor-pointer select-none active:scale-95 ${
+              isP1
+                ? 'bg-rose-500 text-white ring-2 ring-rose-300 hover:bg-rose-600'
+                : 'bg-emerald-600 text-white ring-2 ring-emerald-300 hover:bg-emerald-700'
             }`}
           >
-            {isRolling && currentTurn === 'p1' ? (
-              <Dices className="w-5 h-5 animate-spin" />
-            ) : diceValue && currentTurn === 'p1' ? (
+            {isRolling ? (
+              <Dices className="w-6 h-6 animate-spin" />
+            ) : diceValue ? (
               <span>{diceValue}</span>
             ) : (
               <span>🎲</span>
             )}
           </button>
-        </div>
-      </div>
 
-      {/* 5. Live Match Commentary & Action Banner */}
-      <div className="bg-stone-900 text-white rounded-2xl px-3.5 py-2.5 shadow-xs flex items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-base shrink-0">📢</span>
-          <span className="font-semibold text-stone-200 truncate">{lastEventText}</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleResetGame}
-          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer shrink-0"
-          title="Recommencer la partie"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* 6. Settings Controls: 2 pions vs 4 pions & Reset Scores */}
-      <div className="flex items-center justify-between gap-2 px-1 text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="text-stone-500 font-medium text-[11px]">Format :</span>
+          {/* Bouton d'action direct */}
           <button
             type="button"
-            onClick={() => {
-              setTokensPerPlayer(2);
-              handleResetGame();
-            }}
-            className={`px-2 py-0.5 rounded-lg font-bold text-[10px] cursor-pointer transition-colors ${
-              tokensPerPlayer === 2
-                ? 'bg-rose-500 text-white'
-                : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+            disabled={isRolling || (gameMode === 'ai' && currentTurn === 'p2')}
+            onClick={handleRollDice}
+            className={`px-4 py-2 rounded-xl font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer text-white ${
+              isP1 ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-700'
             }`}
           >
-            2 Pions (Rapide ⚡)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTokensPerPlayer(4);
-              handleResetGame();
-            }}
-            className={`px-2 py-0.5 rounded-lg font-bold text-[10px] cursor-pointer transition-colors ${
-              tokensPerPlayer === 4
-                ? 'bg-rose-500 text-white'
-                : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
-            }`}
-          >
-            4 Pions (Classique 👑)
+            {isRolling
+              ? 'Lancement...'
+              : diceValue
+              ? `Dé : ${diceValue} (Relancer)`
+              : `Lancer le dé (${isP1 ? p1.name : p2.name})`}
           </button>
         </div>
 
-        <span className="text-[11px] font-bold text-stone-600">
-          Victoires : {p1.name} {p1Wins} - {p2Wins} {p2.name}
-        </span>
+        {/* Boutons rapides pour déplacer les pions jouables (s'affiche seulement si nécessaire) */}
+        {diceValue && playableTokens.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-full">
+            {playableTokens.map((token) => {
+              const tokenIdx = (currentTurn === 'p1' ? tokensP1 : tokensP2).findIndex(
+                (t) => t.id === token.id
+              );
+              const isYard = token.state === 'yard';
+              return (
+                <button
+                  key={token.id}
+                  type="button"
+                  onClick={() => handleMoveToken(token)}
+                  className={`px-2.5 py-1 rounded-lg border text-xs font-bold shadow-2xs active:scale-95 cursor-pointer transition-all ${
+                    isP1
+                      ? 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100'
+                      : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  {isYard ? `🚀 Sortir Pion ${tokenIdx + 1}` : `🎯 Pion ${tokenIdx + 1} (+${diceValue})`}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Message d'événement discret (1 seule ligne) */}
+        <p className="text-[11px] text-stone-500 text-center truncate max-w-xs px-2">
+          {lastEventText}
+        </p>
       </div>
 
-      {/* 7. Winner Modal & Pledge Dialog */}
+      {/* 5. Modale Gagnant & Gage Romantique */}
       <AnimatePresence>
         {winner && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1174,51 +1243,51 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border-2 border-amber-300 text-center space-y-4"
+              className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl border border-stone-200 text-center space-y-3"
             >
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-400 to-rose-500 text-white mx-auto flex items-center justify-center text-3xl shadow-lg">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-rose-500 text-white mx-auto flex items-center justify-center text-2xl shadow-md">
                 👑
               </div>
 
               <div>
-                <h3 className="font-serif-romantic text-2xl font-bold text-stone-900">
+                <h3 className="font-serif-romantic text-xl font-bold text-stone-900">
                   Victoire de {winner === 'p1' ? p1.name : p2.name} !
                 </h3>
-                <p className="text-xs text-stone-500 mt-1">
-                  Tous les pions sont rentrés victorieusement au centre du Ludo !
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Tous les pions sont rentrés victorieusement !
                 </p>
               </div>
 
               {/* Gage Box */}
-              <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-left space-y-1">
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-left space-y-1">
                 <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
                   <Flame className="w-3 h-3 text-amber-600" />
-                  <span>Gage Amoureux pour {winner === 'p1' ? p2.name : p1.name}</span>
+                  <span>Gage pour {winner === 'p1' ? p2.name : p1.name}</span>
                 </span>
-                <p className="text-xs font-semibold text-stone-800 font-serif-romantic italic">
+                <p className="text-xs font-semibold text-stone-800 italic">
                   « {selectedPledge} »
                 </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-2 pt-1">
+              {/* Boutons d'action */}
+              <div className="flex flex-col gap-1.5 pt-1">
                 {onSendChatMessage && (
                   <button
                     type="button"
                     onClick={handleShareResultToChat}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+                    className="w-full py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>{sentToChatToast ? 'Envoyé dans le chat ! 💌' : 'Partager dans le chat'}</span>
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>{sentToChatToast ? 'Envoyé ! 💌' : 'Partager au chat'}</span>
                   </button>
                 )}
 
                 <button
                   type="button"
                   onClick={handleResetGame}
-                  className="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
+                  className="w-full py-2 rounded-xl bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-bold text-xs shadow-xs cursor-pointer"
                 >
-                  Revanche immédiate ! ⚔️
+                  Revanche ! ⚔️
                 </button>
               </div>
             </motion.div>

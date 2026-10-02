@@ -1053,7 +1053,7 @@ export async function setLoveTouchStatus(partnerId: PartnerId, isTouching: boole
 }
 
 // -------------------------------------------------------------
-// LUDO KING DUO (EN DIRECT À DEUX) LIVE SYNCHRONISATION
+// LUDO MS DUO (EN DIRECT À DEUX) LIVE SYNCHRONISATION
 // -------------------------------------------------------------
 export function subscribeLudoGame(
   onUpdate: (session: LudoGameSession | null) => void,

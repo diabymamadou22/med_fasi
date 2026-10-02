@@ -57,9 +57,9 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
 }) => {
   const [selectedImage, setSelectedImage] = useState(DEFAULT_PUZZLE_IMAGES[0].url);
   const [secretNote, setSecretNote] = useState(DEFAULT_PUZZLE_IMAGES[0].defaultNote);
-  const [gridSize, setGridSize] = useState<3 | 4>(3);
+  const [gridSize, setGridSize] = useState<2 | 3 | 4>(2);
   const [tiles, setTiles] = useState<number[]>([]);
-  const [emptyIndex, setEmptyIndex] = useState<number>(8);
+  const [emptyIndex, setEmptyIndex] = useState<number>(3);
   const [moves, setMoves] = useState(0);
   const [isSolved, setIsSolved] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -88,7 +88,7 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
   };
 
   // Initialize and shuffle puzzle
-  const initPuzzle = (size: 3 | 4 = gridSize) => {
+  const initPuzzle = (size: 2 | 3 | 4 = gridSize) => {
     const total = size * size;
     const solved = Array.from({ length: total }, (_, i) => i);
     
@@ -288,14 +288,25 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
           <div className="flex items-center bg-white border border-stone-200 rounded-xl p-1 text-xs font-bold">
             <button
               onClick={() => {
+                setGridSize(2);
+                soundEffects.playSoftTap();
+              }}
+              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                gridSize === 2 ? 'bg-rose-500 text-white shadow-2xs font-extrabold' : 'text-stone-600 hover:bg-stone-100'
+              }`}
+            >
+              2x2 (4 Pièces 🧩)
+            </button>
+            <button
+              onClick={() => {
                 setGridSize(3);
                 soundEffects.playSoftTap();
               }}
               className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                gridSize === 3 ? 'bg-rose-500 text-white' : 'text-stone-600 hover:bg-stone-100'
+                gridSize === 3 ? 'bg-rose-500 text-white shadow-2xs font-extrabold' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              3x3 (Facile)
+              3x3
             </button>
             <button
               onClick={() => {
@@ -303,10 +314,10 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
                 soundEffects.playSoftTap();
               }}
               className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                gridSize === 4 ? 'bg-rose-500 text-white' : 'text-stone-600 hover:bg-stone-100'
+                gridSize === 4 ? 'bg-rose-500 text-white shadow-2xs font-extrabold' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              4x4 (Expert)
+              4x4
             </button>
           </div>
 

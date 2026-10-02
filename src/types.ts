@@ -415,7 +415,7 @@ export interface LoveTouchSession {
 }
 
 // -------------------------------------------------------------
-// LUDO KING DUO AMOUROUX EN DIRECT
+// LUDO MS DUO AMOUROUX EN DIRECT
 // -------------------------------------------------------------
 export interface LudoToken {
   id: string; // e.g. 'p1_0', 'p1_1', 'p2_0', 'p2_1'

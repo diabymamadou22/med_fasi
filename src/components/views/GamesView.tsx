@@ -416,12 +416,12 @@ export const GamesView: React.FC<GamesViewProps> = ({
     },
   ];
 
-  // Catalogue principal épuré (Ludo King ajouté, jeux épurés carrés)
+  // Catalogue principal épuré (Ludo MS ajouté, jeux épurés carrés)
   const gameCards: GameCardDef[] = [
     // 1. Défis & Duels
     {
       id: 'ludo',
-      title: 'Ludo King',
+      title: 'Ludo MS',
       desc: 'Le célèbre jeu de petits chevaux à deux en direct',
       category: 'duo',
       categoryLabel: 'Défis & Duels',
