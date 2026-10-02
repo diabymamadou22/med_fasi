@@ -73,6 +73,26 @@ class RomanticSoundEffects {
       osc.stop(ctx.currentTime + 0.03);
     } catch {}
   }
+  playDiceRoll() {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      // Realistic dice rolling rattle ticks
+      [0, 0.06, 0.12, 0.18, 0.25, 0.33].forEach((t, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(450 + i * 80, ctx.currentTime + t);
+        osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + t + 0.04);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.04);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.04);
+      });
+    } catch {}
+  }
   playVictoryChime() {
     try {
       const ctx = getAudioContext();

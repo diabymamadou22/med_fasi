@@ -32,6 +32,7 @@ import {
   WhoMostLikelySession,
   LoveRouletteSession,
   LoveTouchSession,
+  LudoGameSession,
   PartnerId,
 } from '../types';
 import {
@@ -1049,6 +1050,48 @@ export async function setLoveTouchStatus(partnerId: PartnerId, isTouching: boole
     await setDoc(docRef, sanitizeForFirestore(updateData), { merge: true });
     return true;
   }, 'Set LoveTouch status').then((res) => res !== null && res !== undefined);
+}
+
+// -------------------------------------------------------------
+// LUDO KING DUO (EN DIRECT À DEUX) LIVE SYNCHRONISATION
+// -------------------------------------------------------------
+export function subscribeLudoGame(
+  onUpdate: (session: LudoGameSession | null) => void,
+  onError?: (error: Error) => void
+) {
+  try {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'ludo_live');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          onUpdate({ id: snap.id, ...snap.data() } as LudoGameSession);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (err) => {
+        logFirestoreSyncIssue('LudoGame sync', err);
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('LudoGame attach', err);
+    return () => {};
+  }
+}
+
+export async function saveLudoGame(session: Partial<LudoGameSession>): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'ludo_live');
+    const sanitized = sanitizeForFirestore({
+      ...session,
+      id: 'ludo_live',
+      lastUpdated: new Date().toISOString(),
+    });
+    await setDoc(docRef, sanitized, { merge: true });
+    return true;
+  }, 'Save LudoGame session').then((res) => res !== null && res !== undefined);
 }
 
 export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };

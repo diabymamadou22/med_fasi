@@ -414,3 +414,35 @@ export interface LoveTouchSession {
   lastUpdated: string;
 }
 
+// -------------------------------------------------------------
+// LUDO KING DUO AMOUROUX EN DIRECT
+// -------------------------------------------------------------
+export interface LudoToken {
+  id: string; // e.g. 'p1_0', 'p1_1', 'p2_0', 'p2_1'
+  player: PartnerId; // 'p1' | 'p2'
+  state: 'yard' | 'path' | 'home_run' | 'finished';
+  step: number; // 0 in yard, 0..50 on path, 51..55 on home run, 56 is finished
+}
+
+export interface LudoGameSession {
+  id: string; // 'ludo_live'
+  currentTurn: PartnerId;
+  diceValue: number | null;
+  isRolling: boolean;
+  consecutiveSixes: number;
+  tokens: {
+    p1: LudoToken[];
+    p2: LudoToken[];
+  };
+  winner: PartnerId | null;
+  lastMoveBy?: PartnerId | null;
+  lastMoveText?: string | null;
+  lastDiceRolledBy?: PartnerId | null;
+  p1Wins: number;
+  p2Wins: number;
+  selectedPledge?: string;
+  tokensPerPlayer: 2 | 4;
+  lastUpdated: string;
+}
+
+

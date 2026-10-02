@@ -49,10 +49,12 @@ import { LoveRouletteGame } from '../games/LoveRouletteGame';
 import { WhoMostLikelyGame } from '../games/WhoMostLikelyGame';
 import { SixtySecondsLoveGame } from '../games/SixtySecondsLoveGame';
 import { LovePuzzleGame } from '../games/LovePuzzleGame';
+import { LoveLudoGame } from '../games/LoveLudoGame';
 import { INITIAL_LEXICON_WORDS } from '../../data/initialLexiconData';
 import { useBackHandler } from '../../lib/backNavigation';
 
 export type EnglishGameTab =
+  | 'ludo'
   | 'english_hub'
   | 'roulette'
   | 'wordle'
@@ -414,9 +416,20 @@ export const GamesView: React.FC<GamesViewProps> = ({
     },
   ];
 
-  // Catalogue principal épuré (Tu Préfères, Quiz Connivence, Bons, Missions & Défis Hebdo retirés)
+  // Catalogue principal épuré (Ludo King ajouté, jeux épurés carrés)
   const gameCards: GameCardDef[] = [
     // 1. Défis & Duels
+    {
+      id: 'ludo',
+      title: 'Ludo King',
+      desc: 'Le célèbre jeu de petits chevaux à deux en direct',
+      category: 'duo',
+      categoryLabel: 'Défis & Duels',
+      tag: 'En Direct ⚡',
+      icon: <Dices className="w-5 h-5 text-amber-500" />,
+      color: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80',
+      badge: 'En Direct ⚡',
+    },
     {
       id: 'tic_tac_toe',
       title: 'Morpion & Gages',
@@ -863,6 +876,14 @@ export const GamesView: React.FC<GamesViewProps> = ({
               completedQuizIds={completedQuizIds}
               onAddXp={handleAddXp}
               onSaveCompletedQuiz={handleSaveCompletedQuiz}
+            />
+          )}
+
+          {resolvedTab === 'ludo' && (
+            <LoveLudoGame
+              profile={profile}
+              activePartnerId={activePartnerId}
+              onSendChatMessage={onSendChatMessage}
             />
           )}
 
