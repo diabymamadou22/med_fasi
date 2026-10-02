@@ -116,21 +116,21 @@ const P2_GREEN_HOME_STRETCH: [number, number][] = [
   [7, 5], // 55
 ];
 
-// Yard base coordinates (matching 4 white circle spots in the screenshot)
+// Yard base coordinates (matching exact center of the 4 circle sockets: 210, 390)
 // P1 (Blue - Bottom-Left: Cols 0..5, Rows 9..14)
 const P1_YARD_SPOTS: [number, number][] = [
-  [1.8, 10.8],
-  [4.2, 10.8],
-  [1.8, 13.2],
-  [4.2, 13.2],
+  [1.6, 10.6], // Spot 0: x=210, y=1110
+  [3.4, 10.6], // Spot 1: x=390, y=1110
+  [1.6, 12.4], // Spot 2: x=210, y=1290
+  [3.4, 12.4], // Spot 3: x=390, y=1290
 ];
 
 // P2 (Green - Top-Right: Cols 9..14, Rows 0..5)
 const P2_YARD_SPOTS: [number, number][] = [
-  [10.8, 1.8],
-  [13.2, 1.8],
-  [10.8, 4.2],
-  [13.2, 4.2],
+  [10.6, 1.6], // Spot 0: x=1110, y=210
+  [12.4, 1.6], // Spot 1: x=1290, y=210
+  [10.6, 3.4], // Spot 2: x=1110, y=390
+  [12.4, 3.4], // Spot 3: x=1290, y=390
 ];
 
 const LUDO_PLEDGES = [
@@ -171,6 +171,13 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const [diceValue, setDiceValue] = useState<number | null>(null);
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [isMoving, setIsMoving] = useState<boolean>(false);
+  const [movingTokenId, setMovingTokenId] = useState<string | null>(null);
+  const [stepRipple, setStepRipple] = useState<{
+    x: number;
+    y: number;
+    color: string;
+    key: number;
+  } | null>(null);
   const [consecutiveSixes, setConsecutiveSixes] = useState<number>(0);
   const [winner, setWinner] = useState<PartnerId | null>(null);
   const [p1Wins, setP1Wins] = useState<number>(0);
@@ -340,17 +347,38 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     [activeTokensP1, activeTokensP2]
   );
 
+  const isMyTurn = useMemo(() => {
+    if (gameMode === 'local') return true;
+    if (gameMode === 'ai') return currentTurn === 'p1';
+    return currentTurn === activePartnerId;
+  }, [gameMode, currentTurn, activePartnerId]);
+
   const playableTokens = useMemo(() => {
+    // In live mode: Nobody can play or move tokens when it is not their turn!
+    if (gameMode === 'live' && currentTurn !== activePartnerId) {
+      return [];
+    }
+    // In AI mode: Human cannot touch AI tokens
+    if (gameMode === 'ai' && currentTurn === 'p2') {
+      return [];
+    }
     return getPlayableTokens(currentTurn, diceValue);
-  }, [currentTurn, diceValue, getPlayableTokens]);
+  }, [currentTurn, diceValue, getPlayableTokens, gameMode, activePartnerId]);
 
   const nextTurnPlayer = (player: PartnerId) => (player === 'p1' ? 'p2' : 'p1');
 
   // Handle dice rolling
-  const handleRollDice = () => {
+  const handleRollDice = (isAiTrigger = false) => {
     if (isRolling || isMoving || winner) return;
 
-    if (gameMode === 'ai' && currentTurn === 'p2') return;
+    // Strict Live Turn Check: You cannot roll if it is not your turn!
+    if (gameMode === 'live' && currentTurn !== activePartnerId) {
+      const activeName = currentTurn === 'p1' ? p1.name : p2.name;
+      setLastEventText(`⏳ Au tour de ${activeName} de lancer le dé !`);
+      return;
+    }
+
+    if (gameMode === 'ai' && currentTurn === 'p2' && !isAiTrigger) return;
 
     soundEffects.playDiceRoll();
     setIsRolling(true);
@@ -418,10 +446,16 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
         setTimeout(() => {
-          handleStepByStepMove(availableMoves[0], finalRoll);
+          handleStepByStepMove(availableMoves[0], finalRoll, true);
         }, 350);
       } else {
-        const text = `Fait un ${finalRoll} ! Touchez un pion à déplacer.`;
+        const isCurrentMyTurn =
+          gameMode === 'local' ||
+          (gameMode === 'live' && currentTurn === activePartnerId) ||
+          (gameMode === 'ai' && currentTurn === 'p1');
+        const text = isCurrentMyTurn
+          ? `Tu as fait un ${finalRoll} ! Touche un pion à déplacer.`
+          : `${rollingPartnerName} a fait un ${finalRoll} ! En attente de son choix...`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
       }
@@ -438,9 +472,24 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   };
 
   // STEP-BY-STEP MOVEMENT ("passe de pas a pas au lieu de sauter")
-  const handleStepByStepMove = (token: LudoToken, rollToUse?: number) => {
+  const handleStepByStepMove = (token: LudoToken, rollToUse?: number, isAutoMove = false) => {
     const roll = rollToUse ?? diceValue;
     if (!roll || winner || isRolling || isMoving) return;
+
+    // Strict Live Security Check: Med cannot play for Safi, and Safi cannot play for Med!
+    if (gameMode === 'live') {
+      if (currentTurn !== activePartnerId) {
+        const activeName = currentTurn === 'p1' ? p1.name : p2.name;
+        setLastEventText(`⏳ Au tour de ${activeName} de jouer !`);
+        return;
+      }
+      if (token.player !== activePartnerId) {
+        return; // Cannot touch or move partner's piece!
+      }
+    }
+
+    // In AI mode, player cannot touch AI tokens
+    if (gameMode === 'ai' && currentTurn === 'p2' && !isAutoMove) return;
 
     const movingPlayer = token.player;
     if (movingPlayer !== currentTurn) return;
@@ -449,7 +498,17 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     if (token.state === 'yard') {
       if (roll !== 6) return;
       setIsMoving(true);
-      soundEffects.playSoftTap();
+      setMovingTokenId(token.id);
+      soundEffects.playPawnStep(1);
+
+      // Yard exit animation with ripple on step 0
+      const startPos = movingPlayer === 'p1' ? { x: 650, y: 1350 } : { x: 850, y: 150 };
+      setStepRipple({
+        x: startPos.x,
+        y: startPos.y,
+        color: movingPlayer === 'p1' ? '#3B82F6' : '#10B981',
+        key: Date.now(),
+      });
 
       setTimeout(() => {
         const exitedToken: LudoToken = {
@@ -459,6 +518,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         };
         updateSingleToken(exitedToken, movingPlayer);
         setIsMoving(false);
+        setMovingTokenId(null);
+        setTimeout(() => setStepRipple(null), 500);
 
         // Rolling 6 grants bonus roll!
         const msg = `🎉 ${movingPlayer === 'p1' ? p1.name : p2.name} a sorti un pion ! Rejouez.`;
@@ -475,7 +536,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           diceValue: null,
           lastMoveText: msg,
         });
-      }, 250);
+      }, 350);
       return;
     }
 
@@ -485,12 +546,15 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     if (targetStep > 56) return; // Cannot overshoot
 
     setIsMoving(true);
+    setMovingTokenId(token.id);
     let currentStep = startStep;
-    const stepInterval = 130; // 130ms per square -> smooth, fluid and tactile!
+    // Pacing: 290ms per square (très agréable, lisible et suspense garanti)
+    const stepInterval = 290;
 
     const stepNext = () => {
       currentStep += 1;
-      soundEffects.playSoftTap();
+      const stepIndex = currentStep - startStep;
+      soundEffects.playPawnStep(stepIndex);
 
       const interimState =
         currentStep === 56 ? 'finished' : currentStep >= 51 ? 'home_run' : 'path';
@@ -501,13 +565,28 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         state: interimState,
       };
 
+      // Trigger visual ripple on board
+      const indexInPlayer = movingPlayer === 'p1'
+        ? tokensP1.findIndex((t) => t.id === token.id)
+        : tokensP2.findIndex((t) => t.id === token.id);
+      const pos = getTokenPosition(interimToken, Math.max(0, indexInPlayer));
+
+      setStepRipple({
+        x: pos.x,
+        y: pos.y,
+        color: movingPlayer === 'p1' ? '#3B82F6' : '#10B981',
+        key: Date.now() + currentStep,
+      });
+
       updateSingleToken(interimToken, movingPlayer);
 
       if (currentStep < targetStep) {
         moveTimerRef.current = setTimeout(stepNext, stepInterval);
       } else {
-        // Reached destination! Finalize move
-        finalizeMove(interimToken, movingPlayer, roll);
+        // Reached destination! Finalize move smoothly
+        setTimeout(() => {
+          finalizeMove(interimToken, movingPlayer, roll);
+        }, 120);
       }
     };
 
@@ -517,6 +596,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   // Finalize move after step-by-step animation completes
   const finalizeMove = (finalToken: LudoToken, movingPlayer: PartnerId, roll: number) => {
     setIsMoving(false);
+    setMovingTokenId(null);
+    setTimeout(() => setStepRipple(null), 500);
 
     let gotBonusTurn = roll === 6;
     let capturedOpponent = false;
@@ -648,7 +729,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
     const timer = setTimeout(() => {
       if (diceValue === null) {
-        handleRollDice();
+        handleRollDice(true);
       } else {
         const moves = getPlayableTokens('p2', diceValue);
         if (moves.length > 0) {
@@ -664,7 +745,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           const yardMove = moves.find((m) => m.state === 'yard' && diceValue === 6);
 
           const chosen = captureMove || homeMove || yardMove || moves[0];
-          handleStepByStepMove(chosen, diceValue);
+          handleStepByStepMove(chosen, diceValue, true);
         }
       }
     }, 850);
@@ -855,11 +936,12 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     }
   };
 
-  // Render individual Ludo King Pin Pawn (matching the screenshot exactly)
+  // Render individual Luxury 3D Royal Pawn (Stylé, Ultra-Attirant & Prestigieux)
   const renderPawn = (token: LudoToken, index: number) => {
     const isPlayer1 = token.player === 'p1';
     const pos = getTokenPosition(token, index);
     const isPlayable = playableTokens.some((pt) => pt.id === token.id);
+    const isThisTokenMoving = movingTokenId === token.id;
 
     return (
       <g
@@ -873,30 +955,48 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         }}
         className={isPlayable && !isMoving ? 'cursor-pointer' : ''}
       >
-        {/* Invisible touch target */}
+        {/* Generous touch target */}
         <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
 
-        {/* Contact shadow at base */}
+        {/* 1. Realistic Multi-layered Ground Shadows (Expands & softens when floating/moving) */}
         <ellipse
           cx={pos.x}
-          cy={pos.y + 16}
-          rx="22"
-          ry="7"
+          cy={pos.y + (isThisTokenMoving ? 23 : 20)}
+          rx={isThisTokenMoving ? '30' : '26'}
+          ry={isThisTokenMoving ? '9.5' : '8'}
+          fill="url(#pawn-contact-shadow)"
+          opacity={isThisTokenMoving ? 0.75 : 1}
+        />
+        <ellipse
+          cx={pos.x}
+          cy={pos.y + (isThisTokenMoving ? 22 : 19)}
+          rx={isThisTokenMoving ? '20' : '18'}
+          ry={isThisTokenMoving ? '6' : '5'}
           fill="#000000"
-          opacity="0.35"
+          opacity="0.4"
         />
 
-        {/* Glowing Turn Halo (NO BOUNCING, just soft aura as requested) */}
+        {/* 2. Magnetic Celestial Glow & Aura when Playable (Très attirante & captivante) */}
         {isPlayable && !isMoving && (
           <>
+            {/* Luminous Pulsing Golden Floor Halo */}
+            <ellipse
+              cx={pos.x}
+              cy={pos.y + 19}
+              rx="28"
+              ry="9.5"
+              fill="url(#pawn-floor-glow)"
+              className="animate-pulse"
+            />
+            {/* Rotating Celestial Star Orbit Ring */}
             <circle
               cx={pos.x}
               cy={pos.y - 4}
-              r="30"
+              r="34"
               fill="none"
-              stroke="#FACC15"
-              strokeWidth="3.5"
-              strokeDasharray="6 4"
+              stroke="url(#gold-polished)"
+              strokeWidth="3.2"
+              strokeDasharray="7 5"
               className="animate-spin"
               style={{
                 animationDuration: '6s',
@@ -907,84 +1007,269 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             <circle
               cx={pos.x}
               cy={pos.y - 4}
-              r="26"
+              r="27"
               fill="#FEF08A"
-              opacity="0.25"
+              opacity="0.22"
               className="animate-pulse"
             />
+            {/* Sparkling Star Gleam above the Crown */}
+            <text
+              x={pos.x}
+              y={pos.y - 34}
+              fill="#FACC15"
+              fontSize="16"
+              textAnchor="middle"
+              className="animate-pulse"
+              style={{ pointerEvents: 'none' }}
+            >
+              ✨
+            </text>
           </>
         )}
 
-        {/* 3D Pin Skirt / Flared Conical Body */}
-        <path
-          d={`M ${pos.x - 13} ${pos.y - 4} 
-              C ${pos.x - 15} ${pos.y + 9}, ${pos.x - 18} ${pos.y + 14}, ${pos.x - 16} ${pos.y + 17}
-              C ${pos.x - 9} ${pos.y + 20}, ${pos.x + 9} ${pos.y + 20}, ${pos.x + 16} ${pos.y + 17}
-              C ${pos.x + 18} ${pos.y + 14}, ${pos.x + 15} ${pos.y + 9}, ${pos.x + 13} ${pos.y - 4}
-              Z`}
-          fill={isPlayer1 ? '#FFFFFF' : '#FFFFFF'}
-          stroke={isPlayer1 ? '#1D4ED8' : '#047857'}
-          strokeWidth="2.5"
-        />
+        {/* Active Movement Levitation Effect & Sparkle Trail */}
+        {isThisTokenMoving && (
+          <g style={{ pointerEvents: 'none' }}>
+            {/* Luminous Pulsing Motion Ring */}
+            <circle
+              cx={pos.x}
+              cy={pos.y - 12}
+              r="36"
+              fill="none"
+              stroke={isPlayer1 ? '#60A5FA' : '#34D399'}
+              strokeWidth="3"
+              strokeDasharray="6 4"
+              className="animate-spin"
+              style={{
+                animationDuration: '1.8s',
+                transformOrigin: `${pos.x}px ${pos.y - 12}px`,
+              }}
+              opacity="0.85"
+            />
+            {/* Golden Star Trail behind the pawn */}
+            <text
+              x={pos.x + 18}
+              y={pos.y - 30}
+              fill="#FACC15"
+              fontSize="16"
+              className="animate-bounce"
+            >
+              ✨
+            </text>
+          </g>
+        )}
 
-        {/* Base Rim Color Band */}
-        <ellipse
-          cx={pos.x}
-          cy={pos.y + 16}
-          rx="14"
-          ry="4"
-          fill={isPlayer1 ? '#2563EB' : '#10B981'}
-        />
+        {/* Main Pawn Body Group (Subtly elevates / glides smoothly during step movement) */}
+        <g
+          transform={isThisTokenMoving ? 'translate(0, -7)' : undefined}
+          style={{ transition: 'transform 0.18s ease-out' }}
+        >
+          {/* 3. Tiered Heavy Pedestal Base (Double étage or 24k & laque royale) */}
+          {/* Lower Base Gold Rim */}
+          <ellipse
+            cx={pos.x}
+            cy={pos.y + 19}
+            rx="21"
+            ry="6"
+            fill="url(#gold-polished)"
+            stroke="#78350F"
+            strokeWidth="0.8"
+          />
+          {/* Lower Base Lacquer Bevel Ring */}
+          <ellipse
+            cx={pos.x}
+            cy={pos.y + 17.8}
+            rx="19"
+            ry="5"
+            fill={isPlayer1 ? 'url(#p1-royal-body)' : 'url(#p2-royal-body)'}
+          />
+          {/* Upper Base Gold Step */}
+          <ellipse
+            cx={pos.x}
+            cy={pos.y + 15}
+            rx="15"
+            ry="4"
+            fill="url(#gold-polished)"
+            stroke="#78350F"
+            strokeWidth="0.6"
+          />
+          {/* Upper Base Collar */}
+          <ellipse
+            cx={pos.x}
+            cy={pos.y + 14.2}
+            rx="13.5"
+            ry="3.3"
+            fill={isPlayer1 ? '#1E40AF' : '#047857'}
+          />
 
-        {/* Head Outer Chrome Rim */}
-        <circle
-          cx={pos.x}
-          cy={pos.y - 6}
-          r="19"
-          fill="#FFFFFF"
-          stroke="#94A3B8"
-          strokeWidth="2"
-        />
+          {/* 4. Sculpted Flared Bell Body with Rich 3D Royal Lacquer */}
+          <path
+            d={`M ${pos.x - 7.5} ${pos.y - 2} 
+                C ${pos.x - 6} ${pos.y + 4}, ${pos.x - 14} ${pos.y + 10}, ${pos.x - 16} ${pos.y + 15}
+                Q ${pos.x} ${pos.y + 18.5}, ${pos.x + 16} ${pos.y + 15}
+                C ${pos.x + 14} ${pos.y + 10}, ${pos.x + 6} ${pos.y + 4}, ${pos.x + 7.5} ${pos.y - 2}
+                Z`}
+            fill={isPlayer1 ? 'url(#p1-royal-body)' : 'url(#p2-royal-body)'}
+            stroke={isPlayer1 ? '#1E3A8A' : '#064E3B'}
+            strokeWidth="1.2"
+          />
 
-        {/* Head Inner Jewel Circle */}
-        <circle
-          cx={pos.x}
-          cy={pos.y - 6}
-          r="13.5"
-          fill={isPlayer1 ? '#2563EB' : '#10B981'}
-        />
+          {/* 5. Curved Glossy Ceramic Reflection Highlight on the Left Flank */}
+          <path
+            d={`M ${pos.x - 4} ${pos.y - 1}
+                C ${pos.x - 3} ${pos.y + 4}, ${pos.x - 7.5} ${pos.y + 9}, ${pos.x - 11} ${pos.y + 14}
+                L ${pos.x - 8} ${pos.y + 14}
+                C ${pos.x - 5} ${pos.y + 9}, ${pos.x - 1} ${pos.y + 4}, ${pos.x - 2} ${pos.y - 1}
+                Z`}
+            fill="url(#stem-specular)"
+            style={{ pointerEvents: 'none' }}
+          />
 
-        {/* Glass Specular Glint Reflection */}
-        <ellipse
-          cx={pos.x}
-          cy={pos.y - 11}
-          rx="9"
-          ry="4"
-          fill="#FFFFFF"
-          opacity="0.65"
-        />
+          {/* 6. Waist Ornamental Gold Filigree Ring */}
+          <ellipse
+            cx={pos.x}
+            cy={pos.y + 6}
+            rx="9.5"
+            ry="2.6"
+            fill="none"
+            stroke="url(#gold-polished)"
+            strokeWidth="1.4"
+          />
 
-        {/* Center Eye Dot / Finished Star */}
-        {token.state === 'finished' ? (
-          <text
-            x={pos.x}
-            y={pos.y - 1}
+          {/* 7. Neck Polished Gold Choker Collar */}
+          <ellipse
+            cx={pos.x}
+            cy={pos.y - 2}
+            rx="10.5"
+            ry="3.2"
+            fill="url(#gold-polished)"
+            stroke="#78350F"
+            strokeWidth="0.8"
+          />
+          <ellipse
+            cx={pos.x}
+            cy={pos.y - 2.8}
+            rx="8.5"
+            ry="2"
             fill="#FEF08A"
-            fontSize="15"
-            fontWeight="bold"
-            textAnchor="middle"
-          >
-            ★
-          </text>
-        ) : (
+          />
+
+          {/* 8. Head Bezel Socket (Polished Gold Crown Ring) */}
           <circle
             cx={pos.x}
-            cy={pos.y - 5.5}
-            r="5"
+            cy={pos.y - 12}
+            r="18.5"
+            fill="url(#gold-bezel-radial)"
+            stroke="#78350F"
+            strokeWidth="1"
+          />
+
+          {/* 9. Head 3D Gemstone Crystal Sphere (Sapphire / Emerald) */}
+          <circle
+            cx={pos.x}
+            cy={pos.y - 12}
+            r="15"
+            fill={isPlayer1 ? 'url(#p1-sapphire-gem)' : 'url(#p2-emerald-gem)'}
+            stroke="#FFFFFF"
+            strokeWidth="1"
+          />
+
+          {/* 10. Inner Gemstone Facet Ring */}
+          <circle
+            cx={pos.x}
+            cy={pos.y - 12}
+            r="11.5"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="0.8"
+            opacity="0.3"
+            strokeDasharray="3 2"
+            style={{ pointerEvents: 'none' }}
+          />
+
+          {/* 11. Curved Glass Specular Highlight Arc */}
+          <ellipse
+            cx={pos.x - 4.5}
+            cy={pos.y - 17}
+            rx="8"
+            ry="3.8"
+            transform={`rotate(-25 ${pos.x - 4.5} ${pos.y - 17})`}
+            fill="url(#glass-specular)"
+            style={{ pointerEvents: 'none' }}
+          />
+
+          {/* 12. Intense Star Glint Reflection */}
+          <circle
+            cx={pos.x - 6.5}
+            cy={pos.y - 17.5}
+            r="1.8"
+            fill="#FFFFFF"
+            opacity="0.95"
+            style={{ pointerEvents: 'none' }}
+          />
+
+          {/* 13. Center Medallion: Initial & Number Badge (or Crown when finished) */}
+          {token.state === 'finished' ? (
+            <text
+              x={pos.x}
+              y={pos.y - 7}
+              fill="#FEF08A"
+              fontSize="15"
+              fontWeight="900"
+              textAnchor="middle"
+              style={{
+                pointerEvents: 'none',
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))',
+              }}
+            >
+              👑
+            </text>
+          ) : (
+            <>
+              <circle
+                cx={pos.x}
+                cy={pos.y - 11.5}
+                r="7.5"
+                fill="rgba(0, 0, 0, 0.38)"
+                stroke="url(#gold-polished)"
+                strokeWidth="1"
+                style={{ pointerEvents: 'none' }}
+              />
+              <text
+                x={pos.x}
+                y={pos.y - 8.5}
+                fill="#FEF08A"
+                fontSize="10"
+                fontWeight="900"
+                textAnchor="middle"
+                style={{
+                  pointerEvents: 'none',
+                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.9))',
+                  letterSpacing: '-0.3px',
+                }}
+              >
+                {isPlayer1 ? 'M' : 'S'}{index + 1}
+              </text>
+            </>
+          )}
+
+          {/* 14. Top Finial Crown Bead */}
+          <circle
+            cx={pos.x}
+            cy={pos.y - 28}
+            r="3.2"
+            fill="url(#gold-polished)"
+            stroke="#78350F"
+            strokeWidth="0.6"
+          />
+          <circle
+            cx={pos.x - 0.8}
+            cy={pos.y - 28.8}
+            r="1"
             fill="#FFFFFF"
             opacity="0.9"
           />
-        )}
+        </g>
       </g>
     );
   };
@@ -999,6 +1284,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           <span className="text-[10px] text-stone-500 font-semibold truncate">
             {p1Wins} - {p2Wins}
           </span>
+          {gameMode === 'live' && (
+            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 text-blue-800 border border-blue-200 truncate">
+              ⚡ Direct ({activePartnerId === 'p1' ? p1.name : p2.name})
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
@@ -1101,17 +1391,139 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           className="w-full h-full select-none"
           style={{ touchAction: 'manipulation' }}
         >
+          {/* Luxury 3D Pawn & Material Defs */}
+          <defs>
+            {/* Real 3D Soft Drop Shadow for Pawns */}
+            <filter id="pawn-soft-shadow" x="-50%" y="-30%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="6" stdDeviation="4" floodColor="#020617" floodOpacity="0.5" />
+            </filter>
+
+            {/* Glowing Golden Aura for Active Pawns */}
+            <filter id="pawn-gold-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
+            {/* Player 1 (Blue / Med) Royal 3D Lacquer Body */}
+            <linearGradient id="p1-royal-body" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#1E3A8A" />
+              <stop offset="15%" stopColor="#1D4ED8" />
+              <stop offset="35%" stopColor="#60A5FA" />
+              <stop offset="52%" stopColor="#93C5FD" />
+              <stop offset="70%" stopColor="#2563EB" />
+              <stop offset="90%" stopColor="#1D4ED8" />
+              <stop offset="100%" stopColor="#0F172A" />
+            </linearGradient>
+
+            {/* Player 2 (Green / Safi) Royal 3D Lacquer Body */}
+            <linearGradient id="p2-royal-body" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#064E3B" />
+              <stop offset="15%" stopColor="#059669" />
+              <stop offset="35%" stopColor="#34D399" />
+              <stop offset="52%" stopColor="#A7F3D0" />
+              <stop offset="70%" stopColor="#10B981" />
+              <stop offset="90%" stopColor="#047857" />
+              <stop offset="100%" stopColor="#022C22" />
+            </linearGradient>
+
+            {/* 24k Polished Imperial Gold Metal Gradient */}
+            <linearGradient id="gold-polished" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FFFBEB" />
+              <stop offset="20%" stopColor="#FDE047" />
+              <stop offset="45%" stopColor="#F59E0B" />
+              <stop offset="70%" stopColor="#D97706" />
+              <stop offset="85%" stopColor="#78350F" />
+              <stop offset="100%" stopColor="#FEF08A" />
+            </linearGradient>
+
+            {/* Concentric Gold Bezel Gradient */}
+            <radialGradient id="gold-bezel-radial" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#FEF08A" />
+              <stop offset="40%" stopColor="#F59E0B" />
+              <stop offset="75%" stopColor="#B45309" />
+              <stop offset="100%" stopColor="#78350F" />
+            </radialGradient>
+
+            {/* Blue (Player 1) 3D Royal Sapphire Jewel Sphere */}
+            <radialGradient id="p1-sapphire-gem" cx="30%" cy="25%" r="75%">
+              <stop offset="0%" stopColor="#DBEAFE" />
+              <stop offset="20%" stopColor="#60A5FA" />
+              <stop offset="50%" stopColor="#2563EB" />
+              <stop offset="75%" stopColor="#1E40AF" />
+              <stop offset="92%" stopColor="#172554" />
+              <stop offset="100%" stopColor="#0B132B" />
+            </radialGradient>
+
+            {/* Green (Player 2) 3D Royal Emerald Jewel Sphere */}
+            <radialGradient id="p2-emerald-gem" cx="30%" cy="25%" r="75%">
+              <stop offset="0%" stopColor="#D1FAE5" />
+              <stop offset="20%" stopColor="#34D399" />
+              <stop offset="50%" stopColor="#059669" />
+              <stop offset="75%" stopColor="#047857" />
+              <stop offset="92%" stopColor="#064E3B" />
+              <stop offset="100%" stopColor="#022C22" />
+            </radialGradient>
+
+            {/* Ground Contact Shadow Gradient */}
+            <radialGradient id="pawn-contact-shadow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#000000" stopOpacity="0.65" />
+              <stop offset="50%" stopColor="#020617" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+            </radialGradient>
+
+            {/* Playable Pulsing Floor Ring Glow */}
+            <radialGradient id="pawn-floor-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#FDE047" stopOpacity="0.8" />
+              <stop offset="60%" stopColor="#F59E0B" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#D97706" stopOpacity="0" />
+            </radialGradient>
+
+            {/* Glass Curved Glint Specular Overlay */}
+            <linearGradient id="glass-specular" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
+              <stop offset="45%" stopColor="#FFFFFF" stopOpacity="0.45" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+
+            {/* Glossy Stem Reflection */}
+            <linearGradient id="stem-specular" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+              <stop offset="40%" stopColor="#FFFFFF" stopOpacity="0.65" />
+              <stop offset="70%" stopColor="#FFFFFF" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
           {/* Base Background Surface */}
           <rect x="0" y="0" width="1500" height="1500" fill="#FFFFFF" />
 
-          {/* 1. TOP-LEFT: RED BASE (with 4 red circular token spots) */}
+          {/* 1. TOP-LEFT: RED BASE (with 4 luxury indented red sockets) */}
           <rect x="0" y="0" width="600" height="600" fill="#DC2626" />
-          <rect x="60" y="60" width="480" height="480" rx="30" fill="#FFFFFF" />
-          {/* 4 Red circular spots */}
-          <circle cx="210" cy="210" r="45" fill="#DC2626" />
-          <circle cx="390" cy="210" r="45" fill="#DC2626" />
-          <circle cx="210" cy="390" r="45" fill="#DC2626" />
-          <circle cx="390" cy="390" r="45" fill="#DC2626" />
+          <rect x="60" y="60" width="480" height="480" rx="30" fill="#FFFFFF" stroke="#B91C1C" strokeWidth="4" />
+          {/* 4 Red circular sockets */}
+          <g>
+            <circle cx="210" cy="210" r="48" fill="#FCA5A5" opacity="0.3" />
+            <circle cx="210" cy="210" r="42" fill="#DC2626" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="210" cy="210" r="30" fill="none" stroke="#FEE2E2" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="390" cy="210" r="48" fill="#FCA5A5" opacity="0.3" />
+            <circle cx="390" cy="210" r="42" fill="#DC2626" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="390" cy="210" r="30" fill="none" stroke="#FEE2E2" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="210" cy="390" r="48" fill="#FCA5A5" opacity="0.3" />
+            <circle cx="210" cy="390" r="42" fill="#DC2626" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="210" cy="390" r="30" fill="none" stroke="#FEE2E2" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="390" cy="390" r="48" fill="#FCA5A5" opacity="0.3" />
+            <circle cx="390" cy="390" r="42" fill="#DC2626" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="390" cy="390" r="30" fill="none" stroke="#FEE2E2" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
 
           {/* 2. TOP-RIGHT: GREEN BASE (Computer / Safi) */}
           <rect x="900" y="0" width="600" height="600" fill="#16A34A" />
@@ -1125,21 +1537,53 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           >
             {gameMode === 'ai' ? 'Computer' : p2.name}
           </text>
-          <rect x="960" y="60" width="480" height="480" rx="30" fill="#FFFFFF" />
-          {/* 4 Green circular spots */}
-          <circle cx="1110" cy="210" r="45" fill="#16A34A" />
-          <circle cx="1290" cy="210" r="45" fill="#16A34A" />
-          <circle cx="1110" cy="390" r="45" fill="#16A34A" />
-          <circle cx="1290" cy="390" r="45" fill="#16A34A" />
+          <rect x="960" y="60" width="480" height="480" rx="30" fill="#FFFFFF" stroke="#15803D" strokeWidth="4" />
+          {/* 4 Green circular sockets */}
+          <g>
+            <circle cx="1110" cy="210" r="48" fill="#86EFAC" opacity="0.3" />
+            <circle cx="1110" cy="210" r="42" fill="#16A34A" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1110" cy="210" r="30" fill="none" stroke="#DCFCE7" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="1290" cy="210" r="48" fill="#86EFAC" opacity="0.3" />
+            <circle cx="1290" cy="210" r="42" fill="#16A34A" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1290" cy="210" r="30" fill="none" stroke="#DCFCE7" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="1110" cy="390" r="48" fill="#86EFAC" opacity="0.3" />
+            <circle cx="1110" cy="390" r="42" fill="#16A34A" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1110" cy="390" r="30" fill="none" stroke="#DCFCE7" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="1290" cy="390" r="48" fill="#86EFAC" opacity="0.3" />
+            <circle cx="1290" cy="390" r="42" fill="#16A34A" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1290" cy="390" r="30" fill="none" stroke="#DCFCE7" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
 
           {/* 3. BOTTOM-LEFT: BLUE BASE (You / Med) */}
           <rect x="0" y="900" width="600" height="600" fill="#2563EB" />
-          <rect x="60" y="960" width="480" height="480" rx="30" fill="#FFFFFF" />
-          {/* 4 Blue circular spots */}
-          <circle cx="210" cy="1110" r="45" fill="#2563EB" />
-          <circle cx="390" cy="1110" r="45" fill="#2563EB" />
-          <circle cx="210" cy="1290" r="45" fill="#2563EB" />
-          <circle cx="390" cy="1290" r="45" fill="#2563EB" />
+          <rect x="60" y="960" width="480" height="480" rx="30" fill="#FFFFFF" stroke="#1D4ED8" strokeWidth="4" />
+          {/* 4 Blue circular sockets */}
+          <g>
+            <circle cx="210" cy="1110" r="48" fill="#93C5FD" opacity="0.3" />
+            <circle cx="210" cy="1110" r="42" fill="#2563EB" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="210" cy="1110" r="30" fill="none" stroke="#DBEAFE" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="390" cy="1110" r="48" fill="#93C5FD" opacity="0.3" />
+            <circle cx="390" cy="1110" r="42" fill="#2563EB" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="390" cy="1110" r="30" fill="none" stroke="#DBEAFE" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="210" cy="1290" r="48" fill="#93C5FD" opacity="0.3" />
+            <circle cx="210" cy="1290" r="42" fill="#2563EB" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="210" cy="1290" r="30" fill="none" stroke="#DBEAFE" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="390" cy="1290" r="48" fill="#93C5FD" opacity="0.3" />
+            <circle cx="390" cy="1290" r="42" fill="#2563EB" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="390" cy="1290" r="30" fill="none" stroke="#DBEAFE" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
           <text
             x="300"
             y="1485"
@@ -1153,12 +1597,28 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* 4. BOTTOM-RIGHT: YELLOW BASE */}
           <rect x="900" y="900" width="600" height="600" fill="#EAB308" />
-          <rect x="960" y="960" width="480" height="480" rx="30" fill="#FFFFFF" />
-          {/* 4 Yellow circular spots */}
-          <circle cx="1110" cy="1110" r="45" fill="#EAB308" />
-          <circle cx="1290" cy="1110" r="45" fill="#EAB308" />
-          <circle cx="1110" cy="1290" r="45" fill="#EAB308" />
-          <circle cx="1290" cy="1290" r="45" fill="#EAB308" />
+          <rect x="960" y="960" width="480" height="480" rx="30" fill="#FFFFFF" stroke="#CA8A04" strokeWidth="4" />
+          {/* 4 Yellow circular sockets */}
+          <g>
+            <circle cx="1110" cy="1110" r="48" fill="#FDE047" opacity="0.3" />
+            <circle cx="1110" cy="1110" r="42" fill="#EAB308" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1110" cy="1110" r="30" fill="none" stroke="#FEF9C3" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="1290" cy="1110" r="48" fill="#FDE047" opacity="0.3" />
+            <circle cx="1290" cy="1110" r="42" fill="#EAB308" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1290" cy="1110" r="30" fill="none" stroke="#FEF9C3" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="1110" cy="1290" r="48" fill="#FDE047" opacity="0.3" />
+            <circle cx="1110" cy="1290" r="42" fill="#EAB308" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1110" cy="1290" r="30" fill="none" stroke="#FEF9C3" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
+          <g>
+            <circle cx="1290" cy="1290" r="48" fill="#FDE047" opacity="0.3" />
+            <circle cx="1290" cy="1290" r="42" fill="#EAB308" stroke="#FFFFFF" strokeWidth="3" />
+            <circle cx="1290" cy="1290" r="30" fill="none" stroke="#FEF9C3" strokeWidth="2" strokeDasharray="4 3" />
+          </g>
 
           {/* 5. 52 MAIN PERIMETER SQUARES */}
           {TRACK_COORDINATES.map((c, idx) => {
@@ -1300,7 +1760,51 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           <line x1="600" y1="600" x2="900" y2="900" stroke="#0F172A" strokeWidth="2" />
           <line x1="600" y1="900" x2="900" y2="600" stroke="#0F172A" strokeWidth="2" />
 
-          {/* 9. RENDER AUTHENTIC LUDO PIN PAWNS */}
+          {/* 9. STEP RIPPLE WAVE EFFECT (Onde lumineuse à chaque pas du pion) */}
+          {stepRipple && (
+            <g key={stepRipple.key} style={{ pointerEvents: 'none' }}>
+              {/* Outer expanding ripple ring */}
+              <circle
+                cx={stepRipple.x}
+                cy={stepRipple.y}
+                r="40"
+                fill="none"
+                stroke={stepRipple.color}
+                strokeWidth="4"
+                opacity="0.8"
+                className="animate-ping"
+                style={{ animationDuration: '0.6s' }}
+              />
+              {/* Glowing inner golden footprint ring */}
+              <circle
+                cx={stepRipple.x}
+                cy={stepRipple.y}
+                r="26"
+                fill="none"
+                stroke="#FACC15"
+                strokeWidth="2.5"
+                strokeDasharray="4 3"
+                opacity="0.9"
+              />
+              <circle
+                cx={stepRipple.x}
+                cy={stepRipple.y}
+                r="16"
+                fill={stepRipple.color}
+                opacity="0.3"
+                className="animate-pulse"
+              />
+              <circle
+                cx={stepRipple.x}
+                cy={stepRipple.y}
+                r="5"
+                fill="#FFFFFF"
+                opacity="0.95"
+              />
+            </g>
+          )}
+
+          {/* 10. RENDER AUTHENTIC LUDO PIN PAWNS */}
           {/* Player 1 (Blue / You) */}
           {activeTokensP1.map((t, idx) => renderPawn(t, idx))}
 
@@ -1314,7 +1818,9 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         {/* Left: Player 1 (You / Med) */}
         <div
           className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all min-w-0 ${
-            isP1 ? 'bg-blue-600/50 border border-blue-400 shadow-xs' : 'opacity-70'
+            isP1
+              ? 'bg-blue-600/50 border-2 border-blue-400 shadow-md ring-2 ring-blue-400/30'
+              : 'opacity-65'
           }`}
         >
           <div className="relative shrink-0">
@@ -1330,12 +1836,32 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             )}
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
-              {p1.name}
-            </span>
-            <span className="text-[10px] text-blue-200 block leading-tight">
-              {p1HomeCount}/{tokensPerPlayer} 🏠
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
+                {p1.name}
+              </span>
+              {gameMode === 'live' && activePartnerId === 'p1' && (
+                <span className="text-[8px] bg-blue-400/30 text-blue-200 border border-blue-400/40 px-1 rounded-sm font-semibold">
+                  Toi
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-blue-200 block leading-tight">
+                {p1HomeCount}/{tokensPerPlayer} 🏠
+              </span>
+              {gameMode === 'live' && (
+                <span
+                  className={`text-[8px] font-bold px-1 rounded-sm ${
+                    currentTurn === 'p1'
+                      ? 'bg-emerald-500 text-white animate-pulse'
+                      : 'bg-stone-800 text-stone-400'
+                  }`}
+                >
+                  {currentTurn === 'p1' ? '🟢 Au tour' : 'Attente'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1343,13 +1869,20 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         <div className="flex flex-col items-center shrink-0">
           <button
             type="button"
-            disabled={isRolling || isMoving || (gameMode === 'ai' && currentTurn === 'p2')}
-            onClick={handleRollDice}
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#E0F2FE] border-3 border-amber-300 shadow-md flex items-center justify-center cursor-pointer transition-all active:scale-95 relative overflow-hidden ${
-              isP1
-                ? 'ring-3 ring-blue-400/60 hover:scale-105'
-                : 'ring-3 ring-emerald-400/60 hover:scale-105'
+            disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
+            onClick={() => handleRollDice()}
+            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#E0F2FE] border-3 border-amber-300 shadow-md flex items-center justify-center transition-all relative overflow-hidden ${
+              !isMyTurn
+                ? 'opacity-40 cursor-not-allowed grayscale-30 ring-1 ring-stone-400'
+                : isP1
+                ? 'ring-3 ring-blue-400/80 hover:scale-105 cursor-pointer active:scale-95'
+                : 'ring-3 ring-emerald-400/80 hover:scale-105 cursor-pointer active:scale-95'
             }`}
+            title={
+              !isMyTurn
+                ? `En attente du tour de ${currentTurn === 'p1' ? p1.name : p2.name}`
+                : 'Lancer le dé'
+            }
           >
             {isRolling ? (
               <Dices className="w-7 h-7 text-blue-600 animate-spin" />
@@ -1358,13 +1891,28 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             ) : (
               <span className="text-2xl">🎲</span>
             )}
+
+            {/* Turn status indicator on the dice */}
+            {gameMode === 'live' && (
+              !isMyTurn ? (
+                <span className="absolute bottom-0.5 bg-stone-900/90 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-amber-300 border border-stone-700">
+                  ⏳ Attente
+                </span>
+              ) : (
+                <span className="absolute bottom-0.5 bg-emerald-600 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-white animate-pulse">
+                  À toi !
+                </span>
+              )
+            )}
           </button>
         </div>
 
         {/* Right: Player 2 (Computer / Safi) */}
         <div
           className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all flex-row-reverse text-right min-w-0 ${
-            !isP1 ? 'bg-emerald-600/50 border border-emerald-400 shadow-xs' : 'opacity-70'
+            !isP1
+              ? 'bg-emerald-600/50 border-2 border-emerald-400 shadow-md ring-2 ring-emerald-400/30'
+              : 'opacity-65'
           }`}
         >
           <div className="relative shrink-0">
@@ -1380,12 +1928,32 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             )}
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
-              {gameMode === 'ai' ? 'Computer' : p2.name}
-            </span>
-            <span className="text-[10px] text-emerald-200 block leading-tight">
-              {p2HomeCount}/{tokensPerPlayer} 🏠
-            </span>
+            <div className="flex items-center justify-end gap-1">
+              {gameMode === 'live' && activePartnerId === 'p2' && (
+                <span className="text-[8px] bg-emerald-400/30 text-emerald-200 border border-emerald-400/40 px-1 rounded-sm font-semibold">
+                  Toi
+                </span>
+              )}
+              <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
+                {gameMode === 'ai' ? 'Computer' : p2.name}
+              </span>
+            </div>
+            <div className="flex items-center justify-end gap-1.5">
+              {gameMode === 'live' && (
+                <span
+                  className={`text-[8px] font-bold px-1 rounded-sm ${
+                    currentTurn === 'p2'
+                      ? 'bg-emerald-500 text-white animate-pulse'
+                      : 'bg-stone-800 text-stone-400'
+                  }`}
+                >
+                  {currentTurn === 'p2' ? '🟢 Au tour' : 'Attente'}
+                </span>
+              )}
+              <span className="text-[10px] text-emerald-200 block leading-tight">
+                {p2HomeCount}/{tokensPerPlayer} 🏠
+              </span>
+            </div>
           </div>
         </div>
       </div>

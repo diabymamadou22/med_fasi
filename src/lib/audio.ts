@@ -138,6 +138,25 @@ class RomanticSoundEffects {
       osc.stop(ctx.currentTime + 0.04);
     } catch {}
   }
+  playPawnStep(stepIndex = 1) {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      // Pleasant marimba woodblock pitch rising with step count
+      const baseFreq = 420 + Math.min(stepIndex, 6) * 45;
+      osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.55, ctx.currentTime + 0.06);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.07);
+    } catch {}
+  }
   playCountdownTick() {
     try {
       const ctx = getAudioContext();
