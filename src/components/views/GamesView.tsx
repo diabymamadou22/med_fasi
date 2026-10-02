@@ -617,9 +617,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
                   </span>
                 )}
               </h1>
-              <p className="text-xs text-stone-500 truncate">
-                {currentGameDef?.desc}
-              </p>
             </div>
           </div>
 
@@ -746,9 +743,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
             </div>
           </div>
 
-          {/* Grille des Cartes de Jeux Épurées */}
+          {/* Grille des Cartes de Jeux Carrées & Stylées sur Mobile */}
           {filteredGameCards.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3.5">
               {filteredGameCards.map((game) => (
                 <button
                   key={game.id}
@@ -757,32 +754,36 @@ export const GamesView: React.FC<GamesViewProps> = ({
                     soundEffects.playNoteClick();
                     setActiveTab(game.id);
                   }}
-                  className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all active:scale-[0.99] hover:shadow-xs flex items-center justify-between gap-3 cursor-pointer ${game.color}`}
+                  className={`aspect-square p-3 sm:p-4 rounded-2xl sm:rounded-3xl border flex flex-col items-center justify-between text-center transition-all active:scale-95 hover:shadow-md cursor-pointer relative overflow-hidden group shadow-2xs ${game.color}`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-white shadow-2xs border border-white/80 flex items-center justify-center shrink-0">
-                      {game.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/80 text-stone-600">
-                          {game.tag}
-                        </span>
-                        {game.badge && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-2xs">
-                            {game.badge}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-sm sm:text-base font-bold text-stone-900 font-serif-romantic tracking-tight mt-0.5 truncate">
-                        {game.title}
-                      </h3>
-                      <p className="text-xs text-stone-500 mt-0.5 truncate">
-                        {game.desc}
-                      </p>
-                    </div>
+                  {/* Badge discret en haut */}
+                  <div className="w-full flex items-center justify-end h-5">
+                    {game.badge ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-rose-500 text-white shadow-2xs shrink-0">
+                        {game.badge}
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold text-stone-500 bg-white/80 shrink-0">
+                        {game.tag}
+                      </span>
+                    )}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-stone-400 shrink-0" />
+
+                  {/* Grande icône centrale élégante */}
+                  <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-transform shrink-0 my-auto">
+                    {React.isValidElement(game.icon)
+                      ? React.cloneElement(game.icon as React.ReactElement<{ className?: string }>, {
+                          className: 'w-6 h-6 sm:w-7 sm:h-7',
+                        })
+                      : game.icon}
+                  </div>
+
+                  {/* Nom du jeu stylé (aucun long commentaire !) */}
+                  <div className="w-full px-1">
+                    <h3 className="text-xs sm:text-sm font-bold text-stone-900 font-serif-romantic tracking-tight leading-snug line-clamp-2">
+                      {game.title}
+                    </h3>
+                  </div>
                 </button>
               ))}
             </div>
