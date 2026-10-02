@@ -9,11 +9,8 @@ import {
   MessageCircle,
   Volume2,
   BookOpen,
-  Target,
-  Gift,
   ArrowLeft,
   ChevronRight,
-  Flame,
   Grid3X3,
   HelpCircle,
   Users,
@@ -40,28 +37,23 @@ import {
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
 import { LexiconSection } from './LexiconSection';
-import { WeeklyChallengesSection } from './WeeklyChallengesSection';
 import { FlirtCardsGame } from './games/FlirtCardsGame';
 import { LoveRoleplayGame } from './games/LoveRoleplayGame';
 import { LoveBlindTestGame } from './games/LoveBlindTestGame';
-import { LoveVouchersSection } from './games/LoveVouchersSection';
 import { LoveWordleGame } from './games/LoveWordleGame';
 import { LoveSpeedMatchGame } from './games/LoveSpeedMatchGame';
 import { LoveVoiceChallengeGame } from './games/LoveVoiceChallengeGame';
 import { RomanticMadLibsGame } from './games/RomanticMadLibsGame';
-import { SecretDateMissionsGame } from './games/SecretDateMissionsGame';
 import { LoveTicTacToeGame } from '../games/LoveTicTacToeGame';
 import { LoveRouletteGame } from '../games/LoveRouletteGame';
-import { CompatibilityQuizGame } from '../games/CompatibilityQuizGame';
 import { WhoMostLikelyGame } from '../games/WhoMostLikelyGame';
-import { WouldYouRatherGame } from '../games/WouldYouRatherGame';
 import { SixtySecondsLoveGame } from '../games/SixtySecondsLoveGame';
 import { LovePuzzleGame } from '../games/LovePuzzleGame';
 import { INITIAL_LEXICON_WORDS } from '../../data/initialLexiconData';
-import { INITIAL_WEEKLY_LEARNING_CHALLENGES } from '../../data/initialWeeklyChallenges';
 import { useBackHandler } from '../../lib/backNavigation';
 
 export type EnglishGameTab =
+  | 'english_hub'
   | 'roulette'
   | 'wordle'
   | 'speed_match'
@@ -86,7 +78,7 @@ export type EnglishGameTab =
   | 'challenges'
   | 'couple_extras';
 
-export type GameCategory = 'all' | 'duo' | 'flirt' | 'bilingual' | 'rewards';
+export type GameCategory = 'all' | 'duo' | 'flirt' | 'bilingual';
 
 interface GamesViewProps {
   profile: CoupleProfile;
@@ -121,7 +113,7 @@ interface GameCardDef {
   id: EnglishGameTab;
   title: string;
   desc: string;
-  category: 'duo' | 'flirt' | 'bilingual' | 'rewards';
+  category: 'duo' | 'flirt' | 'bilingual';
   categoryLabel: string;
   tag: string;
   icon: React.ReactNode;
@@ -331,14 +323,98 @@ export const GamesView: React.FC<GamesViewProps> = ({
       ? 'trivia'
       : activeTab === 'dialogues'
       ? 'roleplay'
-      : activeTab === 'challenges' || activeTab === 'couple_extras'
-      ? 'vouchers'
+      : activeTab === 'challenges' ||
+        activeTab === 'couple_extras' ||
+        activeTab === 'vouchers' ||
+        activeTab === 'date_missions' ||
+        activeTab === 'weekly_challenges'
+      ? null
       : activeTab;
 
-  // Handle hardware / gesture back button to return to games catalog
-  useBackHandler(Boolean(resolvedTab), () => setActiveTab(null), 'game-detail-view');
+  const isEnglishSubGame = [
+    'wordle',
+    'speed_match',
+    'voice_coach',
+    'trivia',
+    'cards',
+    'roleplay',
+    'mad_libs',
+    'vault',
+  ].includes(resolvedTab || '');
 
-  // Curated catalog of romantic couple games & activities (punchy, clean, no long text)
+  const handleBack = () => {
+    soundEffects.playSoftTap();
+    if (isEnglishSubGame) {
+      setActiveTab('english_hub');
+    } else {
+      setActiveTab(null);
+    }
+  };
+
+  // Handle hardware / gesture back button to return to games catalog
+  useBackHandler(Boolean(resolvedTab), handleBack, 'game-detail-view');
+
+  // Jeux d'apprentissage d'anglais regroupés dans le hub
+  const englishSubGames = [
+    {
+      id: 'wordle' as EnglishGameTab,
+      title: 'Love Wordle',
+      tag: 'Lettres 🔤',
+      icon: <Heart className="w-5 h-5 text-pink-500" />,
+      color: 'bg-pink-50/70 hover:bg-pink-100/80 border-pink-200/80',
+    },
+    {
+      id: 'speed_match' as EnglishGameTab,
+      title: 'Speed Match',
+      tag: 'Mémoire ⚡',
+      icon: <Zap className="w-5 h-5 text-amber-500" />,
+      color: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80',
+    },
+    {
+      id: 'voice_coach' as EnglishGameTab,
+      title: 'Coach Vocal',
+      tag: 'Audio 🎙️',
+      icon: <Volume2 className="w-5 h-5 text-teal-500" />,
+      color: 'bg-teal-50/70 hover:bg-teal-100/80 border-teal-200/80',
+    },
+    {
+      id: 'trivia' as EnglishGameTab,
+      title: 'Blind Test Audio',
+      tag: 'Écoute 🎧',
+      icon: <Volume2 className="w-5 h-5 text-blue-500" />,
+      color: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80',
+    },
+    {
+      id: 'cards' as EnglishGameTab,
+      title: 'Cartes Vocabulaire',
+      tag: 'Flirt 💬',
+      icon: <Sparkles className="w-5 h-5 text-purple-500" />,
+      color: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80',
+    },
+    {
+      id: 'roleplay' as EnglishGameTab,
+      title: 'Jeux de Rôles',
+      tag: 'Impro 🎭',
+      icon: <MessageCircle className="w-5 h-5 text-indigo-500" />,
+      color: 'bg-indigo-50/70 hover:bg-indigo-100/80 border-indigo-200/80',
+    },
+    {
+      id: 'mad_libs' as EnglishGameTab,
+      title: 'Mad Libs Amoureux',
+      tag: 'Créatif ✍️',
+      icon: <BookOpen className="w-5 h-5 text-emerald-500" />,
+      color: 'bg-emerald-50/70 hover:bg-emerald-100/80 border-emerald-200/80',
+    },
+    {
+      id: 'vault' as EnglishGameTab,
+      title: 'Lexique Complice',
+      tag: 'Coffre 💎',
+      icon: <BookOpen className="w-5 h-5 text-stone-600" />,
+      color: 'bg-stone-50/70 hover:bg-stone-100/80 border-stone-200/80',
+    },
+  ];
+
+  // Catalogue principal épuré (Tu Préfères, Quiz Connivence, Bons, Missions & Défis Hebdo retirés)
   const gameCards: GameCardDef[] = [
     // 1. Défis & Duels
     {
@@ -364,14 +440,15 @@ export const GamesView: React.FC<GamesViewProps> = ({
       badge: 'En Direct ⚡',
     },
     {
-      id: 'puzzle',
-      title: 'Puzzle Romantique',
-      desc: 'Reconstituez vos photos souvenirs',
-      category: 'duo',
-      categoryLabel: 'Défis & Duels',
-      tag: 'Photos 📷',
-      icon: <Puzzle className="w-5 h-5 text-purple-500" />,
-      color: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80',
+      id: 'who_most_likely',
+      title: 'Qui de Nous Deux ?',
+      desc: 'Votez et découvrez vos réponses',
+      category: 'flirt',
+      categoryLabel: 'Flirt & Amour',
+      tag: 'En Direct ⚡',
+      icon: <Users className="w-5 h-5 text-blue-500" />,
+      color: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80',
+      badge: 'En Direct ⚡',
     },
     {
       id: 'sixty_seconds',
@@ -383,161 +460,36 @@ export const GamesView: React.FC<GamesViewProps> = ({
       icon: <Timer className="w-5 h-5 text-emerald-500" />,
       color: 'bg-emerald-50/70 hover:bg-emerald-100/80 border-emerald-200/80',
     },
-
-    // 2. Flirt & Intimité
     {
-      id: 'who_most_likely',
-      title: 'Qui de Nous Deux ?',
-      desc: 'Votez et personnalisez vos questions',
-      category: 'flirt',
-      categoryLabel: 'Flirt & Intimité',
-      tag: 'En Direct ⚡',
-      icon: <Users className="w-5 h-5 text-blue-500" />,
-      color: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80',
-      badge: 'Personnalisable ✍️',
-    },
-    {
-      id: 'cards',
-      title: 'Cartes Intimes',
-      desc: 'Questions & confessions douces',
-      category: 'flirt',
-      categoryLabel: 'Flirt & Intimité',
-      tag: 'Flirt 💬',
-      icon: <Sparkles className="w-5 h-5 text-purple-500" />,
+      id: 'puzzle',
+      title: 'Puzzle Romantique',
+      desc: 'Reconstituez vos photos souvenirs',
+      category: 'duo',
+      categoryLabel: 'Défis & Duels',
+      tag: 'Photos 📷',
+      icon: <Puzzle className="w-5 h-5 text-purple-500" />,
       color: 'bg-purple-50/70 hover:bg-purple-100/80 border-purple-200/80',
     },
+
+    // 2. Hub Tout-en-un Apprentissage Anglais
     {
-      id: 'would_you_rather',
-      title: 'Tu Préfères... ?',
-      desc: 'Dilemmes complices & fous rires',
-      category: 'flirt',
-      categoryLabel: 'Flirt & Intimité',
-      tag: 'Dilemmes 🤔',
-      icon: <HelpCircle className="w-5 h-5 text-amber-500" />,
-      color: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80',
-    },
-    {
-      id: 'affinity_quiz',
-      title: 'Quiz de Connivence',
-      desc: 'Testez votre complicité à deux',
-      category: 'flirt',
-      categoryLabel: 'Flirt & Intimité',
-      tag: 'Score 🏆',
-      icon: <Heart className="w-5 h-5 text-rose-500" />,
-      color: 'bg-rose-50/70 hover:bg-rose-100/80 border-rose-200/80',
-    },
-    {
-      id: 'roleplay',
-      title: 'Jeux de Rôles',
-      desc: 'Scénarios amusants à improviser',
-      category: 'flirt',
-      categoryLabel: 'Flirt & Intimité',
-      tag: 'Impro 🎭',
-      icon: <MessageCircle className="w-5 h-5 text-indigo-500" />,
+      id: 'english_hub',
+      title: 'Anglais Complice',
+      desc: '8 jeux pour apprendre l’anglais en duo',
+      category: 'bilingual',
+      categoryLabel: 'Anglais 🇬🇧',
+      tag: '8 Jeux 🇬🇧',
+      icon: <BookOpen className="w-5 h-5 text-indigo-500" />,
       color: 'bg-indigo-50/70 hover:bg-indigo-100/80 border-indigo-200/80',
-    },
-
-    // 3. Bilingue & Mots Doux
-    {
-      id: 'wordle',
-      title: 'Love Wordle',
-      desc: 'Devinez le mot doux en 6 essais',
-      category: 'bilingual',
-      categoryLabel: 'Bilingue & Mots',
-      tag: 'Lettres 🔤',
-      icon: <Heart className="w-5 h-5 text-pink-500" />,
-      color: 'bg-pink-50/70 hover:bg-pink-100/80 border-pink-200/80',
-    },
-    {
-      id: 'speed_match',
-      title: 'Speed Match',
-      desc: 'Associez les paires d’amour',
-      category: 'bilingual',
-      categoryLabel: 'Bilingue & Mots',
-      tag: 'Mémoire ⚡',
-      icon: <Zap className="w-5 h-5 text-amber-500" />,
-      color: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80',
-    },
-    {
-      id: 'voice_coach',
-      title: 'Coach Vocal',
-      desc: 'Murmurez vos mots complices',
-      category: 'bilingual',
-      categoryLabel: 'Bilingue & Mots',
-      tag: 'Audio 🎙️',
-      icon: <Volume2 className="w-5 h-5 text-teal-500" />,
-      color: 'bg-teal-50/70 hover:bg-teal-100/80 border-teal-200/80',
-    },
-    {
-      id: 'trivia',
-      title: 'Blind Test Audio',
-      desc: 'Écoutez et retrouvez la réplique',
-      category: 'bilingual',
-      categoryLabel: 'Bilingue & Mots',
-      tag: 'Écoute 🎧',
-      icon: <Volume2 className="w-5 h-5 text-blue-500" />,
-      color: 'bg-blue-50/70 hover:bg-blue-100/80 border-blue-200/80',
-    },
-    {
-      id: 'mad_libs',
-      title: 'Mad Libs Amoureux',
-      desc: 'Histoires drôles à inventer',
-      category: 'bilingual',
-      categoryLabel: 'Bilingue & Mots',
-      tag: 'Créatif ✍️',
-      icon: <BookOpen className="w-5 h-5 text-emerald-500" />,
-      color: 'bg-emerald-50/70 hover:bg-emerald-100/80 border-emerald-200/80',
-    },
-    {
-      id: 'vault',
-      title: 'Lexique Complice',
-      desc: `${effectiveLexicon.length} mots doux enregistrés`,
-      category: 'bilingual',
-      categoryLabel: 'Bilingue & Mots',
-      tag: 'Coffre 💎',
-      icon: <BookOpen className="w-5 h-5 text-stone-600" />,
-      color: 'bg-stone-50/70 hover:bg-stone-100/80 border-stone-200/80',
-    },
-
-    // 4. Récompenses & Missions
-    {
-      id: 'vouchers',
-      title: 'Bons Privilège',
-      desc: 'Massages, câlins & jokers à offrir',
-      category: 'rewards',
-      categoryLabel: 'Récompenses',
-      tag: 'Bons 🎁',
-      icon: <Gift className="w-5 h-5 text-rose-500" />,
-      color: 'bg-rose-50/70 hover:bg-rose-100/80 border-rose-200/80',
-    },
-    {
-      id: 'date_missions',
-      title: 'Missions Secrètes',
-      desc: 'Petits défis pour vos sorties',
-      category: 'rewards',
-      categoryLabel: 'Récompenses',
-      tag: 'Missions 🎯',
-      icon: <Target className="w-5 h-5 text-red-500" />,
-      color: 'bg-red-50/70 hover:bg-red-100/80 border-red-200/80',
-    },
-    {
-      id: 'weekly_challenges',
-      title: 'Défis Hebdo',
-      desc: 'Rituels complices du quotidien',
-      category: 'rewards',
-      categoryLabel: 'Récompenses',
-      tag: 'Hebdo 🔥',
-      icon: <Flame className="w-5 h-5 text-amber-500" />,
-      color: 'bg-amber-50/70 hover:bg-amber-100/80 border-amber-200/80',
+      badge: '8 en 1 🇬🇧',
     },
   ];
 
   const categories: { id: GameCategory; label: string; icon: string; count: number }[] = [
     { id: 'all', label: 'Tous', icon: '🌟', count: gameCards.length },
     { id: 'duo', label: 'Duels & Gages', icon: '🎲', count: gameCards.filter((g) => g.category === 'duo').length },
-    { id: 'flirt', label: 'Flirt & Intimité', icon: '💖', count: gameCards.filter((g) => g.category === 'flirt').length },
-    { id: 'bilingual', label: 'Mots Doux', icon: '🇬🇧', count: gameCards.filter((g) => g.category === 'bilingual').length },
-    { id: 'rewards', label: 'Récompenses', icon: '🎁', count: gameCards.filter((g) => g.category === 'rewards').length },
+    { id: 'flirt', label: 'Flirt & Amour', icon: '💖', count: gameCards.filter((g) => g.category === 'flirt').length },
+    { id: 'bilingual', label: 'Anglais 🇬🇧', icon: '🇬🇧', count: gameCards.filter((g) => g.category === 'bilingual').length },
   ];
 
   const handleRandomSurpriseGame = () => {
@@ -568,13 +520,21 @@ export const GamesView: React.FC<GamesViewProps> = ({
       q === ''
         ? true
         : game.title.toLowerCase().includes(q) ||
-          game.desc.toLowerCase().includes(q) ||
           game.categoryLabel.toLowerCase().includes(q) ||
           game.tag.toLowerCase().includes(q);
     return matchesCategory && matchesSearch;
   });
 
-  const currentGameDef = gameCards.find((g) => g.id === resolvedTab);
+  const allGameDefs: GameCardDef[] = [
+    ...gameCards,
+    ...englishSubGames.map((g) => ({
+      ...g,
+      desc: '',
+      category: 'bilingual' as const,
+      categoryLabel: 'Anglais 🇬🇧',
+    })),
+  ];
+  const currentGameDef = allGameDefs.find((g) => g.id === resolvedTab);
 
   return (
     <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 space-y-4">
@@ -599,12 +559,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              onClick={() => {
-                soundEffects.playSoftTap();
-                setActiveTab(null);
-              }}
+              onClick={handleBack}
               className="p-2 -ml-0.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors flex items-center justify-center cursor-pointer shrink-0"
-              title="Retour aux jeux"
+              title={isEnglishSubGame ? "Retour à l'anglais" : "Retour aux jeux"}
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
@@ -863,15 +820,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
             />
           )}
 
-          {resolvedTab === 'date_missions' && (
-            <SecretDateMissionsGame
-              profile={profile}
-              activePartnerId={activePartnerId}
-              onSendChatMessage={onSendChatMessage}
-              onAddXp={handleAddXp}
-            />
-          )}
-
           {resolvedTab === 'cards' && (
             <FlirtCardsGame
               profile={profile}
@@ -934,14 +882,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
             />
           )}
 
-          {resolvedTab === 'affinity_quiz' && (
-            <CompatibilityQuizGame
-              profile={profile}
-              activePartnerId={activePartnerId}
-              onSendChatMessage={onSendChatMessage}
-            />
-          )}
-
           {resolvedTab === 'who_most_likely' && (
             <WhoMostLikelyGame
               profile={profile}
@@ -950,12 +890,70 @@ export const GamesView: React.FC<GamesViewProps> = ({
             />
           )}
 
-          {resolvedTab === 'would_you_rather' && (
-            <WouldYouRatherGame
-              profile={profile}
-              activePartnerId={activePartnerId}
-              onSendChatMessage={onSendChatMessage}
-            />
+          {resolvedTab === 'english_hub' && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shrink-0">
+                    🇬🇧
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold font-serif-romantic tracking-tight">
+                      Anglais Complice
+                    </h2>
+                    <p className="text-xs text-indigo-100">
+                      8 jeux pour apprendre et flirter en anglais à deux
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEffects.playSoftTap();
+                    setActiveTab(null);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-semibold backdrop-blur-xs transition-colors cursor-pointer shrink-0"
+                >
+                  Tous les jeux
+                </button>
+              </div>
+
+              {/* Grille carrée des 8 jeux d'anglais */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3.5">
+                {englishSubGames.map((subGame) => (
+                  <button
+                    key={subGame.id}
+                    type="button"
+                    onClick={() => {
+                      soundEffects.playNoteClick();
+                      setActiveTab(subGame.id);
+                    }}
+                    className={`aspect-square p-3 sm:p-4 rounded-2xl sm:rounded-3xl border flex flex-col items-center justify-between text-center transition-all active:scale-95 hover:shadow-md cursor-pointer relative overflow-hidden group shadow-2xs ${subGame.color}`}
+                  >
+                    <div className="w-full flex items-center justify-end h-5">
+                      <span className="px-1.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-semibold text-stone-500 bg-white/80 shrink-0">
+                        {subGame.tag}
+                      </span>
+                    </div>
+
+                    <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-transform shrink-0 my-auto">
+                      {React.isValidElement(subGame.icon)
+                        ? React.cloneElement(subGame.icon as React.ReactElement<{ className?: string }>, {
+                            className: 'w-6 h-6 sm:w-7 sm:h-7',
+                          })
+                        : subGame.icon}
+                    </div>
+
+                    <div className="w-full px-1">
+                      <h3 className="text-xs sm:text-sm font-bold text-stone-900 font-serif-romantic tracking-tight leading-snug line-clamp-2">
+                        {subGame.title}
+                      </h3>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {resolvedTab === 'sixty_seconds' && (
@@ -972,35 +970,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
               activePartnerId={activePartnerId}
               memories={memories}
               onSendChatMessage={onSendChatMessage}
-            />
-          )}
-
-          {resolvedTab === 'weekly_challenges' && (
-            <WeeklyChallengesSection
-              profile={profile}
-              activePartnerId={activePartnerId}
-              challenges={
-                weeklyChallenges && weeklyChallenges.length > 0
-                  ? weeklyChallenges
-                  : INITIAL_WEEKLY_LEARNING_CHALLENGES
-              }
-              onSelectActiveChallenge={onSelectActiveWeeklyChallenge || (() => {})}
-              onSaveChallenge={onSaveWeeklyChallenge || (() => {})}
-              onSaveLexiconWord={onSaveLexiconWord}
-              onSendChatMessage={onSendChatMessage}
-              onOpenChatWithDraft={onOpenChatWithDraft}
-              onAddXp={handleAddXp}
-            />
-          )}
-
-          {resolvedTab === 'vouchers' && (
-            <LoveVouchersSection
-              profile={profile}
-              activePartnerId={activePartnerId}
-              xpPoints={xpPoints}
-              dateIdeas={dateIdeas || []}
-              onSendChatMessage={onSendChatMessage}
-              onOpenLexicon={() => setActiveTab('vault')}
             />
           )}
 
