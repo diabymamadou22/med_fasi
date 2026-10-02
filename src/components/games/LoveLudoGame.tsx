@@ -6,104 +6,131 @@ import {
   Dices,
   Flame,
   Settings2,
-  Trophy,
 } from 'lucide-react';
 import { CoupleProfile, PartnerId, LudoToken, LudoGameSession } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
 import { subscribeLudoGame, saveLudoGame } from '../../lib/firestoreService';
 
-// Coordinates on 15x15 standard Ludo grid (0 to 14)
-// Total 52 main perimeter squares in clockwise order
+// -------------------------------------------------------------
+// 15x15 STANDARD LUDO TRACK COORDINATES (0 to 51 = 52 squares)
+// Clockwise perimeter starting at Player 1 (Blue) start at [6, 13]
+// Matching the authentic Ludo King layout in the reference screenshot
+// -------------------------------------------------------------
 const TRACK_COORDINATES: [number, number][] = [
-  [1, 8],  // 0 - P1 Start (Star)
-  [2, 8],  // 1
-  [3, 8],  // 2
-  [4, 8],  // 3
-  [5, 8],  // 4
-  [6, 9],  // 5
-  [6, 10], // 6
-  [6, 11], // 7
-  [6, 12], // 8 - Star
-  [6, 13], // 9
-  [6, 14], // 10
-  [7, 14], // 11
-  [8, 14], // 12
-  [8, 13], // 13 - Star (P3 start)
-  [8, 12], // 14
-  [8, 11], // 15
-  [8, 10], // 16
-  [8, 9],  // 17
-  [9, 8],  // 18
-  [10, 8], // 19
-  [11, 8], // 20
-  [12, 8], // 21 - Star
-  [13, 8], // 22
-  [14, 8], // 23
-  [14, 7], // 24
-  [14, 6], // 25
-  [13, 6], // 26 - P2 Start (Star)
-  [12, 6], // 27
-  [11, 6], // 28
-  [10, 6], // 29
-  [9, 6],  // 30
-  [8, 5],  // 31
-  [8, 4],  // 32
-  [8, 3],  // 33
-  [8, 2],  // 34 - Star
-  [8, 1],  // 35
-  [8, 0],  // 36
-  [7, 0],  // 37
-  [6, 0],  // 38
-  [6, 1],  // 39 - Star (P4 start)
-  [6, 2],  // 40
-  [6, 3],  // 41
-  [6, 4],  // 42
-  [6, 5],  // 43
-  [5, 6],  // 44
-  [4, 6],  // 45
-  [3, 6],  // 46
-  [2, 6],  // 47 - Star
-  [1, 6],  // 48
-  [0, 6],  // 49
-  [0, 7],  // 50
-  [0, 8],  // 51
+  // 1. Bottom arm going UP on the left side (Blue side)
+  [6, 13], // 0 - Blue Start (Star)
+  [6, 12], // 1
+  [6, 11], // 2
+  [6, 10], // 3
+  [6, 9],  // 4
+
+  // 2. Left arm going LEFT (Bottom row of left arm)
+  [5, 8],  // 5
+  [4, 8],  // 6
+  [3, 8],  // 7
+  [2, 8],  // 8 - Safe Star
+  [1, 8],  // 9
+  [0, 8],  // 10
+
+  // 3. Left arm turn
+  [0, 7],  // 11 - Red Arrow [→] Entry
+  [0, 6],  // 12
+
+  // 4. Left arm going RIGHT (Red Start area)
+  [1, 6],  // 13 - Red Start (Star)
+  [2, 6],  // 14
+  [3, 6],  // 15
+  [4, 6],  // 16
+  [5, 6],  // 17
+
+  // 5. Top arm going UP on the left side
+  [6, 5],  // 18
+  [6, 4],  // 19
+  [6, 3],  // 20
+  [6, 2],  // 21 - Safe Star
+  [6, 1],  // 22
+  [6, 0],  // 23
+
+  // 6. Top arm turn
+  [7, 0],  // 24 - Green Arrow [↓] Entry
+  [8, 0],  // 25
+
+  // 7. Top arm going DOWN on the right side (Green Start area)
+  [8, 1],  // 26 - Green Start (Star)
+  [8, 2],  // 27
+  [8, 3],  // 28
+  [8, 4],  // 29
+  [8, 5],  // 30
+
+  // 8. Right arm going RIGHT (Top row of right arm)
+  [9, 6],  // 31
+  [10, 6], // 32
+  [11, 6], // 33
+  [12, 6], // 34 - Safe Star
+  [13, 6], // 35
+  [14, 6], // 36
+
+  // 9. Right arm turn
+  [14, 7], // 37 - Yellow Arrow [←] Entry
+  [14, 8], // 38
+
+  // 10. Right arm going LEFT (Yellow Start area)
+  [13, 8], // 39 - Yellow Start (Star)
+  [12, 8], // 40
+  [11, 8], // 41
+  [10, 8], // 42
+  [9, 8],  // 43
+
+  // 11. Bottom arm going DOWN on the right side
+  [8, 9],  // 44
+  [8, 10], // 45
+  [8, 11], // 46
+  [8, 12], // 47 - Safe Star
+  [8, 13], // 48
+  [8, 14], // 49
+
+  // 12. Bottom arm turn
+  [7, 14], // 50 - Blue Arrow [↑] Entry
+  [6, 14], // 51
 ];
 
 // Safe track indexes where pieces cannot be knocked out
 const SAFE_TRACK_INDEXES = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 
-// P1 Home stretch coordinates (steps 51 to 55) -> step 56 is home finish
-const P1_HOME_STRETCH: [number, number][] = [
-  [1, 7], // 51
-  [2, 7], // 52
-  [3, 7], // 53
-  [4, 7], // 54
-  [5, 7], // 55
+// P1 Blue Home Stretch (Col 7, Rows 13 down to 9 leading up into center)
+const P1_BLUE_HOME_STRETCH: [number, number][] = [
+  [7, 13], // 51
+  [7, 12], // 52
+  [7, 11], // 53
+  [7, 10], // 54
+  [7, 9],  // 55
 ];
 
-// P2 Home stretch coordinates (steps 51 to 55) -> step 56 is home finish
-const P2_HOME_STRETCH: [number, number][] = [
-  [13, 7], // 51
-  [12, 7], // 52
-  [11, 7], // 53
-  [10, 7], // 54
-  [9, 7],  // 55
+// P2 Green Home Stretch (Col 7, Rows 1 up to 5 leading down into center)
+const P2_GREEN_HOME_STRETCH: [number, number][] = [
+  [7, 1], // 51
+  [7, 2], // 52
+  [7, 3], // 53
+  [7, 4], // 54
+  [7, 5], // 55
 ];
 
-// Yard base coordinates
+// Yard base coordinates (matching 4 white circle spots in the screenshot)
+// P1 (Blue - Bottom-Left: Cols 0..5, Rows 9..14)
 const P1_YARD_SPOTS: [number, number][] = [
-  [1.5, 10.5],
-  [4.5, 10.5],
-  [1.5, 13.5],
-  [4.5, 13.5],
+  [1.8, 10.8],
+  [4.2, 10.8],
+  [1.8, 13.2],
+  [4.2, 13.2],
 ];
 
+// P2 (Green - Top-Right: Cols 9..14, Rows 0..5)
 const P2_YARD_SPOTS: [number, number][] = [
-  [10.5, 1.5],
-  [13.5, 1.5],
-  [10.5, 4.5],
-  [13.5, 4.5],
+  [10.8, 1.8],
+  [13.2, 1.8],
+  [10.8, 4.2],
+  [13.2, 4.2],
 ];
 
 const LUDO_PLEDGES = [
@@ -134,7 +161,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const p1 = profile.partner1;
   const p2 = profile.partner2;
 
-  // Settings (Default: 4 pieces as requested, pass-and-play local)
+  // Settings: 4 pieces standard (can toggle to 2)
   const [tokensPerPlayer, setTokensPerPlayer] = useState<2 | 4>(4);
   const [gameMode, setGameMode] = useState<'local' | 'live' | 'ai'>('local');
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -143,12 +170,15 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const [currentTurn, setCurrentTurn] = useState<PartnerId>('p1');
   const [diceValue, setDiceValue] = useState<number | null>(null);
   const [isRolling, setIsRolling] = useState<boolean>(false);
+  const [isMoving, setIsMoving] = useState<boolean>(false);
   const [consecutiveSixes, setConsecutiveSixes] = useState<number>(0);
   const [winner, setWinner] = useState<PartnerId | null>(null);
   const [p1Wins, setP1Wins] = useState<number>(0);
   const [p2Wins, setP2Wins] = useState<number>(0);
   const [selectedPledge, setSelectedPledge] = useState<string>(LUDO_PLEDGES[0]);
-  const [lastEventText, setLastEventText] = useState<string>('À Med de lancer le dé !');
+  const [lastEventText, setLastEventText] = useState<string>(
+    `À ${p1.name} (Bleu) de lancer le dé !`
+  );
   const [sentToChatToast, setSentToChatToast] = useState<boolean>(false);
 
   // Tokens state
@@ -171,12 +201,26 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   );
 
   // Active subset depending on 2 or 4 tokens mode
-  const activeTokensP1 = useMemo(() => tokensP1.slice(0, tokensPerPlayer), [tokensP1, tokensPerPlayer]);
-  const activeTokensP2 = useMemo(() => tokensP2.slice(0, tokensPerPlayer), [tokensP2, tokensPerPlayer]);
+  const activeTokensP1 = useMemo(
+    () => tokensP1.slice(0, tokensPerPlayer),
+    [tokensP1, tokensPerPlayer]
+  );
+  const activeTokensP2 = useMemo(
+    () => tokensP2.slice(0, tokensPerPlayer),
+    [tokensP2, tokensPerPlayer]
+  );
 
   // Real-time broadcast and sync
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isSyncingFromRemote = useRef<boolean>(false);
+  const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear timers on unmount
+  useEffect(() => {
+    return () => {
+      if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
+    };
+  }, []);
 
   // Synchronisation BroadcastChannel
   useEffect(() => {
@@ -304,7 +348,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
   // Handle dice rolling
   const handleRollDice = () => {
-    if (isRolling || winner) return;
+    if (isRolling || isMoving || winner) return;
 
     if (gameMode === 'ai' && currentTurn === 'p2') return;
 
@@ -327,7 +371,9 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       if (nextSixCount >= 3) {
         soundEffects.playSoftTap();
         const nextPlayer = nextTurnPlayer(currentTurn);
-        const text = `3 fois 6 d'affilée ! Le tour passe à ${nextPlayer === 'p1' ? p1.name : p2.name}.`;
+        const text = `3 fois 6 d'affilée ! Le tour passe à ${
+          nextPlayer === 'p1' ? p1.name : p2.name
+        }.`;
         setLastEventText(text);
         setCurrentTurn(nextPlayer);
         setDiceValue(null);
@@ -367,114 +413,170 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           });
         }
       } else if (availableMoves.length === 1) {
+        // Exactly 1 move -> execute step-by-step
         const text = `${rollingPartnerName} a fait un ${finalRoll} !`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
         setTimeout(() => {
-          handleMoveToken(availableMoves[0], finalRoll);
-        }, 500);
+          handleStepByStepMove(availableMoves[0], finalRoll);
+        }, 350);
       } else {
-        const text = `Fait un ${finalRoll} ! Choisissez un pion à déplacer.`;
+        const text = `Fait un ${finalRoll} ! Touchez un pion à déplacer.`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
       }
     }, 450);
   };
 
-  // Move token logic
-  const handleMoveToken = (token: LudoToken, rollToUse?: number) => {
+  // Helper to update a single token in tokens state
+  const updateSingleToken = (updated: LudoToken, player: PartnerId) => {
+    if (player === 'p1') {
+      setTokensP1((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    } else {
+      setTokensP2((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    }
+  };
+
+  // STEP-BY-STEP MOVEMENT ("passe de pas a pas au lieu de sauter")
+  const handleStepByStepMove = (token: LudoToken, rollToUse?: number) => {
     const roll = rollToUse ?? diceValue;
-    if (!roll || winner || isRolling) return;
+    if (!roll || winner || isRolling || isMoving) return;
 
     const movingPlayer = token.player;
     if (movingPlayer !== currentTurn) return;
 
-    soundEffects.playSoftTap();
-
-    let newStep = token.step;
-    let newState = token.state;
-    let gotBonusTurn = false;
-    let capturedOpponent = false;
-
-    // 1. Moving out of Yard
+    // 1. If in yard (rolling 6), exit from yard to step 0
     if (token.state === 'yard') {
       if (roll !== 6) return;
-      newState = 'path';
-      newStep = 0;
-      gotBonusTurn = true;
-    } else {
-      newStep = token.step + roll;
-      if (newStep > 56) return;
+      setIsMoving(true);
+      soundEffects.playSoftTap();
 
-      if (newStep === 56) {
-        newState = 'finished';
-        soundEffects.playSuccessSparkle();
-        triggerHeartConfetti();
-        gotBonusTurn = true;
-      } else if (newStep >= 51) {
-        newState = 'home_run';
-      } else {
-        newState = 'path';
-      }
-    }
-
-    const movingTrackIndex =
-      newState === 'path'
-        ? movingPlayer === 'p1'
-          ? newStep
-          : (26 + newStep) % 52
-        : null;
-
-    let nextP1Tokens = [...tokensP1];
-    let nextP2Tokens = [...tokensP2];
-
-    if (movingTrackIndex !== null && !SAFE_TRACK_INDEXES.has(movingTrackIndex)) {
-      const opponentPlayer = nextTurnPlayer(movingPlayer);
-      const opponentTokens = opponentPlayer === 'p1' ? nextP1Tokens : nextP2Tokens;
-
-      const capturedIdx = opponentTokens.findIndex((op) => {
-        if (op.state !== 'path') return false;
-        const opTrackIdx = opponentPlayer === 'p1' ? op.step : (26 + op.step) % 52;
-        return opTrackIdx === movingTrackIndex;
-      });
-
-      if (capturedIdx >= 0) {
-        capturedOpponent = true;
-        gotBonusTurn = true;
-        soundEffects.playVictoryChime();
-        triggerHeartConfetti();
-
-        const updatedOpponent = {
-          ...opponentTokens[capturedIdx],
-          state: 'yard' as const,
+      setTimeout(() => {
+        const exitedToken: LudoToken = {
+          ...token,
+          state: 'path',
           step: 0,
         };
+        updateSingleToken(exitedToken, movingPlayer);
+        setIsMoving(false);
 
-        if (opponentPlayer === 'p1') {
-          nextP1Tokens[capturedIdx] = updatedOpponent;
-        } else {
-          nextP2Tokens[capturedIdx] = updatedOpponent;
+        // Rolling 6 grants bonus roll!
+        const msg = `🎉 ${movingPlayer === 'p1' ? p1.name : p2.name} a sorti un pion ! Rejouez.`;
+        setLastEventText(msg);
+        setDiceValue(null);
+
+        const nextTokens =
+          movingPlayer === 'p1'
+            ? { p1: tokensP1.map((t) => (t.id === exitedToken.id ? exitedToken : t)), p2: tokensP2 }
+            : { p1: tokensP1, p2: tokensP2.map((t) => (t.id === exitedToken.id ? exitedToken : t)) };
+
+        syncSessionToCloud({
+          tokens: nextTokens,
+          diceValue: null,
+          lastMoveText: msg,
+        });
+      }, 250);
+      return;
+    }
+
+    // 2. Token is already on track or home stretch: move step-by-step!
+    const startStep = token.step;
+    const targetStep = startStep + roll;
+    if (targetStep > 56) return; // Cannot overshoot
+
+    setIsMoving(true);
+    let currentStep = startStep;
+    const stepInterval = 130; // 130ms per square -> smooth, fluid and tactile!
+
+    const stepNext = () => {
+      currentStep += 1;
+      soundEffects.playSoftTap();
+
+      const interimState =
+        currentStep === 56 ? 'finished' : currentStep >= 51 ? 'home_run' : 'path';
+
+      const interimToken: LudoToken = {
+        ...token,
+        step: currentStep,
+        state: interimState,
+      };
+
+      updateSingleToken(interimToken, movingPlayer);
+
+      if (currentStep < targetStep) {
+        moveTimerRef.current = setTimeout(stepNext, stepInterval);
+      } else {
+        // Reached destination! Finalize move
+        finalizeMove(interimToken, movingPlayer, roll);
+      }
+    };
+
+    moveTimerRef.current = setTimeout(stepNext, stepInterval);
+  };
+
+  // Finalize move after step-by-step animation completes
+  const finalizeMove = (finalToken: LudoToken, movingPlayer: PartnerId, roll: number) => {
+    setIsMoving(false);
+
+    let gotBonusTurn = roll === 6;
+    let capturedOpponent = false;
+
+    // Check arrival at center home
+    if (finalToken.step === 56) {
+      soundEffects.playSuccessSparkle();
+      triggerHeartConfetti();
+      gotBonusTurn = true; // Entering home grants bonus turn!
+    }
+
+    // Check capture on main path (steps 0..50)
+    let nextP1Tokens =
+      movingPlayer === 'p1'
+        ? tokensP1.map((t) => (t.id === finalToken.id ? finalToken : t))
+        : [...tokensP1];
+    let nextP2Tokens =
+      movingPlayer === 'p2'
+        ? tokensP2.map((t) => (t.id === finalToken.id ? finalToken : t))
+        : [...tokensP2];
+
+    if (finalToken.state === 'path') {
+      const finalTrackIndex =
+        movingPlayer === 'p1' ? finalToken.step : (26 + finalToken.step) % 52;
+
+      // Safe squares cannot be captured
+      if (!SAFE_TRACK_INDEXES.has(finalTrackIndex)) {
+        const opponentPlayer = nextTurnPlayer(movingPlayer);
+        const opponentTokens = opponentPlayer === 'p1' ? nextP1Tokens : nextP2Tokens;
+
+        const capturedIdx = opponentTokens.findIndex((op) => {
+          if (op.state !== 'path') return false;
+          const opTrackIdx = opponentPlayer === 'p1' ? op.step : (26 + op.step) % 52;
+          return opTrackIdx === finalTrackIndex;
+        });
+
+        if (capturedIdx >= 0) {
+          capturedOpponent = true;
+          gotBonusTurn = true; // Capturing grants another roll!
+          soundEffects.playVictoryChime();
+          triggerHeartConfetti();
+
+          const updatedOpponent: LudoToken = {
+            ...opponentTokens[capturedIdx],
+            state: 'yard',
+            step: 0,
+          };
+
+          if (opponentPlayer === 'p1') {
+            nextP1Tokens[capturedIdx] = updatedOpponent;
+            setTokensP1([...nextP1Tokens]);
+          } else {
+            nextP2Tokens[capturedIdx] = updatedOpponent;
+            setTokensP2([...nextP2Tokens]);
+          }
         }
       }
     }
 
-    const updatedMoverToken: LudoToken = {
-      ...token,
-      step: newStep,
-      state: newState,
-    };
-
-    if (movingPlayer === 'p1') {
-      const idx = nextP1Tokens.findIndex((t) => t.id === token.id);
-      if (idx >= 0) nextP1Tokens[idx] = updatedMoverToken;
-      setTokensP1(nextP1Tokens);
-    } else {
-      const idx = nextP2Tokens.findIndex((t) => t.id === token.id);
-      if (idx >= 0) nextP2Tokens[idx] = updatedMoverToken;
-      setTokensP2(nextP2Tokens);
-    }
-
-    // Check WIN condition
+    // Check WIN condition (all active tokens reached home)
     const p1Active = nextP1Tokens.slice(0, tokensPerPlayer);
     const p2Active = nextP2Tokens.slice(0, tokensPerPlayer);
 
@@ -508,7 +610,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
     const moverName = movingPlayer === 'p1' ? p1.name : p2.name;
     let moveMsg = `${moverName} a avancé son pion !`;
-    if (newState === 'finished') {
+    if (finalToken.state === 'finished') {
       moveMsg = `🎉 ${moverName} a rentré un pion ! Rejouez !`;
     } else if (capturedOpponent) {
       moveMsg = `💥 Pion adverse capturé ! Rejouez !`;
@@ -518,7 +620,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
     setLastEventText(moveMsg);
 
-    if (gotBonusTurn || roll === 6) {
+    if (gotBonusTurn) {
       setDiceValue(null);
       syncSessionToCloud({
         tokens: { p1: nextP1Tokens, p2: nextP2Tokens },
@@ -542,7 +644,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
   // AI Cupid automated turn
   useEffect(() => {
-    if (gameMode !== 'ai' || currentTurn !== 'p2' || winner || isRolling) return;
+    if (gameMode !== 'ai' || currentTurn !== 'p2' || winner || isRolling || isMoving) return;
 
     const timer = setTimeout(() => {
       if (diceValue === null) {
@@ -550,18 +652,31 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       } else {
         const moves = getPlayableTokens('p2', diceValue);
         if (moves.length > 0) {
-          const chosen = moves[Math.floor(Math.random() * moves.length)];
-          handleMoveToken(chosen, diceValue);
+          // AI strategy: prioritize capture, then home, then forward
+          const captureMove = moves.find((m) => {
+            const nextTrack = (26 + m.step + diceValue) % 52;
+            return (
+              !SAFE_TRACK_INDEXES.has(nextTrack) &&
+              tokensP1.some((p1t) => p1t.state === 'path' && p1t.step === nextTrack)
+            );
+          });
+          const homeMove = moves.find((m) => m.step + diceValue === 56);
+          const yardMove = moves.find((m) => m.state === 'yard' && diceValue === 6);
+
+          const chosen = captureMove || homeMove || yardMove || moves[0];
+          handleStepByStepMove(chosen, diceValue);
         }
       }
-    }, 800);
+    }, 850);
 
     return () => clearTimeout(timer);
-  }, [gameMode, currentTurn, diceValue, winner, isRolling, getPlayableTokens]);
+  }, [gameMode, currentTurn, diceValue, winner, isRolling, isMoving, getPlayableTokens, tokensP1]);
 
   // Reset Game
   const handleResetGame = () => {
+    if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
     soundEffects.playSoftTap();
+
     const freshP1: LudoToken[] = Array.from({ length: 4 }, (_, idx) => ({
       id: `p1_${idx}`,
       player: 'p1',
@@ -580,9 +695,10 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     setWinner(null);
     setDiceValue(null);
     setIsRolling(false);
+    setIsMoving(false);
     setConsecutiveSixes(0);
     setCurrentTurn('p1');
-    setLastEventText('Nouvelle partie ! À Med de lancer.');
+    setLastEventText(`Nouvelle partie ! À ${p1.name} (Bleu) de lancer.`);
 
     syncSessionToCloud({
       tokens: { p1: freshP1, p2: freshP2 },
@@ -625,27 +741,31 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       return { x: spot[0] * 100 + 50, y: spot[1] * 100 + 50 };
     }
 
-    // 2. Finished in Home Center
+    // 2. Finished in Home Center (inside respective colored triangle)
     if (token.state === 'finished') {
       const offset = (indexInPlayer - 1.5) * 22;
       if (isP1) {
-        return { x: 700, y: 750 + offset };
+        // Blue bottom triangle
+        return { x: 750 + offset, y: 810 };
       }
-      return { x: 800, y: 750 + offset };
+      // Green top triangle
+      return { x: 750 + offset, y: 690 };
     }
 
-    // 3. In Home Stretch
+    // 3. In Home Stretch (steps 51 to 55)
     if (token.state === 'home_run') {
       const stretchIdx = Math.min(Math.max(token.step - 51, 0), 4);
-      const coord = isP1 ? P1_HOME_STRETCH[stretchIdx] : P2_HOME_STRETCH[stretchIdx];
+      const coord = isP1
+        ? P1_BLUE_HOME_STRETCH[stretchIdx]
+        : P2_GREEN_HOME_STRETCH[stretchIdx];
       return { x: coord[0] * 100 + 50, y: coord[1] * 100 + 50 };
     }
 
-    // 4. On main track (0..50)
+    // 4. On main perimeter track (steps 0 to 50)
     const trackIndex = isP1 ? token.step : (26 + token.step) % 52;
-    const coord = TRACK_COORDINATES[trackIndex] || [1, 8];
+    const coord = TRACK_COORDINATES[trackIndex] || [6, 13];
 
-    // Check multiple tokens on same square to offset cleanly
+    // Offset multiple tokens on the same square
     const allSamePlayerTokens = isP1 ? tokensP1 : tokensP2;
     const sameSquareTokens = allSamePlayerTokens.filter(
       (t) => t.state === token.state && t.step === token.step
@@ -655,10 +775,10 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     if (sameSquareTokens.length > 1) {
       const idxInSame = sameSquareTokens.findIndex((t) => t.id === token.id);
       const offsets = [
-        [-10, -10],
-        [10, -10],
-        [-10, 10],
-        [10, 10],
+        [-9, -9],
+        [9, -9],
+        [-9, 9],
+        [9, 9],
       ];
       offsetX = offsets[idxInSame % 4][0];
       offsetY = offsets[idxInSame % 4][1];
@@ -671,19 +791,216 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const p2HomeCount = activeTokensP2.filter((t) => t.state === 'finished').length;
   const isP1 = currentTurn === 'p1';
 
+  // Render 6-dot face on the Ludo King dice button
+  const renderDiceDots = (value: number | null) => {
+    if (!value) return null;
+    const dot = 'w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-600 shadow-2xs shrink-0';
+
+    switch (value) {
+      case 1:
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-blue-600 shadow-xs" />
+          </div>
+        );
+      case 2:
+        return (
+          <div className="w-full h-full p-1.5 flex justify-between">
+            <span className={dot} />
+            <span className={`${dot} self-end`} />
+          </div>
+        );
+      case 3:
+        return (
+          <div className="w-full h-full p-1.5 flex justify-between">
+            <span className={dot} />
+            <span className={`${dot} self-center`} />
+            <span className={`${dot} self-end`} />
+          </div>
+        );
+      case 4:
+        return (
+          <div className="w-full h-full p-1.5 grid grid-cols-2 gap-2 content-between">
+            <span className={dot} />
+            <span className={dot} />
+            <span className={dot} />
+            <span className={dot} />
+          </div>
+        );
+      case 5:
+        return (
+          <div className="w-full h-full p-1.5 relative flex items-center justify-center">
+            <div className="absolute inset-1.5 grid grid-cols-2 gap-2 content-between">
+              <span className={dot} />
+              <span className={dot} />
+              <span className={dot} />
+              <span className={dot} />
+            </div>
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-600 shadow-xs z-10" />
+          </div>
+        );
+      case 6:
+        return (
+          <div className="w-full h-full p-1.5 grid grid-cols-2 gap-x-2.5 content-between justify-items-center">
+            <span className={dot} />
+            <span className={dot} />
+            <span className={dot} />
+            <span className={dot} />
+            <span className={dot} />
+            <span className={dot} />
+          </div>
+        );
+      default:
+        return <span>{value}</span>;
+    }
+  };
+
+  // Render individual Ludo King Pin Pawn (matching the screenshot exactly)
+  const renderPawn = (token: LudoToken, index: number) => {
+    const isPlayer1 = token.player === 'p1';
+    const pos = getTokenPosition(token, index);
+    const isPlayable = playableTokens.some((pt) => pt.id === token.id);
+
+    return (
+      <g
+        key={token.id}
+        onClick={() => !isMoving && isPlayable && handleStepByStepMove(token)}
+        onTouchEnd={(e) => {
+          if (!isMoving && isPlayable) {
+            e.preventDefault();
+            handleStepByStepMove(token);
+          }
+        }}
+        className={isPlayable && !isMoving ? 'cursor-pointer' : ''}
+      >
+        {/* Invisible touch target */}
+        <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
+
+        {/* Contact shadow at base */}
+        <ellipse
+          cx={pos.x}
+          cy={pos.y + 16}
+          rx="22"
+          ry="7"
+          fill="#000000"
+          opacity="0.35"
+        />
+
+        {/* Glowing Turn Halo (NO BOUNCING, just soft aura as requested) */}
+        {isPlayable && !isMoving && (
+          <>
+            <circle
+              cx={pos.x}
+              cy={pos.y - 4}
+              r="30"
+              fill="none"
+              stroke="#FACC15"
+              strokeWidth="3.5"
+              strokeDasharray="6 4"
+              className="animate-spin"
+              style={{
+                animationDuration: '6s',
+                transformOrigin: `${pos.x}px ${pos.y - 4}px`,
+              }}
+              opacity="0.95"
+            />
+            <circle
+              cx={pos.x}
+              cy={pos.y - 4}
+              r="26"
+              fill="#FEF08A"
+              opacity="0.25"
+              className="animate-pulse"
+            />
+          </>
+        )}
+
+        {/* 3D Pin Skirt / Flared Conical Body */}
+        <path
+          d={`M ${pos.x - 13} ${pos.y - 4} 
+              C ${pos.x - 15} ${pos.y + 9}, ${pos.x - 18} ${pos.y + 14}, ${pos.x - 16} ${pos.y + 17}
+              C ${pos.x - 9} ${pos.y + 20}, ${pos.x + 9} ${pos.y + 20}, ${pos.x + 16} ${pos.y + 17}
+              C ${pos.x + 18} ${pos.y + 14}, ${pos.x + 15} ${pos.y + 9}, ${pos.x + 13} ${pos.y - 4}
+              Z`}
+          fill={isPlayer1 ? '#FFFFFF' : '#FFFFFF'}
+          stroke={isPlayer1 ? '#1D4ED8' : '#047857'}
+          strokeWidth="2.5"
+        />
+
+        {/* Base Rim Color Band */}
+        <ellipse
+          cx={pos.x}
+          cy={pos.y + 16}
+          rx="14"
+          ry="4"
+          fill={isPlayer1 ? '#2563EB' : '#10B981'}
+        />
+
+        {/* Head Outer Chrome Rim */}
+        <circle
+          cx={pos.x}
+          cy={pos.y - 6}
+          r="19"
+          fill="#FFFFFF"
+          stroke="#94A3B8"
+          strokeWidth="2"
+        />
+
+        {/* Head Inner Jewel Circle */}
+        <circle
+          cx={pos.x}
+          cy={pos.y - 6}
+          r="13.5"
+          fill={isPlayer1 ? '#2563EB' : '#10B981'}
+        />
+
+        {/* Glass Specular Glint Reflection */}
+        <ellipse
+          cx={pos.x}
+          cy={pos.y - 11}
+          rx="9"
+          ry="4"
+          fill="#FFFFFF"
+          opacity="0.65"
+        />
+
+        {/* Center Eye Dot / Finished Star */}
+        {token.state === 'finished' ? (
+          <text
+            x={pos.x}
+            y={pos.y - 1}
+            fill="#FEF08A"
+            fontSize="15"
+            fontWeight="bold"
+            textAnchor="middle"
+          >
+            ★
+          </text>
+        ) : (
+          <circle
+            cx={pos.x}
+            cy={pos.y - 5.5}
+            r="5"
+            fill="#FFFFFF"
+            opacity="0.9"
+          />
+        )}
+      </g>
+    );
+  };
+
   return (
     <div className="w-full max-w-md mx-auto box-border select-none flex flex-col items-center gap-2 overflow-hidden px-1">
-      {/* 1. Header Ultra-Compact & Élégant (Sans fioritures) */}
-      <div className="w-full flex items-center justify-between py-1 px-2 bg-white/90 backdrop-blur-xs rounded-xl border border-stone-200/70 shadow-2xs">
+      {/* Top Bar with Mode, Piece count and Reset */}
+      <div className="w-full flex items-center justify-between py-1 px-2.5 bg-white/95 rounded-xl border border-stone-200/80 shadow-2xs">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-base">🎲</span>
           <span className="font-bold text-xs text-stone-900 tracking-tight">Ludo MS</span>
-          <span className="text-[10px] text-stone-400 font-medium truncate">
-            {p1Wins}-{p2Wins}
+          <span className="text-[10px] text-stone-500 font-semibold truncate">
+            {p1Wins} - {p2Wins}
           </span>
         </div>
 
-        {/* Action icons: Settings & Reset */}
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -706,7 +1023,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         </div>
       </div>
 
-      {/* Settings popdown (hidden by default to avoid screen overflow) */}
+      {/* Options Drawer */}
       <AnimatePresence>
         {showSettings && (
           <motion.div
@@ -720,8 +1037,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <button
                 type="button"
                 onClick={() => setGameMode('local')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  gameMode === 'local' ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  gameMode === 'local' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-600'
                 }`}
               >
                 1 Écran
@@ -729,8 +1046,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <button
                 type="button"
                 onClick={() => setGameMode('live')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  gameMode === 'live' ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  gameMode === 'live' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-600'
                 }`}
               >
                 Direct ⚡
@@ -738,11 +1055,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <button
                 type="button"
                 onClick={() => setGameMode('ai')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  gameMode === 'ai' ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  gameMode === 'ai' ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-600'
                 }`}
               >
-                IA 🤖
+                Vs IA 🤖
               </button>
             </div>
 
@@ -754,11 +1071,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                   setTokensPerPlayer(4);
                   handleResetGame();
                 }}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  tokensPerPlayer === 4 ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  tokensPerPlayer === 4 ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-600'
                 }`}
               >
-                4
+                4 Pions
               </button>
               <button
                 type="button"
@@ -766,751 +1083,329 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                   setTokensPerPlayer(2);
                   handleResetGame();
                 }}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  tokensPerPlayer === 2 ? 'bg-rose-500 text-white' : 'bg-stone-100 text-stone-600'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  tokensPerPlayer === 2 ? 'bg-blue-600 text-white' : 'bg-stone-100 text-stone-600'
                 }`}
               >
-                2
+                2 Pions
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 2. Barre de Duel Intégrée (Ultra-plate, affiche les deux joueurs et le tour) */}
-      <div className="w-full flex items-center justify-between px-2.5 py-1.5 bg-white rounded-xl border border-stone-200/80 shadow-2xs gap-2">
-        {/* Med (Rouge) */}
+      {/* THE AUTHENTIC LUDO KING BOARD CONTAINER */}
+      <div className="relative w-full max-w-[min(84vw,48vh,400px)] aspect-square bg-[#0b2853] p-1.5 sm:p-2 rounded-2xl shadow-xl border-2 border-[#1e4982]">
+        <svg
+          viewBox="0 0 1500 1500"
+          className="w-full h-full select-none"
+          style={{ touchAction: 'manipulation' }}
+        >
+          {/* Base Background Surface */}
+          <rect x="0" y="0" width="1500" height="1500" fill="#FFFFFF" />
+
+          {/* 1. TOP-LEFT: RED BASE (with 4 red circular token spots) */}
+          <rect x="0" y="0" width="600" height="600" fill="#DC2626" />
+          <rect x="60" y="60" width="480" height="480" rx="30" fill="#FFFFFF" />
+          {/* 4 Red circular spots */}
+          <circle cx="210" cy="210" r="45" fill="#DC2626" />
+          <circle cx="390" cy="210" r="45" fill="#DC2626" />
+          <circle cx="210" cy="390" r="45" fill="#DC2626" />
+          <circle cx="390" cy="390" r="45" fill="#DC2626" />
+
+          {/* 2. TOP-RIGHT: GREEN BASE (Computer / Safi) */}
+          <rect x="900" y="0" width="600" height="600" fill="#16A34A" />
+          <text
+            x="1200"
+            y="48"
+            fill="#FFFFFF"
+            fontSize="34"
+            fontWeight="bold"
+            textAnchor="middle"
+          >
+            {gameMode === 'ai' ? 'Computer' : p2.name}
+          </text>
+          <rect x="960" y="60" width="480" height="480" rx="30" fill="#FFFFFF" />
+          {/* 4 Green circular spots */}
+          <circle cx="1110" cy="210" r="45" fill="#16A34A" />
+          <circle cx="1290" cy="210" r="45" fill="#16A34A" />
+          <circle cx="1110" cy="390" r="45" fill="#16A34A" />
+          <circle cx="1290" cy="390" r="45" fill="#16A34A" />
+
+          {/* 3. BOTTOM-LEFT: BLUE BASE (You / Med) */}
+          <rect x="0" y="900" width="600" height="600" fill="#2563EB" />
+          <rect x="60" y="960" width="480" height="480" rx="30" fill="#FFFFFF" />
+          {/* 4 Blue circular spots */}
+          <circle cx="210" cy="1110" r="45" fill="#2563EB" />
+          <circle cx="390" cy="1110" r="45" fill="#2563EB" />
+          <circle cx="210" cy="1290" r="45" fill="#2563EB" />
+          <circle cx="390" cy="1290" r="45" fill="#2563EB" />
+          <text
+            x="300"
+            y="1485"
+            fill="#FFFFFF"
+            fontSize="34"
+            fontWeight="bold"
+            textAnchor="middle"
+          >
+            {p1.name} (You)
+          </text>
+
+          {/* 4. BOTTOM-RIGHT: YELLOW BASE */}
+          <rect x="900" y="900" width="600" height="600" fill="#EAB308" />
+          <rect x="960" y="960" width="480" height="480" rx="30" fill="#FFFFFF" />
+          {/* 4 Yellow circular spots */}
+          <circle cx="1110" cy="1110" r="45" fill="#EAB308" />
+          <circle cx="1290" cy="1110" r="45" fill="#EAB308" />
+          <circle cx="1110" cy="1290" r="45" fill="#EAB308" />
+          <circle cx="1290" cy="1290" r="45" fill="#EAB308" />
+
+          {/* 5. 52 MAIN PERIMETER SQUARES */}
+          {TRACK_COORDINATES.map((c, idx) => {
+            const isBlueStart = idx === 0;
+            const isRedStart = idx === 13;
+            const isGreenStart = idx === 26;
+            const isYellowStart = idx === 39;
+            const isSafe = SAFE_TRACK_INDEXES.has(idx);
+
+            // Starting squares have player color
+            let fill = '#FFFFFF';
+            if (isBlueStart) fill = '#2563EB';
+            if (isRedStart) fill = '#DC2626';
+            if (isGreenStart) fill = '#16A34A';
+            if (isYellowStart) fill = '#EAB308';
+
+            const px = c[0] * 100;
+            const py = c[1] * 100;
+
+            return (
+              <g key={`track_${idx}`}>
+                <rect
+                  x={px}
+                  y={py}
+                  width="100"
+                  height="100"
+                  fill={fill}
+                  stroke="#94A3B8"
+                  strokeWidth="1.5"
+                />
+
+                {/* Safe Star (☆) outlined 5-pointed star matching screenshot */}
+                {isSafe && (
+                  <polygon
+                    points={`${px + 50},${py + 20} ${px + 59},${py + 37} ${px + 78},${py + 40} ${px + 64},${py + 54} ${px + 67},${py + 73} ${px + 50},${py + 63} ${px + 33},${py + 73} ${px + 36},${py + 54} ${px + 22},${py + 40} ${px + 41},${py + 37}`}
+                    fill="none"
+                    stroke={
+                      isBlueStart || isRedStart || isGreenStart || isYellowStart
+                        ? '#FFFFFF'
+                        : '#475569'
+                    }
+                    strokeWidth="3.5"
+                    strokeLinejoin="round"
+                  />
+                )}
+              </g>
+            );
+          })}
+
+          {/* 6. COLORED HOME STRETCHES (Rows/Cols leading to center) */}
+          {/* Blue Home Stretch (Cols 7, Rows 13 down to 9 leading up into center) */}
+          {P1_BLUE_HOME_STRETCH.map((c, idx) => (
+            <rect
+              key={`blue_home_${idx}`}
+              x={c[0] * 100}
+              y={c[1] * 100}
+              width="100"
+              height="100"
+              fill="#2563EB"
+              stroke="#1D4ED8"
+              strokeWidth="1.5"
+            />
+          ))}
+
+          {/* Green Home Stretch (Cols 7, Rows 1 up to 5 leading down into center) */}
+          {P2_GREEN_HOME_STRETCH.map((c, idx) => (
+            <rect
+              key={`green_home_${idx}`}
+              x={c[0] * 100}
+              y={c[1] * 100}
+              width="100"
+              height="100"
+              fill="#16A34A"
+              stroke="#15803D"
+              strokeWidth="1.5"
+            />
+          ))}
+
+          {/* Red Home Stretch (Row 7, Cols 1 up to 5 leading right into center) */}
+          {[1, 2, 3, 4, 5].map((col) => (
+            <rect
+              key={`red_home_${col}`}
+              x={col * 100}
+              y={700}
+              width="100"
+              height="100"
+              fill="#DC2626"
+              stroke="#B91C1C"
+              strokeWidth="1.5"
+            />
+          ))}
+
+          {/* Yellow Home Stretch (Row 7, Cols 13 down to 9 leading left into center) */}
+          {[13, 12, 11, 10, 9].map((col) => (
+            <rect
+              key={`yellow_home_${col}`}
+              x={col * 100}
+              y={700}
+              width="100"
+              height="100"
+              fill="#EAB308"
+              stroke="#CA8A04"
+              strokeWidth="1.5"
+            />
+          ))}
+
+          {/* 7. ENTRY ARROWS (Matching screenshot) */}
+          {/* Red arrow [→] at [0, 7] */}
+          <text x="50" y="768" fill="#475569" fontSize="48" fontWeight="bold" textAnchor="middle">
+            →
+          </text>
+
+          {/* Green arrow [↓] at [7, 0] */}
+          <text x="750" y="68" fill="#475569" fontSize="48" fontWeight="bold" textAnchor="middle">
+            ↓
+          </text>
+
+          {/* Yellow arrow [←] at [14, 7] */}
+          <text x="1450" y="768" fill="#475569" fontSize="48" fontWeight="bold" textAnchor="middle">
+            ←
+          </text>
+
+          {/* Blue arrow [↑] at [7, 14] */}
+          <text x="750" y="1468" fill="#475569" fontSize="48" fontWeight="bold" textAnchor="middle">
+            ↑
+          </text>
+
+          {/* 8. CENTER FINISH: 4 COLORED TRIANGLES MEETING IN THE CENTER */}
+          {/* Top Triangle: Green */}
+          <polygon points="600,600 900,600 750,750" fill="#16A34A" />
+          {/* Left Triangle: Red */}
+          <polygon points="600,600 600,900 750,750" fill="#DC2626" />
+          {/* Bottom Triangle: Blue */}
+          <polygon points="600,900 900,900 750,750" fill="#2563EB" />
+          {/* Right Triangle: Yellow */}
+          <polygon points="900,600 900,900 750,750" fill="#EAB308" />
+
+          {/* Center Border Lines */}
+          <line x1="600" y1="600" x2="900" y2="900" stroke="#0F172A" strokeWidth="2" />
+          <line x1="600" y1="900" x2="900" y2="600" stroke="#0F172A" strokeWidth="2" />
+
+          {/* 9. RENDER AUTHENTIC LUDO PIN PAWNS */}
+          {/* Player 1 (Blue / You) */}
+          {activeTokensP1.map((t, idx) => renderPawn(t, idx))}
+
+          {/* Player 2 (Green / Com) */}
+          {activeTokensP2.map((t, idx) => renderPawn(t, idx))}
+        </svg>
+      </div>
+
+      {/* DOCK CONTROLLER (Matching the reference screenshot) */}
+      <div className="w-full bg-[#0a1e3f] rounded-2xl border-2 border-amber-400 p-2 shadow-lg flex items-center justify-between gap-2 text-white">
+        {/* Left: Player 1 (You / Med) */}
         <div
-          className={`flex items-center gap-1.5 transition-all ${
-            isP1 ? 'font-bold text-rose-600' : 'text-stone-400 opacity-70'
+          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all min-w-0 ${
+            isP1 ? 'bg-blue-600/50 border border-blue-400 shadow-xs' : 'opacity-70'
           }`}
         >
-          <div className="relative">
-            <div className="w-6 h-6 rounded-full bg-rose-500 text-white font-bold flex items-center justify-center text-[10px] overflow-hidden border border-white shadow-2xs">
+          <div className="relative shrink-0">
+            <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-xs overflow-hidden">
               {p1.avatar ? (
                 <img src={p1.avatar} alt={p1.name} className="w-full h-full object-cover" />
               ) : (
-                <span>{p1.name.charAt(0)}</span>
+                <span>📍</span>
               )}
             </div>
             {isP1 && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-1 ring-white animate-pulse" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-white animate-pulse" />
             )}
           </div>
           <div className="min-w-0">
-            <span className="text-xs truncate block max-w-[70px]">{p1.name}</span>
-            <span className="text-[9px] text-stone-500 font-semibold block leading-none">
+            <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
+              {p1.name}
+            </span>
+            <span className="text-[10px] text-blue-200 block leading-tight">
               {p1HomeCount}/{tokensPerPlayer} 🏠
             </span>
           </div>
         </div>
 
-        {/* Statut Tour au centre */}
-        <div className="flex flex-col items-center text-center px-1">
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-2xs ${
-              isP1 ? 'bg-rose-500 text-white' : 'bg-emerald-600 text-white'
+        {/* Center: The Iconic Dice Button (Cream/White face, blue dots, amber rim) */}
+        <div className="flex flex-col items-center shrink-0">
+          <button
+            type="button"
+            disabled={isRolling || isMoving || (gameMode === 'ai' && currentTurn === 'p2')}
+            onClick={handleRollDice}
+            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#E0F2FE] border-3 border-amber-300 shadow-md flex items-center justify-center cursor-pointer transition-all active:scale-95 relative overflow-hidden ${
+              isP1
+                ? 'ring-3 ring-blue-400/60 hover:scale-105'
+                : 'ring-3 ring-emerald-400/60 hover:scale-105'
             }`}
           >
-            {isP1 ? `Tour de ${p1.name}` : `Tour de ${gameMode === 'ai' ? 'Cupidon' : p2.name}`}
-          </span>
-          <span className="text-[9px] text-stone-400 truncate max-w-[130px] mt-0.5">
-            {isRolling
-              ? '🎲 Roulement...'
-              : diceValue
-              ? `Dé : ${diceValue} ${diceValue === 6 ? '🔥 Rejoue' : ''}`
-              : 'Touchez le dé'}
-          </span>
+            {isRolling ? (
+              <Dices className="w-7 h-7 text-blue-600 animate-spin" />
+            ) : diceValue ? (
+              <div className="w-full h-full p-2">{renderDiceDots(diceValue)}</div>
+            ) : (
+              <span className="text-2xl">🎲</span>
+            )}
+          </button>
         </div>
 
-        {/* Safi (Vert) */}
+        {/* Right: Player 2 (Computer / Safi) */}
         <div
-          className={`flex items-center gap-1.5 flex-row-reverse text-right transition-all ${
-            !isP1 ? 'font-bold text-emerald-600' : 'text-stone-400 opacity-70'
+          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all flex-row-reverse text-right min-w-0 ${
+            !isP1 ? 'bg-emerald-600/50 border border-emerald-400 shadow-xs' : 'opacity-70'
           }`}
         >
-          <div className="relative">
-            <div className="w-6 h-6 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center text-[10px] overflow-hidden border border-white shadow-2xs">
+          <div className="relative shrink-0">
+            <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-xs overflow-hidden">
               {p2.avatar ? (
                 <img src={p2.avatar} alt={p2.name} className="w-full h-full object-cover" />
               ) : (
-                <span>{p2.name.charAt(0)}</span>
+                <span>📍</span>
               )}
             </div>
             {!isP1 && (
-              <span className="absolute -top-1 -left-1 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white animate-pulse" />
+              <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
             )}
           </div>
           <div className="min-w-0">
-            <span className="text-xs truncate block max-w-[70px]">
-              {gameMode === 'ai' ? 'Cupidon' : p2.name}
+            <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
+              {gameMode === 'ai' ? 'Computer' : p2.name}
             </span>
-            <span className="text-[9px] text-stone-500 font-semibold block leading-none">
+            <span className="text-[10px] text-emerald-200 block leading-tight">
               {p2HomeCount}/{tokensPerPlayer} 🏠
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Plateau SVG Ludo MS : Équilibré et Proportionné (Ne déborde JAMAIS de l'écran) */}
-      <div className="relative w-full max-w-[min(82vw,46vh,380px)] aspect-square bg-[#FAF7F2] rounded-2xl p-1 border border-stone-200/90 shadow-xs box-border overflow-hidden">
-        <svg
-          viewBox="0 0 1500 1500"
-          className="w-full h-full select-none"
-          style={{ touchAction: 'manipulation' }}
-        >
-          {/* Luxury 3D Pawn & Visual Defs */}
-          <defs>
-            {/* Real 3D Drop Shadow */}
-            <filter id="pawn-drop-shadow" x="-40%" y="-40%" width="180%" height="180%">
-              <feDropShadow dx="0" dy="8" stdDeviation="5" floodColor="#0F172A" floodOpacity="0.38" />
-            </filter>
+      {/* Narrative event text */}
+      <p className="text-[11px] text-stone-500 text-center truncate max-w-xs px-2">
+        {lastEventText}
+      </p>
 
-            {/* Shimmering Golden Glow Aura */}
-            <filter id="gold-aura" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-
-            {/* Med - 3D Royal Ruby Gem Radial Gradient */}
-            <radialGradient id="p1-ruby-gem" cx="30%" cy="26%" r="75%">
-              <stop offset="0%" stopColor="#FFF1F2" />
-              <stop offset="18%" stopColor="#FB7185" />
-              <stop offset="48%" stopColor="#E11D48" />
-              <stop offset="82%" stopColor="#9F1239" />
-              <stop offset="100%" stopColor="#4C0519" />
-            </radialGradient>
-
-            {/* Safi - 3D Royal Emerald Gem Radial Gradient */}
-            <radialGradient id="p2-emerald-gem" cx="30%" cy="26%" r="75%">
-              <stop offset="0%" stopColor="#F0FDF4" />
-              <stop offset="18%" stopColor="#34D399" />
-              <stop offset="48%" stopColor="#059669" />
-              <stop offset="82%" stopColor="#064E3B" />
-              <stop offset="100%" stopColor="#022C22" />
-            </radialGradient>
-
-            {/* Royal Gold Beveled Rim */}
-            <linearGradient id="royal-gold-rim" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#FFFBEB" />
-              <stop offset="25%" stopColor="#FDE68A" />
-              <stop offset="50%" stopColor="#F59E0B" />
-              <stop offset="75%" stopColor="#D97706" />
-              <stop offset="100%" stopColor="#78350F" />
-            </linearGradient>
-
-            {/* Glass Curved Glint Specular Overlay */}
-            <linearGradient id="glass-glint" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.9" />
-              <stop offset="55%" stopColor="#FFFFFF" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          {/* Surface */}
-          <rect x="0" y="0" width="1500" height="1500" fill="#FAF7F2" rx="30" />
-
-          {/* 1. Base Joueur 1 (Bas-Gauche : Rouge poudré) */}
-          <rect x="0" y="900" width="600" height="600" fill="#FFE4E6" />
-          <rect
-            x="50"
-            y="950"
-            width="500"
-            height="500"
-            rx="30"
-            fill="#FFF1F3"
-            stroke="#FECDD3"
-            strokeWidth="3"
-          />
-          <text x="300" y="1015" fill="#E11D48" fontSize="28" fontWeight="bold" textAnchor="middle">
-            {p1.name} 🔴
-          </text>
-          {P1_YARD_SPOTS.map((s, idx) => (
-            <g key={`p1_spot_${idx}`}>
-              <circle
-                cx={s[0] * 100 + 50}
-                cy={s[1] * 100 + 50}
-                r="44"
-                fill="#FFE4E6"
-                stroke="#FDA4AF"
-                strokeWidth="2"
-                opacity="0.8"
-              />
-              <circle
-                cx={s[0] * 100 + 50}
-                cy={s[1] * 100 + 50}
-                r="38"
-                fill="#FFF1F3"
-                stroke="#FECDD3"
-                strokeWidth="1.5"
-              />
-              <text
-                x={s[0] * 100 + 50}
-                y={s[1] * 100 + 57}
-                fill="#FDA4AF"
-                fontSize="18"
-                fontWeight="900"
-                textAnchor="middle"
-                opacity="0.65"
-              >
-                M{idx + 1}
-              </text>
-            </g>
-          ))}
-
-          {/* 2. Base Joueur 2 (Haut-Droit : Menthe poudré) */}
-          <rect x="900" y="0" width="600" height="600" fill="#D1FAE5" />
-          <rect
-            x="950"
-            y="50"
-            width="500"
-            height="500"
-            rx="30"
-            fill="#F0FDF4"
-            stroke="#A7F3D0"
-            strokeWidth="3"
-          />
-          <text x="1200" y="115" fill="#059669" fontSize="28" fontWeight="bold" textAnchor="middle">
-            {p2.name} 🟢
-          </text>
-          {P2_YARD_SPOTS.map((s, idx) => (
-            <g key={`p2_spot_${idx}`}>
-              <circle
-                cx={s[0] * 100 + 50}
-                cy={s[1] * 100 + 50}
-                r="44"
-                fill="#D1FAE5"
-                stroke="#6EE7B7"
-                strokeWidth="2"
-                opacity="0.8"
-              />
-              <circle
-                cx={s[0] * 100 + 50}
-                cy={s[1] * 100 + 50}
-                r="38"
-                fill="#F0FDF4"
-                stroke="#A7F3D0"
-                strokeWidth="1.5"
-              />
-              <text
-                x={s[0] * 100 + 50}
-                y={s[1] * 100 + 57}
-                fill="#6EE7B7"
-                fontSize="18"
-                fontWeight="900"
-                textAnchor="middle"
-                opacity="0.65"
-              >
-                S{idx + 1}
-              </text>
-            </g>
-          ))}
-
-          {/* 3. Cadran Haut-Gauche neutre et apaisant */}
-          <rect x="0" y="0" width="600" height="600" fill="#F5EFEB" />
-          <rect
-            x="50"
-            y="50"
-            width="500"
-            height="500"
-            rx="30"
-            fill="#FAF8F5"
-            stroke="#EAE4DC"
-            strokeWidth="2"
-          />
-          <text x="300" y="280" fill="#B8AEA3" fontSize="38" textAnchor="middle">
-            👑
-          </text>
-          <text
-            x="300"
-            y="350"
-            fill="#8C8275"
-            fontSize="26"
-            fontWeight="bold"
-            letterSpacing="2"
-            textAnchor="middle"
-          >
-            Ludo MS
-          </text>
-
-          {/* 4. Cadran Bas-Droit neutre et apaisant */}
-          <rect x="900" y="900" width="600" height="600" fill="#F5EFEB" />
-          <rect
-            x="950"
-            y="950"
-            width="500"
-            height="500"
-            rx="30"
-            fill="#FAF8F5"
-            stroke="#EAE4DC"
-            strokeWidth="2"
-          />
-          <text x="1200" y="1180" fill="#B8AEA3" fontSize="38" textAnchor="middle">
-            ❤️
-          </text>
-          <text
-            x="1200"
-            y="1250"
-            fill="#8C8275"
-            fontSize="24"
-            fontWeight="bold"
-            letterSpacing="1"
-            textAnchor="middle"
-          >
-            {p1.name} & {p2.name}
-          </text>
-
-          {/* 5. Centre d'Arrivée (Triangles) */}
-          <rect x="600" y="600" width="300" height="300" fill="#FAF7F2" />
-          <polygon points="600,600 750,750 600,900" fill="#FB7185" />
-          <polygon points="900,600 750,750 900,900" fill="#34D399" />
-          <polygon points="600,600 750,750 900,600" fill="#EDE7DF" />
-          <polygon points="600,900 750,750 900,900" fill="#EDE7DF" />
-
-          {/* Cercle central */}
-          <circle cx="750" cy="750" r="36" fill="#FEF3C7" stroke="#F59E0B" strokeWidth="3" />
-          <text x="750" y="763" fill="#B45309" fontSize="26" textAnchor="middle">
-            👑
-          </text>
-
-          {/* 6. Cases du parcours */}
-          {TRACK_COORDINATES.map((c, idx) => {
-            const isP1Start = idx === 0;
-            const isP2Start = idx === 26;
-            const isSafe = SAFE_TRACK_INDEXES.has(idx);
-
-            let fill = '#FFFFFF';
-            if (isP1Start) fill = '#FFE4E6';
-            if (isP2Start) fill = '#D1FAE5';
-
-            return (
-              <g key={`track_${idx}`}>
-                <rect
-                  x={c[0] * 100}
-                  y={c[1] * 100}
-                  width="100"
-                  height="100"
-                  fill={fill}
-                  stroke="#E2E8F0"
-                  strokeWidth="1.5"
-                  rx="6"
-                />
-                {isSafe && (
-                  <text
-                    x={c[0] * 100 + 50}
-                    y={c[1] * 100 + 64}
-                    fill={isP1Start ? '#E11D48' : isP2Start ? '#059669' : '#D97706'}
-                    fontSize="32"
-                    textAnchor="middle"
-                  >
-                    ★
-                  </text>
-                )}
-              </g>
-            );
-          })}
-
-          {/* Coulées d'arrivée sécurisées */}
-          {P1_HOME_STRETCH.map((c, idx) => (
-            <rect
-              key={`p1_home_${idx}`}
-              x={c[0] * 100}
-              y={c[1] * 100}
-              width="100"
-              height="100"
-              fill="#FDA4AF"
-              stroke="#F43F5E"
-              strokeWidth="1.5"
-              rx="6"
-            />
-          ))}
-
-          {P2_HOME_STRETCH.map((c, idx) => (
-            <rect
-              key={`p2_home_${idx}`}
-              x={c[0] * 100}
-              y={c[1] * 100}
-              width="100"
-              height="100"
-              fill="#6EE7B7"
-              stroke="#10B981"
-              strokeWidth="1.5"
-              rx="6"
-            />
-          ))}
-
-          {/* 7. Pions Royaux Joueur 1 (Med - Rubis & Or) */}
-          {activeTokensP1.map((t, idx) => {
-            const pos = getTokenPosition(t, idx);
-            const isPlayable = playableTokens.some((pt) => pt.id === t.id);
-
-            return (
-              <g
-                key={t.id}
-                onClick={() => isPlayable && handleMoveToken(t)}
-                onTouchEnd={(e) => {
-                  if (isPlayable) {
-                    e.preventDefault();
-                    handleMoveToken(t);
-                  }
-                }}
-                className={`group ${isPlayable ? 'cursor-pointer' : ''}`}
-              >
-                {/* Touch target invisible */}
-                <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
-
-                {/* Shimmering Golden Aura ring when playable */}
-                {isPlayable && (
-                  <>
-                    <circle
-                      cx={pos.x}
-                      cy={pos.y}
-                      r="44"
-                      fill="none"
-                      stroke="#F59E0B"
-                      strokeWidth="3.5"
-                      strokeDasharray="8 6"
-                      className="animate-spin"
-                      style={{
-                        animationDuration: '8s',
-                        transformOrigin: `${pos.x}px ${pos.y}px`,
-                      }}
-                      opacity="0.9"
-                    />
-                    <circle
-                      cx={pos.x}
-                      cy={pos.y}
-                      r="38"
-                      fill="#FEF3C7"
-                      opacity="0.3"
-                      className="animate-pulse"
-                    />
-                  </>
-                )}
-
-                {/* 3D Realistic Drop Shadow */}
-                <ellipse
-                  cx={pos.x}
-                  cy={pos.y + 10}
-                  rx="28"
-                  ry="10"
-                  fill="#0F172A"
-                  opacity="0.35"
-                />
-
-                {/* Golden Metallic Beveled Rim Base */}
-                <circle cx={pos.x} cy={pos.y + 2.5} r="30" fill="url(#royal-gold-rim)" />
-                <circle cx={pos.x} cy={pos.y + 1} r="27.5" fill="#4C0519" opacity="0.3" />
-
-                {/* 3D Domed Ruby Jewel Body */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r="27"
-                  fill="url(#p1-ruby-gem)"
-                  stroke="#FFFFFF"
-                  strokeWidth="2.5"
-                  className={isPlayable ? 'animate-bounce' : ''}
-                />
-
-                {/* Glossy Specular Glint Crescent */}
-                <ellipse
-                  cx={pos.x}
-                  cy={pos.y - 10}
-                  rx="16"
-                  ry="7"
-                  fill="url(#glass-glint)"
-                  style={{ pointerEvents: 'none' }}
-                />
-
-                {/* Center Royal Medallion Ring */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y + 4}
-                  r="14"
-                  fill="#FFFFFF"
-                  fillOpacity="0.18"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.2"
-                  strokeOpacity="0.8"
-                  style={{ pointerEvents: 'none' }}
-                />
-
-                {/* Royal Crown or Finished Star */}
-                {t.state === 'finished' ? (
-                  <text
-                    x={pos.x}
-                    y={pos.y + 8}
-                    fill="#FDE68A"
-                    fontSize="20"
-                    textAnchor="middle"
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    ⭐
-                  </text>
-                ) : (
-                  <>
-                    <text
-                      x={pos.x}
-                      y={pos.y}
-                      fill="#FEF3C7"
-                      fontSize="10"
-                      textAnchor="middle"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      👑
-                    </text>
-                    <text
-                      x={pos.x}
-                      y={pos.y + 12}
-                      fill="#FFFFFF"
-                      fontSize="14"
-                      fontWeight="900"
-                      textAnchor="middle"
-                      style={{
-                        pointerEvents: 'none',
-                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))',
-                        letterSpacing: '-0.5px',
-                      }}
-                    >
-                      M{idx + 1}
-                    </text>
-                  </>
-                )}
-              </g>
-            );
-          })}
-
-          {/* 8. Pions Royaux Joueur 2 (Safi - Émeraude & Or) */}
-          {activeTokensP2.map((t, idx) => {
-            const pos = getTokenPosition(t, idx);
-            const isPlayable = playableTokens.some((pt) => pt.id === t.id);
-
-            return (
-              <g
-                key={t.id}
-                onClick={() => isPlayable && handleMoveToken(t)}
-                onTouchEnd={(e) => {
-                  if (isPlayable) {
-                    e.preventDefault();
-                    handleMoveToken(t);
-                  }
-                }}
-                className={`group ${isPlayable ? 'cursor-pointer' : ''}`}
-              >
-                {/* Touch target invisible */}
-                <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
-
-                {/* Shimmering Golden Aura ring when playable */}
-                {isPlayable && (
-                  <>
-                    <circle
-                      cx={pos.x}
-                      cy={pos.y}
-                      r="44"
-                      fill="none"
-                      stroke="#F59E0B"
-                      strokeWidth="3.5"
-                      strokeDasharray="8 6"
-                      className="animate-spin"
-                      style={{
-                        animationDuration: '8s',
-                        transformOrigin: `${pos.x}px ${pos.y}px`,
-                      }}
-                      opacity="0.9"
-                    />
-                    <circle
-                      cx={pos.x}
-                      cy={pos.y}
-                      r="38"
-                      fill="#FEF3C7"
-                      opacity="0.3"
-                      className="animate-pulse"
-                    />
-                  </>
-                )}
-
-                {/* 3D Realistic Drop Shadow */}
-                <ellipse
-                  cx={pos.x}
-                  cy={pos.y + 10}
-                  rx="28"
-                  ry="10"
-                  fill="#0F172A"
-                  opacity="0.35"
-                />
-
-                {/* Golden Metallic Beveled Rim Base */}
-                <circle cx={pos.x} cy={pos.y + 2.5} r="30" fill="url(#royal-gold-rim)" />
-                <circle cx={pos.x} cy={pos.y + 1} r="27.5" fill="#022C22" opacity="0.3" />
-
-                {/* 3D Domed Emerald Jewel Body */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r="27"
-                  fill="url(#p2-emerald-gem)"
-                  stroke="#FFFFFF"
-                  strokeWidth="2.5"
-                  className={isPlayable ? 'animate-bounce' : ''}
-                />
-
-                {/* Glossy Specular Glint Crescent */}
-                <ellipse
-                  cx={pos.x}
-                  cy={pos.y - 10}
-                  rx="16"
-                  ry="7"
-                  fill="url(#gloss-glint)"
-                  style={{ pointerEvents: 'none' }}
-                />
-
-                {/* Center Royal Medallion Ring */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y + 4}
-                  r="14"
-                  fill="#FFFFFF"
-                  fillOpacity="0.18"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.2"
-                  strokeOpacity="0.8"
-                  style={{ pointerEvents: 'none' }}
-                />
-
-                {/* Royal Crown or Finished Star */}
-                {t.state === 'finished' ? (
-                  <text
-                    x={pos.x}
-                    y={pos.y + 8}
-                    fill="#FDE68A"
-                    fontSize="20"
-                    textAnchor="middle"
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    ⭐
-                  </text>
-                ) : (
-                  <>
-                    <text
-                      x={pos.x}
-                      y={pos.y}
-                      fill="#FEF3C7"
-                      fontSize="10"
-                      textAnchor="middle"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      👑
-                    </text>
-                    <text
-                      x={pos.x}
-                      y={pos.y + 12}
-                      fill="#FFFFFF"
-                      fontSize="14"
-                      fontWeight="900"
-                      textAnchor="middle"
-                      style={{
-                        pointerEvents: 'none',
-                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))',
-                        letterSpacing: '-0.5px',
-                      }}
-                    >
-                      S{idx + 1}
-                    </text>
-                  </>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      {/* 4. Console de Lancer Unique et Compacte (Tout-en-un, zéro encombrement) */}
-      <div className="w-full flex flex-col items-center gap-1.5 px-2">
-        <div className="flex items-center justify-center gap-3">
-          {/* Dé interactif tactile */}
-          <button
-            type="button"
-            disabled={isRolling || (gameMode === 'ai' && currentTurn === 'p2')}
-            onClick={handleRollDice}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black shadow-xs transition-all cursor-pointer select-none active:scale-95 ${
-              isP1
-                ? 'bg-rose-500 text-white ring-2 ring-rose-300 hover:bg-rose-600'
-                : 'bg-emerald-600 text-white ring-2 ring-emerald-300 hover:bg-emerald-700'
-            }`}
-          >
-            {isRolling ? (
-              <Dices className="w-6 h-6 animate-spin" />
-            ) : diceValue ? (
-              <span>{diceValue}</span>
-            ) : (
-              <span>🎲</span>
-            )}
-          </button>
-
-          {/* Bouton d'action direct */}
-          <button
-            type="button"
-            disabled={isRolling || (gameMode === 'ai' && currentTurn === 'p2')}
-            onClick={handleRollDice}
-            className={`px-4 py-2 rounded-xl font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer text-white ${
-              isP1 ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-700'
-            }`}
-          >
-            {isRolling
-              ? 'Lancement...'
-              : diceValue
-              ? `Dé : ${diceValue} (Relancer)`
-              : `Lancer le dé (${isP1 ? p1.name : p2.name})`}
-          </button>
-        </div>
-
-        {/* Boutons rapides pour déplacer les pions jouables (s'affiche seulement si nécessaire) */}
-        {diceValue && playableTokens.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-full">
-            {playableTokens.map((token) => {
-              const tokenIdx = (currentTurn === 'p1' ? tokensP1 : tokensP2).findIndex(
-                (t) => t.id === token.id
-              );
-              const isYard = token.state === 'yard';
-              return (
-                <button
-                  key={token.id}
-                  type="button"
-                  onClick={() => handleMoveToken(token)}
-                  className={`px-2.5 py-1 rounded-lg border text-xs font-bold shadow-2xs active:scale-95 cursor-pointer transition-all ${
-                    isP1
-                      ? 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100'
-                      : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
-                  }`}
-                >
-                  {isYard ? `🚀 Sortir Pion ${tokenIdx + 1}` : `🎯 Pion ${tokenIdx + 1} (+${diceValue})`}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Message d'événement discret (1 seule ligne) */}
-        <p className="text-[11px] text-stone-500 text-center truncate max-w-xs px-2">
-          {lastEventText}
-        </p>
-      </div>
-
-      {/* 5. Modale Gagnant & Gage Romantique */}
+      {/* Winner Celebration Modal */}
       <AnimatePresence>
         {winner && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl border border-stone-200 text-center space-y-3"
             >
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-rose-500 text-white mx-auto flex items-center justify-center text-2xl shadow-md">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-400 to-blue-500 text-white mx-auto flex items-center justify-center text-2xl shadow-md">
                 👑
               </div>
 
@@ -1534,7 +1429,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                 </p>
               </div>
 
-              {/* Boutons d'action */}
+              {/* Action buttons */}
               <div className="flex flex-col gap-1.5 pt-1">
                 {onSendChatMessage && (
                   <button
@@ -1550,7 +1445,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                 <button
                   type="button"
                   onClick={handleResetGame}
-                  className="w-full py-2 rounded-xl bg-rose-500 hover:bg-rose-600 active:scale-95 text-white font-bold text-xs shadow-xs cursor-pointer"
+                  className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
                 >
                   Revanche ! ⚔️
                 </button>
