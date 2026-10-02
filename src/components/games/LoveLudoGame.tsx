@@ -859,6 +859,57 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           className="w-full h-full select-none"
           style={{ touchAction: 'manipulation' }}
         >
+          {/* Luxury 3D Pawn & Visual Defs */}
+          <defs>
+            {/* Real 3D Drop Shadow */}
+            <filter id="pawn-drop-shadow" x="-40%" y="-40%" width="180%" height="180%">
+              <feDropShadow dx="0" dy="8" stdDeviation="5" floodColor="#0F172A" floodOpacity="0.38" />
+            </filter>
+
+            {/* Shimmering Golden Glow Aura */}
+            <filter id="gold-aura" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
+            {/* Med - 3D Royal Ruby Gem Radial Gradient */}
+            <radialGradient id="p1-ruby-gem" cx="30%" cy="26%" r="75%">
+              <stop offset="0%" stopColor="#FFF1F2" />
+              <stop offset="18%" stopColor="#FB7185" />
+              <stop offset="48%" stopColor="#E11D48" />
+              <stop offset="82%" stopColor="#9F1239" />
+              <stop offset="100%" stopColor="#4C0519" />
+            </radialGradient>
+
+            {/* Safi - 3D Royal Emerald Gem Radial Gradient */}
+            <radialGradient id="p2-emerald-gem" cx="30%" cy="26%" r="75%">
+              <stop offset="0%" stopColor="#F0FDF4" />
+              <stop offset="18%" stopColor="#34D399" />
+              <stop offset="48%" stopColor="#059669" />
+              <stop offset="82%" stopColor="#064E3B" />
+              <stop offset="100%" stopColor="#022C22" />
+            </radialGradient>
+
+            {/* Royal Gold Beveled Rim */}
+            <linearGradient id="royal-gold-rim" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FFFBEB" />
+              <stop offset="25%" stopColor="#FDE68A" />
+              <stop offset="50%" stopColor="#F59E0B" />
+              <stop offset="75%" stopColor="#D97706" />
+              <stop offset="100%" stopColor="#78350F" />
+            </linearGradient>
+
+            {/* Glass Curved Glint Specular Overlay */}
+            <linearGradient id="glass-glint" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.9" />
+              <stop offset="55%" stopColor="#FFFFFF" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
           {/* Surface */}
           <rect x="0" y="0" width="1500" height="1500" fill="#FAF7F2" rx="30" />
 
@@ -878,16 +929,36 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             {p1.name} 🔴
           </text>
           {P1_YARD_SPOTS.map((s, idx) => (
-            <circle
-              key={`p1_spot_${idx}`}
-              cx={s[0] * 100 + 50}
-              cy={s[1] * 100 + 50}
-              r="38"
-              fill="#FFE4E6"
-              stroke="#FDA4AF"
-              strokeWidth="2.5"
-              strokeDasharray="4 4"
-            />
+            <g key={`p1_spot_${idx}`}>
+              <circle
+                cx={s[0] * 100 + 50}
+                cy={s[1] * 100 + 50}
+                r="44"
+                fill="#FFE4E6"
+                stroke="#FDA4AF"
+                strokeWidth="2"
+                opacity="0.8"
+              />
+              <circle
+                cx={s[0] * 100 + 50}
+                cy={s[1] * 100 + 50}
+                r="38"
+                fill="#FFF1F3"
+                stroke="#FECDD3"
+                strokeWidth="1.5"
+              />
+              <text
+                x={s[0] * 100 + 50}
+                y={s[1] * 100 + 57}
+                fill="#FDA4AF"
+                fontSize="18"
+                fontWeight="900"
+                textAnchor="middle"
+                opacity="0.65"
+              >
+                M{idx + 1}
+              </text>
+            </g>
           ))}
 
           {/* 2. Base Joueur 2 (Haut-Droit : Menthe poudré) */}
@@ -906,16 +977,36 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             {p2.name} 🟢
           </text>
           {P2_YARD_SPOTS.map((s, idx) => (
-            <circle
-              key={`p2_spot_${idx}`}
-              cx={s[0] * 100 + 50}
-              cy={s[1] * 100 + 50}
-              r="38"
-              fill="#D1FAE5"
-              stroke="#6EE7B7"
-              strokeWidth="2.5"
-              strokeDasharray="4 4"
-            />
+            <g key={`p2_spot_${idx}`}>
+              <circle
+                cx={s[0] * 100 + 50}
+                cy={s[1] * 100 + 50}
+                r="44"
+                fill="#D1FAE5"
+                stroke="#6EE7B7"
+                strokeWidth="2"
+                opacity="0.8"
+              />
+              <circle
+                cx={s[0] * 100 + 50}
+                cy={s[1] * 100 + 50}
+                r="38"
+                fill="#F0FDF4"
+                stroke="#A7F3D0"
+                strokeWidth="1.5"
+              />
+              <text
+                x={s[0] * 100 + 50}
+                y={s[1] * 100 + 57}
+                fill="#6EE7B7"
+                fontSize="18"
+                fontWeight="900"
+                textAnchor="middle"
+                opacity="0.65"
+              >
+                S{idx + 1}
+              </text>
+            </g>
           ))}
 
           {/* 3. Cadran Haut-Gauche neutre et apaisant */}
@@ -1051,7 +1142,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             />
           ))}
 
-          {/* 7. Pions Joueur 1 (Rouge) */}
+          {/* 7. Pions Royaux Joueur 1 (Med - Rubis & Or) */}
           {activeTokensP1.map((t, idx) => {
             const pos = getTokenPosition(t, idx);
             const isPlayable = playableTokens.some((pt) => pt.id === t.id);
@@ -1066,47 +1157,134 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                     handleMoveToken(t);
                   }
                 }}
-                className={isPlayable ? 'cursor-pointer' : ''}
+                className={`group ${isPlayable ? 'cursor-pointer' : ''}`}
               >
-                <circle cx={pos.x} cy={pos.y} r="46" fill="transparent" />
+                {/* Touch target invisible */}
+                <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
+
+                {/* Shimmering Golden Aura ring when playable */}
                 {isPlayable && (
-                  <circle
-                    cx={pos.x}
-                    cy={pos.y}
-                    r="42"
-                    fill="none"
-                    stroke="#F59E0B"
-                    strokeWidth="5"
-                    className="animate-pulse"
-                    opacity="0.9"
-                  />
+                  <>
+                    <circle
+                      cx={pos.x}
+                      cy={pos.y}
+                      r="44"
+                      fill="none"
+                      stroke="#F59E0B"
+                      strokeWidth="3.5"
+                      strokeDasharray="8 6"
+                      className="animate-spin"
+                      style={{
+                        animationDuration: '8s',
+                        transformOrigin: `${pos.x}px ${pos.y}px`,
+                      }}
+                      opacity="0.9"
+                    />
+                    <circle
+                      cx={pos.x}
+                      cy={pos.y}
+                      r="38"
+                      fill="#FEF3C7"
+                      opacity="0.3"
+                      className="animate-pulse"
+                    />
+                  </>
                 )}
-                <circle cx={pos.x} cy={pos.y + 3} r="30" fill="#881337" opacity="0.3" />
+
+                {/* 3D Realistic Drop Shadow */}
+                <ellipse
+                  cx={pos.x}
+                  cy={pos.y + 10}
+                  rx="28"
+                  ry="10"
+                  fill="#0F172A"
+                  opacity="0.35"
+                />
+
+                {/* Golden Metallic Beveled Rim Base */}
+                <circle cx={pos.x} cy={pos.y + 2.5} r="30" fill="url(#royal-gold-rim)" />
+                <circle cx={pos.x} cy={pos.y + 1} r="27.5" fill="#4C0519" opacity="0.3" />
+
+                {/* 3D Domed Ruby Jewel Body */}
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r="28"
-                  fill="#E11D48"
+                  r="27"
+                  fill="url(#p1-ruby-gem)"
                   stroke="#FFFFFF"
-                  strokeWidth="3.5"
+                  strokeWidth="2.5"
                   className={isPlayable ? 'animate-bounce' : ''}
                 />
-                <circle cx={pos.x} cy={pos.y} r="16" fill="#FFF1F2" />
-                <text
-                  x={pos.x}
-                  y={pos.y + 5.5}
-                  fill="#9F1239"
-                  fontSize="16"
-                  fontWeight="900"
-                  textAnchor="middle"
-                >
-                  M{idx + 1}
-                </text>
+
+                {/* Glossy Specular Glint Crescent */}
+                <ellipse
+                  cx={pos.x}
+                  cy={pos.y - 10}
+                  rx="16"
+                  ry="7"
+                  fill="url(#glass-glint)"
+                  style={{ pointerEvents: 'none' }}
+                />
+
+                {/* Center Royal Medallion Ring */}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 4}
+                  r="14"
+                  fill="#FFFFFF"
+                  fillOpacity="0.18"
+                  stroke="#FFFFFF"
+                  strokeWidth="1.2"
+                  strokeOpacity="0.8"
+                  style={{ pointerEvents: 'none' }}
+                />
+
+                {/* Royal Crown or Finished Star */}
+                {t.state === 'finished' ? (
+                  <text
+                    x={pos.x}
+                    y={pos.y + 8}
+                    fill="#FDE68A"
+                    fontSize="20"
+                    textAnchor="middle"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    ⭐
+                  </text>
+                ) : (
+                  <>
+                    <text
+                      x={pos.x}
+                      y={pos.y}
+                      fill="#FEF3C7"
+                      fontSize="10"
+                      textAnchor="middle"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      👑
+                    </text>
+                    <text
+                      x={pos.x}
+                      y={pos.y + 12}
+                      fill="#FFFFFF"
+                      fontSize="14"
+                      fontWeight="900"
+                      textAnchor="middle"
+                      style={{
+                        pointerEvents: 'none',
+                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))',
+                        letterSpacing: '-0.5px',
+                      }}
+                    >
+                      M{idx + 1}
+                    </text>
+                  </>
+                )}
               </g>
             );
           })}
 
-          {/* 8. Pions Joueur 2 (Vert) */}
+          {/* 8. Pions Royaux Joueur 2 (Safi - Émeraude & Or) */}
           {activeTokensP2.map((t, idx) => {
             const pos = getTokenPosition(t, idx);
             const isPlayable = playableTokens.some((pt) => pt.id === t.id);
@@ -1121,42 +1299,129 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                     handleMoveToken(t);
                   }
                 }}
-                className={isPlayable ? 'cursor-pointer' : ''}
+                className={`group ${isPlayable ? 'cursor-pointer' : ''}`}
               >
-                <circle cx={pos.x} cy={pos.y} r="46" fill="transparent" />
+                {/* Touch target invisible */}
+                <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
+
+                {/* Shimmering Golden Aura ring when playable */}
                 {isPlayable && (
-                  <circle
-                    cx={pos.x}
-                    cy={pos.y}
-                    r="42"
-                    fill="none"
-                    stroke="#F59E0B"
-                    strokeWidth="5"
-                    className="animate-pulse"
-                    opacity="0.9"
-                  />
+                  <>
+                    <circle
+                      cx={pos.x}
+                      cy={pos.y}
+                      r="44"
+                      fill="none"
+                      stroke="#F59E0B"
+                      strokeWidth="3.5"
+                      strokeDasharray="8 6"
+                      className="animate-spin"
+                      style={{
+                        animationDuration: '8s',
+                        transformOrigin: `${pos.x}px ${pos.y}px`,
+                      }}
+                      opacity="0.9"
+                    />
+                    <circle
+                      cx={pos.x}
+                      cy={pos.y}
+                      r="38"
+                      fill="#FEF3C7"
+                      opacity="0.3"
+                      className="animate-pulse"
+                    />
+                  </>
                 )}
-                <circle cx={pos.x} cy={pos.y + 3} r="30" fill="#064E3B" opacity="0.3" />
+
+                {/* 3D Realistic Drop Shadow */}
+                <ellipse
+                  cx={pos.x}
+                  cy={pos.y + 10}
+                  rx="28"
+                  ry="10"
+                  fill="#0F172A"
+                  opacity="0.35"
+                />
+
+                {/* Golden Metallic Beveled Rim Base */}
+                <circle cx={pos.x} cy={pos.y + 2.5} r="30" fill="url(#royal-gold-rim)" />
+                <circle cx={pos.x} cy={pos.y + 1} r="27.5" fill="#022C22" opacity="0.3" />
+
+                {/* 3D Domed Emerald Jewel Body */}
                 <circle
                   cx={pos.x}
                   cy={pos.y}
-                  r="28"
-                  fill="#059669"
+                  r="27"
+                  fill="url(#p2-emerald-gem)"
                   stroke="#FFFFFF"
-                  strokeWidth="3.5"
+                  strokeWidth="2.5"
                   className={isPlayable ? 'animate-bounce' : ''}
                 />
-                <circle cx={pos.x} cy={pos.y} r="16" fill="#ECFDF5" />
-                <text
-                  x={pos.x}
-                  y={pos.y + 5.5}
-                  fill="#065F46"
-                  fontSize="16"
-                  fontWeight="900"
-                  textAnchor="middle"
-                >
-                  S{idx + 1}
-                </text>
+
+                {/* Glossy Specular Glint Crescent */}
+                <ellipse
+                  cx={pos.x}
+                  cy={pos.y - 10}
+                  rx="16"
+                  ry="7"
+                  fill="url(#gloss-glint)"
+                  style={{ pointerEvents: 'none' }}
+                />
+
+                {/* Center Royal Medallion Ring */}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 4}
+                  r="14"
+                  fill="#FFFFFF"
+                  fillOpacity="0.18"
+                  stroke="#FFFFFF"
+                  strokeWidth="1.2"
+                  strokeOpacity="0.8"
+                  style={{ pointerEvents: 'none' }}
+                />
+
+                {/* Royal Crown or Finished Star */}
+                {t.state === 'finished' ? (
+                  <text
+                    x={pos.x}
+                    y={pos.y + 8}
+                    fill="#FDE68A"
+                    fontSize="20"
+                    textAnchor="middle"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    ⭐
+                  </text>
+                ) : (
+                  <>
+                    <text
+                      x={pos.x}
+                      y={pos.y}
+                      fill="#FEF3C7"
+                      fontSize="10"
+                      textAnchor="middle"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      👑
+                    </text>
+                    <text
+                      x={pos.x}
+                      y={pos.y + 12}
+                      fill="#FFFFFF"
+                      fontSize="14"
+                      fontWeight="900"
+                      textAnchor="middle"
+                      style={{
+                        pointerEvents: 'none',
+                        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))',
+                        letterSpacing: '-0.5px',
+                      }}
+                    >
+                      S{idx + 1}
+                    </text>
+                  </>
+                )}
               </g>
             );
           })}
