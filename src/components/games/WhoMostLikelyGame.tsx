@@ -332,8 +332,8 @@ export const WhoMostLikelyGame: React.FC<WhoMostLikelyGameProps> = ({
     if (onSendChatMessage) {
       onSendChatMessage({
         senderId: activePartnerId,
-        text: summary,
-        type: 'text',
+        content: summary,
+        mediaType: 'text',
       });
       setCopiedNotification('Partagé dans le chat ! 💌');
     } else {

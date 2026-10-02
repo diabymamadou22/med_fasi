@@ -695,8 +695,25 @@ export default function App() {
         const prevIds = new Set(prev.map((m) => m.id));
         const newFromPartner: ChatMessage[] = [];
 
-        validIncoming.forEach((m) => {
-          if (m && m.id && !currentDeleted.has(m.id)) {
+        validIncoming.forEach((raw) => {
+          if (raw && raw.id && !currentDeleted.has(raw.id)) {
+            const rawAny = raw as any;
+            const normalizedContent = raw.content || rawAny.text || '';
+            const normalizedMediaUrl = raw.mediaUrl || rawAny.photoUrl;
+            const normalizedMediaType =
+              raw.mediaType === 'image' || raw.mediaType === 'video' || raw.mediaType === 'audio'
+                ? raw.mediaType
+                : normalizedMediaUrl
+                ? ('image' as const)
+                : undefined;
+
+            const m: ChatMessage = {
+              ...raw,
+              content: normalizedContent,
+              mediaUrl: normalizedMediaUrl,
+              mediaType: normalizedMediaType,
+            };
+
             const existing = idMap.get(m.id);
             if (!existing) {
               if (m.senderId !== activePartnerIdRef.current) {
@@ -704,7 +721,11 @@ export default function App() {
               }
               idMap.set(m.id, m);
             } else {
-              idMap.set(m.id, { ...existing, ...m });
+              idMap.set(m.id, {
+                ...existing,
+                ...m,
+                content: normalizedContent || existing.content || (existing as any).text || '',
+              });
             }
           }
         });
@@ -1616,8 +1637,22 @@ export default function App() {
   };
 
   const handleSendChatMessage = async (
-    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'>
+    msgData: Omit<ChatMessage, 'id' | 'timestamp' | 'status' | 'readStatus'> & {
+      text?: string;
+      photoUrl?: string;
+      type?: string;
+    }
   ) => {
+    // Normalisation de msgData: supporter aussi bien .content que .text ou .photoUrl
+    const rawContent = (msgData.content || msgData.text || '').trim();
+    const rawMediaUrl = msgData.mediaUrl || msgData.photoUrl;
+    const rawMediaType: 'image' | 'audio' | 'video' | undefined =
+      msgData.mediaType === 'image' || msgData.mediaType === 'video' || msgData.mediaType === 'audio'
+        ? msgData.mediaType
+        : rawMediaUrl
+        ? 'image'
+        : undefined;
+
     // Determine the highest existing message timestamp in the thread to guarantee strict monotonicity in both directions
     let maxExistingMs = 0;
     for (const m of messages) {
@@ -1636,8 +1671,8 @@ export default function App() {
     let challengeTargetWord = '';
 
     const activeChallenge = getActiveOrCurrentWeekChallenge(weeklyChallenges);
-    if (activeChallenge && msgData.content) {
-      const isMatch = matchLearningChallenge(msgData.content, activeChallenge);
+    if (activeChallenge && rawContent) {
+      const isMatch = matchLearningChallenge(rawContent, activeChallenge);
       if (isMatch) {
         const sender = msgData.senderId;
         const alreadyDoneBySender =
@@ -1658,10 +1693,10 @@ export default function App() {
             ...activeChallenge,
             partner1Completed: updatedPartner1Completed,
             partner1CompletedAt: sender === 'p1' ? nowIso : activeChallenge.partner1CompletedAt,
-            partner1Snippet: sender === 'p1' ? msgData.content.slice(0, 120) : activeChallenge.partner1Snippet,
+            partner1Snippet: sender === 'p1' ? rawContent.slice(0, 120) : activeChallenge.partner1Snippet,
             partner2Completed: updatedPartner2Completed,
             partner2CompletedAt: sender === 'p2' ? nowIso : activeChallenge.partner2CompletedAt,
-            partner2Snippet: sender === 'p2' ? msgData.content.slice(0, 120) : activeChallenge.partner2Snippet,
+            partner2Snippet: sender === 'p2' ? rawContent.slice(0, 120) : activeChallenge.partner2Snippet,
             bothCompleted: bothNowCompleted,
             bothCompletedAt: bothNowCompleted ? (activeChallenge.bothCompletedAt || nowIso) : undefined,
             updatedAt: nowIso,
@@ -1702,6 +1737,9 @@ export default function App() {
       status: 'sent',
       readStatus: 'sent',
       ...msgData,
+      content: rawContent,
+      mediaUrl: rawMediaUrl,
+      mediaType: rawMediaType,
       ...(challengeValidated
         ? {
             isLearningChallengeValidation: true,

@@ -1254,17 +1254,34 @@ export const ChatView: React.FC<ChatViewProps> = ({
                           </div>
                         )}
 
-                        {/* Text Content */}
-                        {msg.content && msg.mediaType === 'text' && (
-                          <p className="text-[13.5px] sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
-                            {msg.content}
-                          </p>
-                        )}
-                        {msg.content && msg.mediaType !== 'text' && !msg.content.startsWith('📷 Photo') && !msg.content.startsWith('🎵 Message') && !msg.content.startsWith('🎬 Vidéo') && (
-                          <p className="text-[12px] sm:text-xs leading-relaxed whitespace-pre-wrap break-words mt-1 opacity-90">
-                            {msg.content}
-                          </p>
-                        )}
+                        {/* Text Content with safe fallback for games and external messages */}
+                        {(() => {
+                          const displayContent = (msg.content || (msg as any).text || '').trim();
+                          const hasMedia = Boolean(msg.mediaUrl && (msg.mediaType === 'image' || msg.mediaType === 'video' || msg.mediaType === 'audio'));
+
+                          if (!hasMedia && displayContent) {
+                            return (
+                              <p className="text-[13.5px] sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                {displayContent}
+                              </p>
+                            );
+                          }
+                          if (hasMedia && displayContent && !displayContent.startsWith('📷 Photo') && !displayContent.startsWith('🎵 Message') && !displayContent.startsWith('🎬 Vidéo')) {
+                            return (
+                              <p className="text-[12px] sm:text-xs leading-relaxed whitespace-pre-wrap break-words mt-1 opacity-90">
+                                {displayContent}
+                              </p>
+                            );
+                          }
+                          if (!hasMedia && !displayContent) {
+                            return (
+                              <p className="text-[13px] sm:text-xs italic opacity-60">
+                                (Message complice)
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
 
                         {/* Time & Discreet Checkmark Status */}
                         <div

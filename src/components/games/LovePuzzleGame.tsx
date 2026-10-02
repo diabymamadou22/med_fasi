@@ -495,9 +495,9 @@ export const LovePuzzleGame: React.FC<LovePuzzleGameProps> = ({
                       const msg = `🧩 *Puzzle Romantique Dévoilé !* ❤️\nPhoto reconstituée en ${moves} coups !\nVoici le mot secret dévoilé :\n« ${secretNote} » 💌`;
                       onSendChatMessage({
                         senderId: activePartnerId,
-                        text: msg,
-                        type: 'text',
-                        photoUrl: selectedImage,
+                        content: msg,
+                        mediaType: 'image',
+                        mediaUrl: selectedImage,
                       });
                       soundEffects.playSuccessSparkle();
                       triggerHeartConfetti();

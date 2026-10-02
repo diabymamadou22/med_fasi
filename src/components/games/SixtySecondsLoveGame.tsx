@@ -129,8 +129,8 @@ export const SixtySecondsLoveGame: React.FC<SixtySecondsLoveGameProps> = ({
     if (onSendChatMessage) {
       onSendChatMessage({
         senderId: activePartnerId,
-        text: summary,
-        type: 'text',
+        content: summary,
+        mediaType: 'text',
       });
       setCopiedNotification('Mots doux envoyés directement dans votre chat ! 💌');
     } else {

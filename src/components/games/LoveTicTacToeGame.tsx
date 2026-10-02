@@ -725,8 +725,8 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
                         const msg = `⚔️ *Morpion des Gages : Victoire de ${winnerName} !* 👑\nLe gage amoureux pour ${loserName} est :\n« ${selectedPledge} » 🌹`;
                         onSendChatMessage({
                           senderId: activePartnerId,
-                          text: msg,
-                          type: 'text',
+                          content: msg,
+                          mediaType: 'text',
                         });
                         soundEffects.playSuccessSparkle();
                         triggerHeartConfetti();

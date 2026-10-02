@@ -260,8 +260,8 @@ export const LoveRouletteGame: React.FC<LoveRouletteGameProps> = ({
 
     onSendChatMessage({
       senderId: activePartnerId,
-      text: msg,
-      type: 'text',
+      content: msg,
+      mediaType: 'text',
     });
 
     soundEffects.playSuccessSparkle();
