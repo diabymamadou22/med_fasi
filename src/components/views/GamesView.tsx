@@ -727,7 +727,7 @@ export const GamesView: React.FC<GamesViewProps> = ({
                   </div>
 
                   {/* Grande icône centrale élégante */}
-                  <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-transform shrink-0 my-auto">
+                  <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-transform shrink-0 my-auto">
                     {React.isValidElement(game.icon)
                       ? React.cloneElement(game.icon as React.ReactElement<{ className?: string }>, {
                           className: 'w-6 h-6 sm:w-7 sm:h-7',
@@ -735,9 +735,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
                       : game.icon}
                   </div>
 
-                  {/* Nom du jeu stylé (aucun long commentaire !) */}
-                  <div className="w-full px-1">
-                    <h3 className="text-xs sm:text-sm font-bold text-stone-900 font-serif-romantic tracking-tight leading-snug line-clamp-2">
+                  {/* Nom du jeu agrandi et très visible (repérage immédiat) */}
+                  <div className="w-full px-0.5 sm:px-1 min-h-[2.4rem] sm:min-h-[2.8rem] flex items-center justify-center">
+                    <h3 className="text-[15px] sm:text-base md:text-lg font-extrabold text-stone-900 font-serif-romantic tracking-tight leading-tight line-clamp-2">
                       {game.title}
                     </h3>
                   </div>
@@ -937,7 +937,7 @@ export const GamesView: React.FC<GamesViewProps> = ({
                       </span>
                     </div>
 
-                    <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-transform shrink-0 my-auto">
+                    <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-white shadow-2xs border border-white/80 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-transform shrink-0 my-auto">
                       {React.isValidElement(subGame.icon)
                         ? React.cloneElement(subGame.icon as React.ReactElement<{ className?: string }>, {
                             className: 'w-6 h-6 sm:w-7 sm:h-7',
@@ -945,8 +945,9 @@ export const GamesView: React.FC<GamesViewProps> = ({
                         : subGame.icon}
                     </div>
 
-                    <div className="w-full px-1">
-                      <h3 className="text-xs sm:text-sm font-bold text-stone-900 font-serif-romantic tracking-tight leading-snug line-clamp-2">
+                    {/* Nom du jeu agrandi et très visible (repérage immédiat) */}
+                    <div className="w-full px-0.5 sm:px-1 min-h-[2.4rem] sm:min-h-[2.8rem] flex items-center justify-center">
+                      <h3 className="text-[15px] sm:text-base md:text-lg font-extrabold text-stone-900 font-serif-romantic tracking-tight leading-tight line-clamp-2">
                         {subGame.title}
                       </h3>
                     </div>
