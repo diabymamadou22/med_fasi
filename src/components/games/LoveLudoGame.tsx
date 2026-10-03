@@ -1659,53 +1659,6 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         )}
       </AnimatePresence>
 
-      {/* ACTIVE TURN INDICATOR BANNER (Indicateur visuel clair et stable du tour actuel) */}
-      <div
-        className={`w-full py-1.5 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all duration-300 ${
-          currentTurn === 'p1'
-            ? 'bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 text-blue-100 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.35)] ring-1 ring-blue-400/50'
-            : 'bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-emerald-100 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/50'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2.5 h-2.5 rounded-full ring-2 ring-white/60 shadow-xs ${
-              currentTurn === 'p1' ? 'bg-blue-400' : 'bg-emerald-400'
-            }`}
-          />
-          <span className="tracking-wide">
-            Tour de :{' '}
-            <span className="text-amber-300 font-extrabold underline decoration-amber-400">
-              {currentTurn === 'p1' ? p1.name : p2.name}
-            </span>{' '}
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold text-white shadow-2xs ${
-                currentTurn === 'p1' ? 'bg-blue-600' : 'bg-emerald-600'
-              }`}
-            >
-              {currentTurn === 'p1' ? 'Bleu' : 'Vert'}
-            </span>
-          </span>
-        </div>
-        <span
-          className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs ${
-            currentTurn === 'p1'
-              ? 'bg-blue-600 text-white border border-blue-300'
-              : 'bg-emerald-600 text-white border border-emerald-300'
-          }`}
-        >
-          {gameMode === 'live'
-            ? currentTurn === activePartnerId
-              ? '⭐ C’est à toi !'
-              : '⏳ En attente...'
-            : isRolling
-            ? '🎲 Roulement...'
-            : diceValue
-            ? '📍 Déplace un pion'
-            : '🎲 Lance le dé !'}
-        </span>
-      </div>
-
       {/* THE AUTHENTIC LUDO KING BOARD CONTAINER (Zone de jeu avec bordure nette & aura lumineuse stable) */}
       <div className="relative w-full max-w-[min(84vw,48vh,400px)] aspect-square flex items-center justify-center">
         {/* Halo néon doux autour de la zone de jeu indiquant le partenaire actif (fixe et sans clignotement) */}

@@ -670,26 +670,6 @@ export const GamesView: React.FC<GamesViewProps> = ({
                 </span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleRandomSurpriseGame}
-              disabled={isSurpriseRolling}
-              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-rose-200"
-              title="Autre jeu au hasard"
-            >
-              <Dices className={`w-3.5 h-3.5 ${isSurpriseRolling ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Autre jeu</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                soundEffects.playSoftTap();
-                setActiveTab(null);
-              }}
-              className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
-            >
-              Tous les jeux
-            </button>
           </div>
         </div>
       ) : (
