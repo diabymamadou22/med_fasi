@@ -77,23 +77,35 @@ class RomanticSoundEffects {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
-      // Realistic 1-second tumbling dice rattle clatter
-      const clatterTimes = [0, 0.05, 0.11, 0.18, 0.26, 0.35, 0.45, 0.56, 0.68, 0.81, 0.92];
-      clatterTimes.forEach((t, i) => {
+
+      // Son doux & feutré de dé en bois roulant sur tapis de velours
+      const rollMoments = [0, 0.08, 0.17, 0.27, 0.38, 0.50, 0.63, 0.77, 0.90];
+      rollMoments.forEach((t, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = i % 2 === 0 ? 'triangle' : 'square';
-        // Random wooden/resin cube clatter pitch variation
-        const freq = 380 + (i * 35) % 240 + Math.random() * 60;
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
-        osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + t + 0.035);
-        const volume = Math.max(0.04, 0.09 - i * 0.005);
+        const filter = ctx.createBiquadFilter();
+
+        // Onde sinusoïdale pure très douce filtrée passe-bas
+        osc.type = 'sine';
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(320, ctx.currentTime + t);
+
+        // Fréquences douces et graves (marimba feutré / bois doux)
+        const baseFreq = 220 + ((i * 18) % 60);
+        osc.frequency.setValueAtTime(baseFreq, ctx.currentTime + t);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.7, ctx.currentTime + t + 0.045);
+
+        // Volume très doux, atténué et apaisant
+        const volume = Math.max(0.015, 0.035 - i * 0.002);
         gain.gain.setValueAtTime(volume, ctx.currentTime + t);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.035);
-        osc.connect(gain);
+        gain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + t + 0.045);
+
+        osc.connect(filter);
+        filter.connect(gain);
         gain.connect(ctx.destination);
+
         osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.035);
+        osc.stop(ctx.currentTime + t + 0.045);
       });
     } catch {}
   }
@@ -102,21 +114,28 @@ class RomanticSoundEffects {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
-      // Crisp solid landing click of the die face settling flat
-      [0, 0.035].forEach((t, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        const startFreq = idx === 0 ? 540 : 380;
-        osc.frequency.setValueAtTime(startFreq, ctx.currentTime + t);
-        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + t + 0.045);
-        gain.gain.setValueAtTime(idx === 0 ? 0.12 : 0.06, ctx.currentTime + t);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.045);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.045);
-      });
+
+      // Son doux & feutré d'arrêt du dé (petit « toc » boisé velouté et très doux)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'sine';
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(300, ctx.currentTime);
+
+      osc.frequency.setValueAtTime(190, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.06);
+
+      gain.gain.setValueAtTime(0.035, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + 0.06);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.06);
     } catch {}
   }
 
@@ -218,6 +237,59 @@ class RomanticSoundEffects {
         harmGain.connect(ctx.destination);
         harm.start(ctx.currentTime + time);
         harm.stop(ctx.currentTime + time + 0.3);
+      });
+    } catch {}
+  }
+
+  // Son agréable et scintillant lorsqu'un pion se pose sur une étoile (case refuge sécurisée ★)
+  playStarLanding() {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      // Fond sonore doux et enveloppant (note chaude fondamentale E4)
+      const baseOsc = ctx.createOscillator();
+      const baseGain = ctx.createGain();
+      baseOsc.type = 'sine';
+      baseOsc.frequency.setValueAtTime(329.63, ctx.currentTime);
+      baseGain.gain.setValueAtTime(0.06, ctx.currentTime);
+      baseGain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + 0.55);
+      baseOsc.connect(baseGain);
+      baseGain.connect(ctx.destination);
+      baseOsc.start(ctx.currentTime);
+      baseOsc.stop(ctx.currentTime + 0.55);
+
+      // Doux carillon céleste scintillant : notes cristallines très mélodieuses et agréables
+      const starNotes = [
+        { freq: 659.25, time: 0 }, // E5
+        { freq: 987.77, time: 0.07 }, // B5
+        { freq: 1318.51, time: 0.15 }, // E6
+        { freq: 1661.22, time: 0.24 }, // G#6
+      ];
+
+      starNotes.forEach(({ freq, time }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime + time);
+        gain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + time + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + time);
+        osc.stop(ctx.currentTime + time + 0.45);
+
+        // Petit éclat d'étoile doré
+        const sparkle = ctx.createOscillator();
+        const sparkleGain = ctx.createGain();
+        sparkle.type = 'triangle';
+        sparkle.frequency.setValueAtTime(freq * 1.5, ctx.currentTime + time);
+        sparkleGain.gain.setValueAtTime(0.02, ctx.currentTime + time);
+        sparkleGain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + time + 0.22);
+        sparkle.connect(sparkleGain);
+        sparkleGain.connect(ctx.destination);
+        sparkle.start(ctx.currentTime + time);
+        sparkle.stop(ctx.currentTime + time + 0.22);
       });
     } catch {}
   }

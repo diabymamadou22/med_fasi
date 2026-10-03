@@ -616,6 +616,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         setIsMoving(false);
         setMovingTokenId(null);
         setTimeout(() => setStepRipple(null), 500);
+        soundEffects.playStarLanding();
 
         // Rolling 6 grants bonus roll!
         const msg = `🎉 ${movingPlayer === 'p1' ? p1.name : p2.name} a sorti un pion ! Rejouez.`;
@@ -719,8 +720,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       const finalTrackIndex =
         movingPlayer === 'p1' ? finalToken.step : (26 + finalToken.step) % 52;
 
-      // Safe squares cannot be captured
-      if (!SAFE_TRACK_INDEXES.has(finalTrackIndex)) {
+      // Safe squares with stars (★) - Son très agréable de protection sous l'étoile
+      if (SAFE_TRACK_INDEXES.has(finalTrackIndex)) {
+        soundEffects.playStarLanding();
+      } else {
+        // Normal squares: check if opponent can be captured
         const opponentPlayer = nextTurnPlayer(movingPlayer);
         const opponentTokens = opponentPlayer === 'p1' ? nextP1Tokens : nextP2Tokens;
 
