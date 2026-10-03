@@ -164,6 +164,8 @@ export type AmbientTrackId =
   | 'soft_rain'
   | 'none';
 
+export type GameAnimationSpeed = 'slow' | 'normal' | 'fast' | 'ultra';
+
 export interface CoupleSettings {
   pinCode?: string; // 4 chiffres, ex: "2024"
   isPinEnabled: boolean;
@@ -176,6 +178,8 @@ export interface CoupleSettings {
   autoCleanChatEnabled?: boolean;
   autoCleanChatDays?: number; // ex: 7, 14, 30, 60, 90 jours
   lastAutoCleanAt?: string; // date ISO du dernier nettoyage
+  // Vitesse d'animation des jeux (Accessibilité ou Compétition)
+  gameAnimationSpeed?: GameAnimationSpeed;
 }
 
 export interface ChatMessage {
@@ -442,6 +446,45 @@ export interface LudoGameSession {
   p2Wins: number;
   selectedPledge?: string;
   tokensPerPlayer: 2 | 4;
+  lastUpdated: string;
+}
+
+// -------------------------------------------------------------
+// HISTORIQUE DES SCORES GLOBAUX DU COUPLE POUR TOUS LES JEUX
+// -------------------------------------------------------------
+export interface GameHistoryEntry {
+  id: string;
+  gameId: string;
+  gameTitle: string;
+  winner: PartnerId | 'tie';
+  winnerName: string;
+  timestamp: string;
+  pledge?: string;
+  notes?: string;
+}
+
+export interface GameScoreRecord {
+  gameId: string;
+  gameTitle: string;
+  category: 'duo' | 'flirt' | 'bilingual';
+  p1Wins: number;
+  p1Losses: number;
+  p2Wins: number;
+  p2Losses: number;
+  ties: number;
+  totalPlayed: number;
+  lastPlayedAt?: string;
+  lastWinner?: PartnerId | 'tie' | null;
+}
+
+export interface GlobalGamesScoreboard {
+  id: string; // 'global_scores'
+  games: Record<string, GameScoreRecord>;
+  recentHistory: GameHistoryEntry[];
+  totalP1Wins: number;
+  totalP2Wins: number;
+  totalTies: number;
+  totalPlayed: number;
   lastUpdated: string;
 }
 

@@ -34,6 +34,9 @@ import {
   LoveTouchSession,
   LudoGameSession,
   PartnerId,
+  GlobalGamesScoreboard,
+  GameScoreRecord,
+  GameHistoryEntry,
 } from '../types';
 import {
   sortChatMessagesChronologically,
@@ -1092,6 +1095,274 @@ export async function saveLudoGame(session: Partial<LudoGameSession>): Promise<b
     await setDoc(docRef, sanitized, { merge: true });
     return true;
   }, 'Save LudoGame session').then((res) => res !== null && res !== undefined);
+}
+
+// -------------------------------------------------------------
+// HISTORIQUE DES SCORES GLOBAUX DU COUPLE (TOUS LES JEUX)
+// -------------------------------------------------------------
+export const INITIAL_GAMES_SCOREBOARD: GlobalGamesScoreboard = {
+  id: 'global_scores',
+  games: {
+    ludo: {
+      gameId: 'ludo',
+      gameTitle: 'Ludo MS',
+      category: 'duo',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    tic_tac_toe: {
+      gameId: 'tic_tac_toe',
+      gameTitle: 'Morpion & Gages',
+      category: 'duo',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    roulette: {
+      gameId: 'roulette',
+      gameTitle: 'Roulette Romantique',
+      category: 'duo',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    who_most_likely: {
+      gameId: 'who_most_likely',
+      gameTitle: 'Qui de Nous Deux ?',
+      category: 'flirt',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    speed_match: {
+      gameId: 'speed_match',
+      gameTitle: 'Speed Match',
+      category: 'bilingual',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    wordle: {
+      gameId: 'wordle',
+      gameTitle: 'Love Wordle',
+      category: 'bilingual',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    trivia: {
+      gameId: 'trivia',
+      gameTitle: 'Blind Test Audio',
+      category: 'bilingual',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    sixty_seconds: {
+      gameId: 'sixty_seconds',
+      gameTitle: '60s Mots Doux',
+      category: 'duo',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+    puzzle: {
+      gameId: 'puzzle',
+      gameTitle: 'Puzzle Romantique',
+      category: 'duo',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    },
+  },
+  recentHistory: [],
+  totalP1Wins: 0,
+  totalP2Wins: 0,
+  totalTies: 0,
+  totalPlayed: 0,
+  lastUpdated: new Date().toISOString(),
+};
+
+export function subscribeGlobalGameScores(
+  onUpdate: (board: GlobalGamesScoreboard) => void,
+  onError?: (error: Error) => void
+) {
+  try {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'global_scores');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as Partial<GlobalGamesScoreboard>;
+          const merged: GlobalGamesScoreboard = {
+            ...INITIAL_GAMES_SCOREBOARD,
+            ...data,
+            games: {
+              ...INITIAL_GAMES_SCOREBOARD.games,
+              ...(data.games || {}),
+            },
+            recentHistory: data.recentHistory || [],
+          };
+          try {
+            localStorage.setItem('nid_damour_global_game_scores', JSON.stringify(merged));
+          } catch {}
+          onUpdate(merged);
+        } else {
+          try {
+            const cached = localStorage.getItem('nid_damour_global_game_scores');
+            if (cached) {
+              onUpdate(JSON.parse(cached));
+              return;
+            }
+          } catch {}
+          onUpdate(INITIAL_GAMES_SCOREBOARD);
+        }
+      },
+      (err) => {
+        logFirestoreSyncIssue('GlobalGameScores sync', err);
+        try {
+          const cached = localStorage.getItem('nid_damour_global_game_scores');
+          if (cached) onUpdate(JSON.parse(cached));
+        } catch {}
+        if (onError) onError(err);
+      }
+    );
+  } catch (err: any) {
+    logFirestoreSyncIssue('GlobalGameScores attach', err);
+    return () => {};
+  }
+}
+
+export async function recordGameResult(result: {
+  gameId: string;
+  gameTitle: string;
+  category?: 'duo' | 'flirt' | 'bilingual';
+  winner: PartnerId | 'tie';
+  winnerName: string;
+  pledge?: string;
+  notes?: string;
+}): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'global_scores');
+    let currentBoard = { ...INITIAL_GAMES_SCOREBOARD };
+
+    try {
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as Partial<GlobalGamesScoreboard>;
+        currentBoard = {
+          ...INITIAL_GAMES_SCOREBOARD,
+          ...data,
+          games: {
+            ...INITIAL_GAMES_SCOREBOARD.games,
+            ...(data.games || {}),
+          },
+          recentHistory: data.recentHistory || [],
+        };
+      } else {
+        const cached = localStorage.getItem('nid_damour_global_game_scores');
+        if (cached) {
+          currentBoard = JSON.parse(cached);
+        }
+      }
+    } catch {}
+
+    const gameId = result.gameId;
+    const game = currentBoard.games[gameId] || {
+      gameId,
+      gameTitle: result.gameTitle,
+      category: result.category || 'duo',
+      p1Wins: 0,
+      p1Losses: 0,
+      p2Wins: 0,
+      p2Losses: 0,
+      ties: 0,
+      totalPlayed: 0,
+    };
+
+    if (result.winner === 'p1') {
+      game.p1Wins = (game.p1Wins || 0) + 1;
+      game.p2Losses = (game.p2Losses || 0) + 1;
+      currentBoard.totalP1Wins = (currentBoard.totalP1Wins || 0) + 1;
+    } else if (result.winner === 'p2') {
+      game.p2Wins = (game.p2Wins || 0) + 1;
+      game.p1Losses = (game.p1Losses || 0) + 1;
+      currentBoard.totalP2Wins = (currentBoard.totalP2Wins || 0) + 1;
+    } else {
+      game.ties = (game.ties || 0) + 1;
+      currentBoard.totalTies = (currentBoard.totalTies || 0) + 1;
+    }
+
+    game.totalPlayed = (game.totalPlayed || 0) + 1;
+    game.lastPlayedAt = new Date().toISOString();
+    game.lastWinner = result.winner;
+    currentBoard.games[gameId] = game;
+    currentBoard.totalPlayed = (currentBoard.totalPlayed || 0) + 1;
+    currentBoard.lastUpdated = new Date().toISOString();
+
+    const newHistoryItem: GameHistoryEntry = {
+      id: `gh_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      gameId: result.gameId,
+      gameTitle: result.gameTitle,
+      winner: result.winner,
+      winnerName: result.winnerName,
+      timestamp: new Date().toISOString(),
+      pledge: result.pledge,
+      notes: result.notes,
+    };
+
+    currentBoard.recentHistory = [newHistoryItem, ...(currentBoard.recentHistory || [])].slice(0, 60);
+
+    try {
+      localStorage.setItem('nid_damour_global_game_scores', JSON.stringify(currentBoard));
+    } catch {}
+
+    await setDoc(docRef, sanitizeForFirestore(currentBoard), { merge: true });
+    return true;
+  }, 'Record game result').then((res) => res !== null && res !== undefined);
+}
+
+export async function resetGlobalGameScores(): Promise<boolean> {
+  return safeFirestoreOperation(async () => {
+    const docRef = doc(db, COLLECTIONS.GAMES, 'global_scores');
+    const resetBoard: GlobalGamesScoreboard = {
+      ...INITIAL_GAMES_SCOREBOARD,
+      lastUpdated: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem('nid_damour_global_game_scores', JSON.stringify(resetBoard));
+    } catch {}
+    await setDoc(docRef, sanitizeForFirestore(resetBoard));
+    return true;
+  }, 'Reset global game scores').then((res) => res !== null && res !== undefined);
 }
 
 export { COLLECTIONS, sortChatMessagesChronologically, extractMessageTimestampMs };

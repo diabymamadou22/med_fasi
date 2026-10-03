@@ -178,7 +178,8 @@
         "isMusicPlaying": { "type": "boolean" },
         "autoCleanChatEnabled": { "type": "boolean" },
         "autoCleanChatDays": { "type": "number" },
-        "lastAutoCleanAt": { "type": "string" }
+        "lastAutoCleanAt": { "type": "string" },
+        "gameAnimationSpeed": { "type": "string" }
       },
       "required": ["isPinEnabled"]
     },
@@ -300,6 +301,22 @@
         "lastUpdated": { "type": "string" }
       },
       "required": ["id", "p1Touching", "p2Touching"]
+    },
+    "GlobalGamesScoreboard": {
+      "title": "GlobalGamesScoreboard",
+      "description": "Historique et statistiques des scores globaux par jeu pour le couple",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "games": { "type": "object" },
+        "recentHistory": { "type": "array", "items": { "type": "object" } },
+        "totalP1Wins": { "type": "number" },
+        "totalP2Wins": { "type": "number" },
+        "totalTies": { "type": "number" },
+        "totalPlayed": { "type": "number" },
+        "lastUpdated": { "type": "string" }
+      },
+      "required": ["id", "games", "totalP1Wins", "totalP2Wins", "totalPlayed"]
     }
   },
   "firestore": {

@@ -33,9 +33,13 @@ import {
   EnglishLexiconItem,
   WeeklyLearningChallenge,
   TimelineMemory,
+  GlobalGamesScoreboard,
+  CoupleSettings,
+  GameAnimationSpeed,
 } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerHeartConfetti } from '../../lib/confetti';
+import { subscribeGlobalGameScores, INITIAL_GAMES_SCOREBOARD } from '../../lib/firestoreService';
 import { LexiconSection } from './LexiconSection';
 import { FlirtCardsGame } from './games/FlirtCardsGame';
 import { LoveRoleplayGame } from './games/LoveRoleplayGame';
@@ -50,6 +54,7 @@ import { WhoMostLikelyGame } from '../games/WhoMostLikelyGame';
 import { SixtySecondsLoveGame } from '../games/SixtySecondsLoveGame';
 import { LovePuzzleGame } from '../games/LovePuzzleGame';
 import { LoveLudoGame } from '../games/LoveLudoGame';
+import { GlobalScoreboardPanel } from '../games/GlobalScoreboardPanel';
 import { INITIAL_LEXICON_WORDS } from '../../data/initialLexiconData';
 import { useBackHandler } from '../../lib/backNavigation';
 
@@ -109,6 +114,9 @@ interface GamesViewProps {
   onSaveWeeklyChallenge?: (challenge: WeeklyLearningChallenge) => void;
   onOpenChatWithDraft?: (prefilledText: string) => void;
   initialTab?: EnglishGameTab | null;
+  settings?: CoupleSettings;
+  onSaveSettings?: (settings: CoupleSettings) => void;
+  onOpenProfileModal?: (partnerId?: PartnerId) => void;
 }
 
 interface GameCardDef {
@@ -148,11 +156,36 @@ export const GamesView: React.FC<GamesViewProps> = ({
   onSaveWeeklyChallenge,
   onOpenChatWithDraft,
   initialTab,
+  settings,
+  onSaveSettings,
+  onOpenProfileModal,
 }) => {
   // Current game (null means menu is showing, or an active game tab)
   const [activeTab, setActiveTab] = useState<EnglishGameTab | null>(initialTab || null);
   const [speechRate, setSpeechRate] = useState<number>(0.85);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Global Game Scoreboard State & real-time sync
+  const [scoreboard, setScoreboard] = useState<GlobalGamesScoreboard>(() => {
+    try {
+      const saved = localStorage.getItem('nid_damour_global_game_scores');
+      return saved ? JSON.parse(saved) : INITIAL_GAMES_SCOREBOARD;
+    } catch {
+      return INITIAL_GAMES_SCOREBOARD;
+    }
+  });
+  const [showScoreboardPanel, setShowScoreboardPanel] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = subscribeGlobalGameScores((board) => {
+      if (board) {
+        setScoreboard(board);
+      }
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     if (initialTab) {
@@ -593,6 +626,52 @@ export const GamesView: React.FC<GamesViewProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowScoreboardPanel(true);
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-amber-200"
+              title="Historique des scores globaux"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline">Scores</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/80 text-amber-900 font-black">
+                {scoreboard.totalP1Wins} - {scoreboard.totalP2Wins}
+              </span>
+            </button>
+            {onOpenProfileModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEffects.playSoftTap();
+                  onOpenProfileModal(activePartnerId);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-purple-200"
+                title="Régler la cadence des animations de jeux (Douce, Normale, Rapide, Éclair)"
+              >
+                <span>
+                  {settings?.gameAnimationSpeed === 'slow'
+                    ? '🐢'
+                    : settings?.gameAnimationSpeed === 'fast'
+                    ? '⚡'
+                    : settings?.gameAnimationSpeed === 'ultra'
+                    ? '🚀'
+                    : '⚖️'}
+                </span>
+                <span className="hidden sm:inline">Vitesse :</span>
+                <span className="capitalize text-[11px]">
+                  {settings?.gameAnimationSpeed === 'slow'
+                    ? 'Douce'
+                    : settings?.gameAnimationSpeed === 'fast'
+                    ? 'Rapide'
+                    : settings?.gameAnimationSpeed === 'ultra'
+                    ? 'Éclair'
+                    : 'Standard'}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
               onClick={handleRandomSurpriseGame}
               disabled={isSurpriseRolling}
               className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-rose-200"
@@ -643,21 +722,92 @@ export const GamesView: React.FC<GamesViewProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleRandomSurpriseGame}
-            disabled={isSurpriseRolling}
-            className="px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shrink-0"
-          >
-            <Dices className={`w-3.5 h-3.5 ${isSurpriseRolling ? 'animate-spin' : ''}`} />
-            <span>Jeu Surprise !</span>
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowScoreboardPanel(true);
+              }}
+              className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              title="Historique des scores globaux"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden sm:inline">Scores Globaux</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/80 text-amber-900 font-black">
+                {scoreboard.totalP1Wins} - {scoreboard.totalP2Wins}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRandomSurpriseGame}
+              disabled={isSurpriseRolling}
+              className="px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shrink-0"
+            >
+              <Dices className={`w-3.5 h-3.5 ${isSurpriseRolling ? 'animate-spin' : ''}`} />
+              <span className="hidden xs:inline">Jeu Surprise !</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* 2. Menu Enrichi : Filtres & Recherche (Quand aucun jeu n'est ouvert) */}
       {!resolvedTab ? (
         <div className="space-y-3">
+          {/* Panneau / Bannière Palmarès des Scores Globaux */}
+          <div className="bg-gradient-to-r from-amber-50/90 via-rose-50/80 to-pink-50/90 rounded-2xl sm:rounded-3xl border border-amber-200/90 p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 text-white flex items-center justify-center text-xl shadow-xs shrink-0">
+                🏆
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-xs sm:text-sm text-stone-900 font-serif-romantic tracking-tight">
+                    Palmarès des Duels du Couple
+                  </h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-200/80 text-amber-900 shrink-0">
+                    {scoreboard.totalPlayed} {scoreboard.totalPlayed > 1 ? 'parties' : 'partie'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-600 mt-0.5 truncate">
+                  {scoreboard.totalPlayed === 0 ? (
+                    'Jouez à Ludo MS, Morpion ou aux autres jeux pour accumuler des victoires !'
+                  ) : scoreboard.totalP1Wins > scoreboard.totalP2Wins ? (
+                    <span>
+                      👑 <strong className="text-blue-700">{profile.partner1.name}</strong> mène avec{' '}
+                      <strong>{scoreboard.totalP1Wins} victoires</strong> contre {scoreboard.totalP2Wins} pour{' '}
+                      {profile.partner2.name}
+                    </span>
+                  ) : scoreboard.totalP2Wins > scoreboard.totalP1Wins ? (
+                    <span>
+                      👑 <strong className="text-emerald-700">{profile.partner2.name}</strong> mène avec{' '}
+                      <strong>{scoreboard.totalP2Wins} victoires</strong> contre {scoreboard.totalP1Wins} pour{' '}
+                      {profile.partner1.name}
+                    </span>
+                  ) : (
+                    <span>
+                      🤝 Égalité parfaite ! <strong>{scoreboard.totalP1Wins} - {scoreboard.totalP2Wins}</strong>
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playSoftTap();
+                setShowScoreboardPanel(true);
+              }}
+              className="px-3 py-2 rounded-xl bg-white hover:bg-amber-100/70 border border-amber-300 text-amber-900 text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-600" />
+              <span>Voir l'historique complet</span>
+              <ChevronRight className="w-3.5 h-3.5 text-amber-500" />
+            </button>
+          </div>
+
           {/* Barre de Recherche & Filtres de Catégories */}
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-stone-200/80 p-2.5 sm:p-3 shadow-xs space-y-2.5">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
@@ -884,6 +1034,10 @@ export const GamesView: React.FC<GamesViewProps> = ({
               profile={profile}
               activePartnerId={activePartnerId}
               onSendChatMessage={onSendChatMessage}
+              animationSpeed={settings?.gameAnimationSpeed || 'normal'}
+              settings={settings}
+              onSaveSettings={onSaveSettings}
+              onOpenSettingsModal={onOpenProfileModal ? () => onOpenProfileModal(activePartnerId) : undefined}
             />
           )}
 
@@ -1010,6 +1164,17 @@ export const GamesView: React.FC<GamesViewProps> = ({
           )}
         </div>
       )}
+
+      {/* Panneau Modal de l'Historique des Scores Globaux du Couple */}
+      <GlobalScoreboardPanel
+        isOpen={showScoreboardPanel}
+        onClose={() => setShowScoreboardPanel(false)}
+        profile={profile}
+        activePartnerId={activePartnerId}
+        scoreboard={scoreboard}
+        onSelectGame={(gameId) => setActiveTab(gameId as EnglishGameTab)}
+        onSendChatMessage={onSendChatMessage}
+      />
     </div>
   );
 };

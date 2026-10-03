@@ -6,11 +6,12 @@ import {
   Dices,
   Flame,
   Settings2,
+  Gauge,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId, LudoToken, LudoGameSession } from '../../types';
+import { CoupleProfile, PartnerId, LudoToken, LudoGameSession, CoupleSettings, GameAnimationSpeed } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
-import { subscribeLudoGame, saveLudoGame } from '../../lib/firestoreService';
+import { subscribeLudoGame, saveLudoGame, recordGameResult } from '../../lib/firestoreService';
 
 // -------------------------------------------------------------
 // 15x15 STANDARD LUDO TRACK COORDINATES (0 to 51 = 52 squares)
@@ -151,15 +152,74 @@ interface LoveLudoGameProps {
     content: string;
     mediaType?: 'image' | 'audio' | 'video' | 'text';
   }) => void;
+  animationSpeed?: GameAnimationSpeed;
+  settings?: CoupleSettings;
+  onSaveSettings?: (settings: CoupleSettings) => void;
+  onOpenSettingsModal?: () => void;
 }
 
 export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   profile,
   activePartnerId,
   onSendChatMessage,
+  animationSpeed = 'normal',
+  settings,
+  onSaveSettings,
+  onOpenSettingsModal,
 }) => {
   const p1 = profile.partner1;
   const p2 = profile.partner2;
+
+  // Animation speed: controlled via ProfileModal or local live toggle
+  const [localSpeed, setLocalSpeed] = useState<GameAnimationSpeed | null>(null);
+  const currentSpeed: GameAnimationSpeed =
+    localSpeed || settings?.gameAnimationSpeed || animationSpeed || 'normal';
+
+  const speedPacing = useMemo(() => {
+    switch (currentSpeed) {
+      case 'slow':
+        return {
+          label: 'Douce',
+          badge: 'Accessible',
+          emoji: '🐢',
+          stepInterval: 440,
+          yardExit: 480,
+          aiDelay: 1100,
+          transitionCss: '0.28s',
+        };
+      case 'fast':
+        return {
+          label: 'Rapide',
+          badge: 'Compétitive',
+          emoji: '⚡',
+          stepInterval: 140,
+          yardExit: 180,
+          aiDelay: 450,
+          transitionCss: '0.10s',
+        };
+      case 'ultra':
+        return {
+          label: 'Éclair',
+          badge: 'Express',
+          emoji: '🚀',
+          stepInterval: 65,
+          yardExit: 80,
+          aiDelay: 220,
+          transitionCss: '0.05s',
+        };
+      case 'normal':
+      default:
+        return {
+          label: 'Standard',
+          badge: 'Équilibrée',
+          emoji: '⚖️',
+          stepInterval: 280,
+          yardExit: 320,
+          aiDelay: 800,
+          transitionCss: '0.18s',
+        };
+    }
+  }, [currentSpeed]);
 
   // Settings: 4 pieces standard (can toggle to 2)
   const [tokensPerPlayer, setTokensPerPlayer] = useState<2 | 4>(4);
@@ -536,7 +596,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           diceValue: null,
           lastMoveText: msg,
         });
-      }, 350);
+      }, speedPacing.yardExit);
       return;
     }
 
@@ -548,8 +608,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     setIsMoving(true);
     setMovingTokenId(token.id);
     let currentStep = startStep;
-    // Pacing: 290ms per square (très agréable, lisible et suspense garanti)
-    const stepInterval = 290;
+    // Pacing dynamisé selon les réglages de vitesse (Accessibilité ou Compétition)
+    const stepInterval = speedPacing.stepInterval;
 
     const stepNext = () => {
       currentStep += 1;
@@ -679,6 +739,16 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       const winText = `🏆 VICTOIRE DE ${winnerName.toUpperCase()} ! 🎉`;
       setLastEventText(winText);
 
+      // Enregistrement dans l'historique des scores globaux du couple
+      recordGameResult({
+        gameId: 'ludo',
+        gameTitle: 'Ludo MS',
+        category: 'duo',
+        winner: gameWinner,
+        winnerName,
+        pledge: selectedPledge,
+      }).catch(console.error);
+
       syncSessionToCloud({
         winner: gameWinner,
         p1Wins: nextP1Wins,
@@ -748,7 +818,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           handleStepByStepMove(chosen, diceValue, true);
         }
       }
-    }, 850);
+    }, speedPacing.aiDelay);
 
     return () => clearTimeout(timer);
   }, [gameMode, currentTurn, diceValue, winner, isRolling, isMoving, getPlayableTokens, tokensP1]);
@@ -872,16 +942,17 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const p2HomeCount = activeTokensP2.filter((t) => t.state === 'finished').length;
   const isP1 = currentTurn === 'p1';
 
-  // Render 6-dot face on the Ludo King dice button
+  // Render 6-dot face on the Ludo King dice button (colored to match active partner's turn)
   const renderDiceDots = (value: number | null) => {
     if (!value) return null;
-    const dot = 'w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-600 shadow-2xs shrink-0';
+    const dotColor = isP1 ? 'bg-blue-600' : 'bg-emerald-600';
+    const dot = `w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${dotColor} shadow-2xs shrink-0`;
 
     switch (value) {
       case 1:
         return (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-blue-600 shadow-xs" />
+            <span className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full ${dotColor} shadow-xs`} />
           </div>
         );
       case 2:
@@ -917,7 +988,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <span className={dot} />
               <span className={dot} />
             </div>
-            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-600 shadow-xs z-10" />
+            <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${dotColor} shadow-xs z-10`} />
           </div>
         );
       case 6:
@@ -936,7 +1007,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     }
   };
 
-  // Render individual Luxury 3D Royal Pawn (Stylé, Ultra-Attirant & Prestigieux)
+  // Render individual Luxury 3D Royal Pawn (Agrandie, Épurée, Superbe & Stable SANS clignotement)
   const renderPawn = (token: LudoToken, index: number) => {
     const isPlayer1 = token.player === 'p1';
     const pos = getTokenPosition(token, index);
@@ -955,271 +1026,238 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         }}
         className={isPlayable && !isMoving ? 'cursor-pointer' : ''}
       >
-        {/* Generous touch target */}
-        <circle cx={pos.x} cy={pos.y} r="48" fill="transparent" />
+        {/* Generous touch target for effortless tapping on mobile */}
+        <circle cx={pos.x} cy={pos.y} r="75" fill="transparent" />
 
-        {/* 1. Realistic Multi-layered Ground Shadows (Expands & softens when floating/moving) */}
+        {/* 1. Multi-layered Ground Contact Shadows (Enlarged & Stable) */}
         <ellipse
           cx={pos.x}
-          cy={pos.y + (isThisTokenMoving ? 23 : 20)}
-          rx={isThisTokenMoving ? '30' : '26'}
-          ry={isThisTokenMoving ? '9.5' : '8'}
+          cy={pos.y + 28}
+          rx={isThisTokenMoving ? '48' : '42'}
+          ry={isThisTokenMoving ? '15' : '12'}
           fill="url(#pawn-contact-shadow)"
-          opacity={isThisTokenMoving ? 0.75 : 1}
+          opacity={isThisTokenMoving ? 0.6 : 0.95}
         />
         <ellipse
           cx={pos.x}
-          cy={pos.y + (isThisTokenMoving ? 22 : 19)}
-          rx={isThisTokenMoving ? '20' : '18'}
-          ry={isThisTokenMoving ? '6' : '5'}
+          cy={pos.y + 27}
+          rx={isThisTokenMoving ? '30' : '26'}
+          ry={isThisTokenMoving ? '8.5' : '7'}
           fill="#000000"
           opacity="0.4"
         />
 
-        {/* 2. Magnetic Celestial Glow & Aura when Playable (Très attirante & captivante) */}
+        {/* 2. Effet Pion Jouable : Net, luxueux, très simple & SANS CLIGNOTEMENT */}
         {isPlayable && !isMoving && (
-          <>
-            {/* Luminous Pulsing Golden Floor Halo */}
+          <g style={{ pointerEvents: 'none' }}>
+            {/* Halo lumineux doré doux et stable au sol */}
             <ellipse
               cx={pos.x}
-              cy={pos.y + 19}
-              rx="28"
-              ry="9.5"
+              cy={pos.y + 28}
+              rx="46"
+              ry="14"
               fill="url(#pawn-floor-glow)"
-              className="animate-pulse"
-            />
-            {/* Rotating Celestial Star Orbit Ring */}
-            <circle
-              cx={pos.x}
-              cy={pos.y - 4}
-              r="34"
-              fill="none"
-              stroke="url(#gold-polished)"
-              strokeWidth="3.2"
-              strokeDasharray="7 5"
-              className="animate-spin"
-              style={{
-                animationDuration: '6s',
-                transformOrigin: `${pos.x}px ${pos.y - 4}px`,
-              }}
               opacity="0.95"
             />
-            <circle
+            {/* Anneau d'or fin et net délimitant la case (fixe et élégant) */}
+            <ellipse
               cx={pos.x}
-              cy={pos.y - 4}
-              r="27"
-              fill="#FEF08A"
-              opacity="0.22"
-              className="animate-pulse"
-            />
-            {/* Sparkling Star Gleam above the Crown */}
-            <text
-              x={pos.x}
-              y={pos.y - 34}
-              fill="#FACC15"
-              fontSize="16"
-              textAnchor="middle"
-              className="animate-pulse"
-              style={{ pointerEvents: 'none' }}
-            >
-              ✨
-            </text>
-          </>
-        )}
-
-        {/* Active Movement Levitation Effect & Sparkle Trail */}
-        {isThisTokenMoving && (
-          <g style={{ pointerEvents: 'none' }}>
-            {/* Luminous Pulsing Motion Ring */}
-            <circle
-              cx={pos.x}
-              cy={pos.y - 12}
-              r="36"
+              cy={pos.y + 28}
+              rx="41"
+              ry="12.5"
               fill="none"
-              stroke={isPlayer1 ? '#60A5FA' : '#34D399'}
-              strokeWidth="3"
-              strokeDasharray="6 4"
-              className="animate-spin"
-              style={{
-                animationDuration: '1.8s',
-                transformOrigin: `${pos.x}px ${pos.y - 12}px`,
-              }}
-              opacity="0.85"
+              stroke="#FACC15"
+              strokeWidth="3.2"
             />
-            {/* Golden Star Trail behind the pawn */}
-            <text
-              x={pos.x + 18}
-              y={pos.y - 30}
-              fill="#FACC15"
-              fontSize="16"
-              className="animate-bounce"
-            >
-              ✨
-            </text>
+            {/* Délicate auréole dorée stable autour de la tête du pion */}
+            <circle
+              cx={pos.x}
+              cy={pos.y - 25}
+              r="38"
+              fill="none"
+              stroke="#FDE047"
+              strokeWidth="2.5"
+              opacity="0.95"
+            />
           </g>
         )}
 
-        {/* Main Pawn Body Group (Subtly elevates / glides smoothly during step movement) */}
+        {/* 3. Effet Pion en Mouvement : Aérien, net et stable */}
+        {isThisTokenMoving && (
+          <g style={{ pointerEvents: 'none' }}>
+            <circle
+              cx={pos.x}
+              cy={pos.y - 15}
+              r="46"
+              fill="none"
+              stroke="#FDE047"
+              strokeWidth="3"
+              opacity="0.9"
+            />
+          </g>
+        )}
+
+        {/* 4. Corps Principal du Pion Agrandie (Élévation fluide en apesanteur si en mouvement) */}
         <g
-          transform={isThisTokenMoving ? 'translate(0, -7)' : undefined}
-          style={{ transition: 'transform 0.18s ease-out' }}
+          transform={isThisTokenMoving ? 'translate(0, -14)' : undefined}
+          style={{ transition: `transform ${speedPacing.transitionCss} ease-out` }}
         >
-          {/* 3. Tiered Heavy Pedestal Base (Double étage or 24k & laque royale) */}
-          {/* Lower Base Gold Rim */}
+          {/* Socle Lourd à Double Biseau Agrandie (Finition Or Impérial 24k) */}
+          {/* Bague inférieure dorée élargie */}
           <ellipse
             cx={pos.x}
-            cy={pos.y + 19}
-            rx="21"
-            ry="6"
+            cy={pos.y + 28}
+            rx="39"
+            ry="11.5"
             fill="url(#gold-polished)"
             stroke="#78350F"
-            strokeWidth="0.8"
+            strokeWidth="1.2"
           />
-          {/* Lower Base Lacquer Bevel Ring */}
+          {/* Biseau en laque royale colorée */}
           <ellipse
             cx={pos.x}
-            cy={pos.y + 17.8}
-            rx="19"
-            ry="5"
+            cy={pos.y + 25.5}
+            rx="34.5"
+            ry="9.5"
             fill={isPlayer1 ? 'url(#p1-royal-body)' : 'url(#p2-royal-body)'}
           />
-          {/* Upper Base Gold Step */}
+          {/* Étage supérieur or */}
           <ellipse
             cx={pos.x}
-            cy={pos.y + 15}
-            rx="15"
-            ry="4"
+            cy={pos.y + 20.5}
+            rx="27.5"
+            ry="7.5"
             fill="url(#gold-polished)"
             stroke="#78350F"
-            strokeWidth="0.6"
+            strokeWidth="1"
           />
-          {/* Upper Base Collar */}
+          {/* Collerette supérieure */}
           <ellipse
             cx={pos.x}
-            cy={pos.y + 14.2}
-            rx="13.5"
-            ry="3.3"
+            cy={pos.y + 18.5}
+            rx="23.5"
+            ry="6"
             fill={isPlayer1 ? '#1E40AF' : '#047857'}
           />
 
-          {/* 4. Sculpted Flared Bell Body with Rich 3D Royal Lacquer */}
+          {/* Silhouette Sculptée Évasée et Agrandie en Laque Royale 3D */}
           <path
-            d={`M ${pos.x - 7.5} ${pos.y - 2} 
-                C ${pos.x - 6} ${pos.y + 4}, ${pos.x - 14} ${pos.y + 10}, ${pos.x - 16} ${pos.y + 15}
-                Q ${pos.x} ${pos.y + 18.5}, ${pos.x + 16} ${pos.y + 15}
-                C ${pos.x + 14} ${pos.y + 10}, ${pos.x + 6} ${pos.y + 4}, ${pos.x + 7.5} ${pos.y - 2}
+            d={`M ${pos.x - 14} ${pos.y - 7} 
+                C ${pos.x - 11} ${pos.y + 4}, ${pos.x - 26} ${pos.y + 14}, ${pos.x - 30} ${pos.y + 21}
+                Q ${pos.x} ${pos.y + 27}, ${pos.x + 30} ${pos.y + 21}
+                C ${pos.x + 26} ${pos.y + 14}, ${pos.x + 11} ${pos.y + 4}, ${pos.x + 14} ${pos.y - 7}
                 Z`}
             fill={isPlayer1 ? 'url(#p1-royal-body)' : 'url(#p2-royal-body)'}
             stroke={isPlayer1 ? '#1E3A8A' : '#064E3B'}
-            strokeWidth="1.2"
+            strokeWidth="1.8"
           />
 
-          {/* 5. Curved Glossy Ceramic Reflection Highlight on the Left Flank */}
+          {/* Reflet Glacé Céramique sur le Flanc Gauche */}
           <path
-            d={`M ${pos.x - 4} ${pos.y - 1}
-                C ${pos.x - 3} ${pos.y + 4}, ${pos.x - 7.5} ${pos.y + 9}, ${pos.x - 11} ${pos.y + 14}
-                L ${pos.x - 8} ${pos.y + 14}
-                C ${pos.x - 5} ${pos.y + 9}, ${pos.x - 1} ${pos.y + 4}, ${pos.x - 2} ${pos.y - 1}
+            d={`M ${pos.x - 8} ${pos.y - 6}
+                C ${pos.x - 7} ${pos.y + 4}, ${pos.x - 14} ${pos.y + 14}, ${pos.x - 20} ${pos.y + 20}
+                L ${pos.x - 15} ${pos.y + 20}
+                C ${pos.x - 10} ${pos.y + 14}, ${pos.x - 2} ${pos.y + 4}, ${pos.x - 4} ${pos.y - 6}
                 Z`}
             fill="url(#stem-specular)"
             style={{ pointerEvents: 'none' }}
           />
 
-          {/* 6. Waist Ornamental Gold Filigree Ring */}
+          {/* Bague Médiane Dorée Filigrane */}
           <ellipse
             cx={pos.x}
-            cy={pos.y + 6}
-            rx="9.5"
-            ry="2.6"
+            cy={pos.y + 8}
+            rx="18.5"
+            ry="5"
             fill="none"
             stroke="url(#gold-polished)"
-            strokeWidth="1.4"
+            strokeWidth="2.2"
           />
 
-          {/* 7. Neck Polished Gold Choker Collar */}
+          {/* Collerette d'Or au Cou */}
           <ellipse
             cx={pos.x}
-            cy={pos.y - 2}
-            rx="10.5"
-            ry="3.2"
+            cy={pos.y - 7}
+            rx="19.5"
+            ry="6"
             fill="url(#gold-polished)"
             stroke="#78350F"
-            strokeWidth="0.8"
+            strokeWidth="1.2"
           />
           <ellipse
             cx={pos.x}
-            cy={pos.y - 2.8}
-            rx="8.5"
-            ry="2"
+            cy={pos.y - 8}
+            rx="16"
+            ry="4.2"
             fill="#FEF08A"
           />
 
-          {/* 8. Head Bezel Socket (Polished Gold Crown Ring) */}
+          {/* Dôme de la Tête : Sertissage d'Or Majestueux Agrandie */}
           <circle
             cx={pos.x}
-            cy={pos.y - 12}
-            r="18.5"
+            cy={pos.y - 25}
+            r="33"
             fill="url(#gold-bezel-radial)"
             stroke="#78350F"
-            strokeWidth="1"
+            strokeWidth="1.6"
           />
 
-          {/* 9. Head 3D Gemstone Crystal Sphere (Sapphire / Emerald) */}
+          {/* Sphère de Cristal Joyau 3D Agrandie (Diamètre 56px) */}
           <circle
             cx={pos.x}
-            cy={pos.y - 12}
-            r="15"
+            cy={pos.y - 25}
+            r="28"
             fill={isPlayer1 ? 'url(#p1-sapphire-gem)' : 'url(#p2-emerald-gem)'}
             stroke="#FFFFFF"
-            strokeWidth="1"
+            strokeWidth="1.4"
           />
 
-          {/* 10. Inner Gemstone Facet Ring */}
+          {/* Facettes Intérieures du Cristal */}
           <circle
             cx={pos.x}
-            cy={pos.y - 12}
-            r="11.5"
+            cy={pos.y - 25}
+            r="22.5"
             fill="none"
             stroke="#FFFFFF"
-            strokeWidth="0.8"
-            opacity="0.3"
-            strokeDasharray="3 2"
+            strokeWidth="1"
+            opacity="0.45"
+            strokeDasharray="4 2"
             style={{ pointerEvents: 'none' }}
           />
 
-          {/* 11. Curved Glass Specular Highlight Arc */}
+          {/* Arc de Reflet Verre Cristallin */}
           <ellipse
-            cx={pos.x - 4.5}
-            cy={pos.y - 17}
-            rx="8"
-            ry="3.8"
-            transform={`rotate(-25 ${pos.x - 4.5} ${pos.y - 17})`}
+            cx={pos.x - 9}
+            cy={pos.y - 35}
+            rx="16"
+            ry="7.5"
+            transform={`rotate(-25 ${pos.x - 9} ${pos.y - 35})`}
             fill="url(#glass-specular)"
             style={{ pointerEvents: 'none' }}
           />
 
-          {/* 12. Intense Star Glint Reflection */}
+          {/* Éclat d'Étoile Éblouissant */}
           <circle
-            cx={pos.x - 6.5}
-            cy={pos.y - 17.5}
-            r="1.8"
+            cx={pos.x - 11}
+            cy={pos.y - 35.5}
+            r="3.4"
             fill="#FFFFFF"
             opacity="0.95"
             style={{ pointerEvents: 'none' }}
           />
 
-          {/* 13. Center Medallion: Initial & Number Badge (or Crown when finished) */}
+          {/* Médaillon Central : Badge Chic Initiale & Numéro Agrandie */}
           {token.state === 'finished' ? (
             <text
               x={pos.x}
-              y={pos.y - 7}
+              y={pos.y - 16}
               fill="#FEF08A"
-              fontSize="15"
+              fontSize="28"
               fontWeight="900"
               textAnchor="middle"
               style={{
                 pointerEvents: 'none',
-                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))',
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
               }}
             >
               👑
@@ -1228,23 +1266,23 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             <>
               <circle
                 cx={pos.x}
-                cy={pos.y - 11.5}
-                r="7.5"
-                fill="rgba(0, 0, 0, 0.38)"
+                cy={pos.y - 24.5}
+                r="15"
+                fill="rgba(15, 23, 42, 0.7)"
                 stroke="url(#gold-polished)"
-                strokeWidth="1"
+                strokeWidth="1.8"
                 style={{ pointerEvents: 'none' }}
               />
               <text
                 x={pos.x}
-                y={pos.y - 8.5}
+                y={pos.y - 18.5}
                 fill="#FEF08A"
-                fontSize="10"
+                fontSize="17"
                 fontWeight="900"
                 textAnchor="middle"
                 style={{
                   pointerEvents: 'none',
-                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.9))',
+                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.95))',
                   letterSpacing: '-0.3px',
                 }}
               >
@@ -1253,19 +1291,19 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             </>
           )}
 
-          {/* 14. Top Finial Crown Bead */}
+          {/* Perle de Faîte Impériale */}
           <circle
             cx={pos.x}
-            cy={pos.y - 28}
-            r="3.2"
+            cy={pos.y - 56}
+            r="5.5"
             fill="url(#gold-polished)"
             stroke="#78350F"
-            strokeWidth="0.6"
+            strokeWidth="1"
           />
           <circle
-            cx={pos.x - 0.8}
-            cy={pos.y - 28.8}
-            r="1"
+            cx={pos.x - 1.5}
+            cy={pos.y - 57.8}
+            r="1.8"
             fill="#FFFFFF"
             opacity="0.9"
           />
@@ -1384,13 +1422,76 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         )}
       </AnimatePresence>
 
-      {/* THE AUTHENTIC LUDO KING BOARD CONTAINER */}
-      <div className="relative w-full max-w-[min(84vw,48vh,400px)] aspect-square bg-[#0b2853] p-1.5 sm:p-2 rounded-2xl shadow-xl border-2 border-[#1e4982]">
-        <svg
-          viewBox="0 0 1500 1500"
-          className="w-full h-full select-none"
-          style={{ touchAction: 'manipulation' }}
+      {/* ACTIVE TURN INDICATOR BANNER (Indicateur visuel clair et stable du tour actuel) */}
+      <div
+        className={`w-full py-1.5 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all duration-300 ${
+          currentTurn === 'p1'
+            ? 'bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 text-blue-100 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.35)] ring-1 ring-blue-400/50'
+            : 'bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-emerald-100 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/50'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-2.5 h-2.5 rounded-full ring-2 ring-white/60 shadow-xs ${
+              currentTurn === 'p1' ? 'bg-blue-400' : 'bg-emerald-400'
+            }`}
+          />
+          <span className="tracking-wide">
+            Tour de :{' '}
+            <span className="text-amber-300 font-extrabold underline decoration-amber-400">
+              {currentTurn === 'p1' ? p1.name : p2.name}
+            </span>{' '}
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold text-white shadow-2xs ${
+                currentTurn === 'p1' ? 'bg-blue-600' : 'bg-emerald-600'
+              }`}
+            >
+              {currentTurn === 'p1' ? 'Bleu' : 'Vert'}
+            </span>
+          </span>
+        </div>
+        <span
+          className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full shadow-xs ${
+            currentTurn === 'p1'
+              ? 'bg-blue-600 text-white border border-blue-300'
+              : 'bg-emerald-600 text-white border border-emerald-300'
+          }`}
         >
+          {gameMode === 'live'
+            ? currentTurn === activePartnerId
+              ? '⭐ C’est à toi !'
+              : '⏳ En attente...'
+            : isRolling
+            ? '🎲 Roulement...'
+            : diceValue
+            ? '📍 Déplace un pion'
+            : '🎲 Lance le dé !'}
+        </span>
+      </div>
+
+      {/* THE AUTHENTIC LUDO KING BOARD CONTAINER (Zone de jeu avec bordure nette & aura lumineuse stable) */}
+      <div className="relative w-full max-w-[min(84vw,48vh,400px)] aspect-square flex items-center justify-center">
+        {/* Halo néon doux autour de la zone de jeu indiquant le partenaire actif (fixe et sans clignotement) */}
+        <div
+          className={`absolute -inset-1 sm:-inset-1.5 rounded-3xl blur-md opacity-60 transition-all duration-500 pointer-events-none ${
+            currentTurn === 'p1'
+              ? 'bg-gradient-to-tr from-blue-600 via-sky-400 to-indigo-500 shadow-[0_0_25px_rgba(59,130,246,0.5)]'
+              : 'bg-gradient-to-tr from-emerald-600 via-teal-400 to-green-500 shadow-[0_0_25px_rgba(16,185,129,0.5)]'
+          }`}
+        />
+
+        <div
+          className={`relative w-full h-full bg-[#0b2853] p-1.5 sm:p-2 rounded-2xl shadow-2xl transition-all duration-300 ${
+            currentTurn === 'p1'
+              ? 'border-2 sm:border-3 border-blue-400 ring-2 sm:ring-4 ring-blue-400/80 shadow-[inset_0_0_20px_rgba(59,130,246,0.35)]'
+              : 'border-2 sm:border-3 border-emerald-400 ring-2 sm:ring-4 ring-emerald-400/80 shadow-[inset_0_0_20px_rgba(16,185,129,0.35)]'
+          }`}
+        >
+          <svg
+            viewBox="0 0 1500 1500"
+            className="w-full h-full select-none"
+            style={{ touchAction: 'manipulation' }}
+          >
           {/* Luxury 3D Pawn & Material Defs */}
           <defs>
             {/* Real 3D Soft Drop Shadow for Pawns */}
@@ -1537,7 +1638,30 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           >
             {gameMode === 'ai' ? 'Computer' : p2.name}
           </text>
-          <rect x="960" y="60" width="480" height="480" rx="30" fill="#FFFFFF" stroke="#15803D" strokeWidth="4" />
+          <rect
+            x="960"
+            y="60"
+            width="480"
+            height="480"
+            rx="30"
+            fill="#FFFFFF"
+            stroke={currentTurn === 'p2' ? '#FACC15' : '#15803D'}
+            strokeWidth={currentTurn === 'p2' ? '8' : '4'}
+          />
+          {/* Elegant stable golden aura on active Green base (SANS clignotement) */}
+          {currentTurn === 'p2' && (
+            <rect
+              x="950"
+              y="50"
+              width="500"
+              height="500"
+              rx="35"
+              fill="none"
+              stroke="#FACC15"
+              strokeWidth="5"
+              opacity="0.9"
+            />
+          )}
           {/* 4 Green circular sockets */}
           <g>
             <circle cx="1110" cy="210" r="48" fill="#86EFAC" opacity="0.3" />
@@ -1562,7 +1686,30 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* 3. BOTTOM-LEFT: BLUE BASE (You / Med) */}
           <rect x="0" y="900" width="600" height="600" fill="#2563EB" />
-          <rect x="60" y="960" width="480" height="480" rx="30" fill="#FFFFFF" stroke="#1D4ED8" strokeWidth="4" />
+          <rect
+            x="60"
+            y="960"
+            width="480"
+            height="480"
+            rx="30"
+            fill="#FFFFFF"
+            stroke={currentTurn === 'p1' ? '#FACC15' : '#1D4ED8'}
+            strokeWidth={currentTurn === 'p1' ? '8' : '4'}
+          />
+          {/* Elegant stable golden aura on active Blue base (SANS clignotement) */}
+          {currentTurn === 'p1' && (
+            <rect
+              x="50"
+              y="950"
+              width="500"
+              height="500"
+              rx="35"
+              fill="none"
+              stroke="#FACC15"
+              strokeWidth="5"
+              opacity="0.9"
+            />
+          )}
           {/* 4 Blue circular sockets */}
           <g>
             <circle cx="210" cy="1110" r="48" fill="#93C5FD" opacity="0.3" />
@@ -1811,16 +1958,23 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           {/* Player 2 (Green / Com) */}
           {activeTokensP2.map((t, idx) => renderPawn(t, idx))}
         </svg>
+        </div>
       </div>
 
-      {/* DOCK CONTROLLER (Matching the reference screenshot) */}
-      <div className="w-full bg-[#0a1e3f] rounded-2xl border-2 border-amber-400 p-2 shadow-lg flex items-center justify-between gap-2 text-white">
+      {/* DOCK CONTROLLER (Matching the reference screenshot with active turn highlights) */}
+      <div
+        className={`w-full bg-[#0a1e3f] rounded-2xl border-2 p-2 shadow-lg flex items-center justify-between gap-2 text-white transition-all duration-500 ${
+          isP1
+            ? 'border-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.35)]'
+            : 'border-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.35)]'
+        }`}
+      >
         {/* Left: Player 1 (You / Med) */}
         <div
-          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all min-w-0 ${
+          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all duration-300 min-w-0 ${
             isP1
-              ? 'bg-blue-600/50 border-2 border-blue-400 shadow-md ring-2 ring-blue-400/30'
-              : 'opacity-65'
+              ? 'bg-blue-600/70 border-2 border-blue-400 shadow-[0_0_18px_rgba(59,130,246,0.6)] ring-4 ring-blue-400/60 scale-[1.02] animate-pulse'
+              : 'opacity-55 scale-95'
           }`}
         >
           <div className="relative shrink-0">
@@ -1832,7 +1986,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               )}
             </div>
             {isP1 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-white animate-pulse" />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-white shadow-xs" />
             )}
           </div>
           <div className="min-w-0">
@@ -1850,69 +2004,111 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               <span className="text-[10px] text-blue-200 block leading-tight">
                 {p1HomeCount}/{tokensPerPlayer} 🏠
               </span>
-              {gameMode === 'live' && (
+              {gameMode === 'live' ? (
                 <span
                   className={`text-[8px] font-bold px-1 rounded-sm ${
                     currentTurn === 'p1'
-                      ? 'bg-emerald-500 text-white animate-pulse'
+                      ? 'bg-emerald-500 text-white shadow-2xs'
                       : 'bg-stone-800 text-stone-400'
                   }`}
                 >
                   {currentTurn === 'p1' ? '🟢 Au tour' : 'Attente'}
                 </span>
+              ) : (
+                isP1 && (
+                  <span className="text-[8px] font-extrabold px-1 rounded-sm bg-blue-500 text-white shadow-2xs">
+                    Au tour
+                  </span>
+                )
               )}
             </div>
           </div>
         </div>
 
-        {/* Center: The Iconic Dice Button (Cream/White face, blue dots, amber rim) */}
+        {/* Center: The Iconic Dice Button (Couleur nette et stable du tour actif - SANS clignotement) */}
         <div className="flex flex-col items-center shrink-0">
-          <button
-            type="button"
-            disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
-            onClick={() => handleRollDice()}
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#E0F2FE] border-3 border-amber-300 shadow-md flex items-center justify-center transition-all relative overflow-hidden ${
-              !isMyTurn
-                ? 'opacity-40 cursor-not-allowed grayscale-30 ring-1 ring-stone-400'
-                : isP1
-                ? 'ring-3 ring-blue-400/80 hover:scale-105 cursor-pointer active:scale-95'
-                : 'ring-3 ring-emerald-400/80 hover:scale-105 cursor-pointer active:scale-95'
-            }`}
-            title={
-              !isMyTurn
-                ? `En attente du tour de ${currentTurn === 'p1' ? p1.name : p2.name}`
-                : 'Lancer le dé'
-            }
-          >
-            {isRolling ? (
-              <Dices className="w-7 h-7 text-blue-600 animate-spin" />
-            ) : diceValue ? (
-              <div className="w-full h-full p-2">{renderDiceDots(diceValue)}</div>
-            ) : (
-              <span className="text-2xl">🎲</span>
-            )}
-
-            {/* Turn status indicator on the dice */}
-            {gameMode === 'live' && (
-              !isMyTurn ? (
-                <span className="absolute bottom-0.5 bg-stone-900/90 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-amber-300 border border-stone-700">
-                  ⏳ Attente
-                </span>
+          <div className="relative">
+            <button
+              type="button"
+              disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
+              onClick={() => handleRollDice()}
+              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-lg flex items-center justify-center transition-all relative overflow-hidden ${
+                !isMyTurn
+                  ? 'opacity-40 cursor-not-allowed grayscale-30 ring-1 ring-stone-500 bg-stone-200 border-2 border-stone-400'
+                  : isP1
+                  ? 'bg-gradient-to-b from-blue-50 to-blue-100 border-3 border-blue-400 ring-4 ring-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.7)] hover:scale-105 cursor-pointer active:scale-95'
+                  : 'bg-gradient-to-b from-emerald-50 to-emerald-100 border-3 border-emerald-400 ring-4 ring-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.7)] hover:scale-105 cursor-pointer active:scale-95'
+              }`}
+              title={
+                !isMyTurn
+                  ? `En attente du tour de ${currentTurn === 'p1' ? p1.name : p2.name}`
+                  : `Au tour de ${currentTurn === 'p1' ? p1.name : p2.name} - Lancer le dé`
+              }
+            >
+              {isRolling ? (
+                <Dices
+                  className={`w-7 h-7 animate-spin ${isP1 ? 'text-blue-600' : 'text-emerald-600'}`}
+                />
+              ) : diceValue ? (
+                <div className="w-full h-full p-2">{renderDiceDots(diceValue)}</div>
               ) : (
-                <span className="absolute bottom-0.5 bg-emerald-600 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-white animate-pulse">
-                  À toi !
-                </span>
-              )
-            )}
-          </button>
+                <span className="text-2xl">🎲</span>
+              )}
+
+              {/* Turn status indicator on the dice button */}
+              {gameMode === 'live' ? (
+                !isMyTurn ? (
+                  <span className="absolute bottom-0.5 bg-stone-900/90 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-amber-300 border border-stone-700">
+                    ⏳ Attente
+                  </span>
+                ) : (
+                  <span
+                    className={`absolute bottom-0.5 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-white shadow-xs ${
+                      isP1 ? 'bg-blue-600' : 'bg-emerald-600'
+                    }`}
+                  >
+                    À toi !
+                  </span>
+                )
+              ) : (
+                !diceValue && (
+                  <span
+                    className={`absolute bottom-0.5 text-[8px] font-extrabold px-1.5 py-0.2 rounded-full text-white shadow-2xs ${
+                      isP1 ? 'bg-blue-600' : 'bg-emerald-600'
+                    }`}
+                  >
+                    {isP1 ? 'Bleu' : 'Vert'}
+                  </span>
+                )
+              )}
+            </button>
+          </div>
+
+          {/* Turn badge under dice button (stable, sans clignotement) */}
+          <div
+            className={`mt-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold flex items-center gap-1.5 shadow-xs transition-all duration-300 ${
+              isP1
+                ? 'bg-blue-500/25 text-blue-200 border border-blue-400/50 ring-1 ring-blue-400/40'
+                : 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 ring-1 ring-emerald-400/40'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ring-1 ring-white/60 ${
+                isP1 ? 'bg-blue-400' : 'bg-emerald-400'
+              }`}
+            />
+            <span className="truncate max-w-[80px]">
+              {isP1 ? p1.name : gameMode === 'ai' ? 'IA' : p2.name}
+            </span>
+          </div>
         </div>
 
         {/* Right: Player 2 (Computer / Safi) */}
         <div
-          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all flex-row-reverse text-right min-w-0 ${
+          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all duration-300 flex-row-reverse text-right min-w-0 ${
             !isP1
-              ? 'bg-emerald-600/50 border-2 border-emerald-400 shadow-md ring-2 ring-emerald-400/30'
-              : 'opacity-65'
+              ? 'bg-emerald-600/70 border-2 border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.6)] ring-3 ring-emerald-400/60 scale-[1.02]'
+              : 'opacity-55 scale-95'
           }`}
         >
           <div className="relative shrink-0">
@@ -1924,7 +2120,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               )}
             </div>
             {!isP1 && (
-              <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse" />
+              <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white shadow-xs" />
             )}
           </div>
           <div className="min-w-0">
@@ -1939,16 +2135,22 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               </span>
             </div>
             <div className="flex items-center justify-end gap-1.5">
-              {gameMode === 'live' && (
+              {gameMode === 'live' ? (
                 <span
                   className={`text-[8px] font-bold px-1 rounded-sm ${
                     currentTurn === 'p2'
-                      ? 'bg-emerald-500 text-white animate-pulse'
+                      ? 'bg-emerald-500 text-white shadow-2xs'
                       : 'bg-stone-800 text-stone-400'
                   }`}
                 >
                   {currentTurn === 'p2' ? '🟢 Au tour' : 'Attente'}
                 </span>
+              ) : (
+                !isP1 && (
+                  <span className="text-[8px] font-extrabold px-1 rounded-sm bg-emerald-500 text-white shadow-2xs">
+                    Au tour
+                  </span>
+                )
               )}
               <span className="text-[10px] text-emerald-200 block leading-tight">
                 {p2HomeCount}/{tokensPerPlayer} 🏠

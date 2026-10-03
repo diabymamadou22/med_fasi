@@ -21,7 +21,7 @@ import {
 import { CoupleProfile, PartnerId, ChatMessage, MorpionGameSession } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti, triggerHeartConfetti } from '../../lib/confetti';
-import { subscribeMorpionGame, saveMorpionGame } from '../../lib/firestoreService';
+import { subscribeMorpionGame, saveMorpionGame, recordGameResult } from '../../lib/firestoreService';
 
 type BoardState = (string | null)[];
 type GameMode = 'live' | 'local' | 'ai';
@@ -247,13 +247,36 @@ export const LoveTicTacToeGame: React.FC<LoveTicTacToeGameProps> = ({
       nextP1Wins += 1;
       soundEffects.playVictoryChime();
       triggerCelebrationConfetti();
+      recordGameResult({
+        gameId: 'tic_tac_toe',
+        gameTitle: 'Morpion & Gages',
+        category: 'duo',
+        winner: 'p1',
+        winnerName: profile.partner1.name,
+        pledge: selectedPledge,
+      }).catch(console.error);
     } else if (result.winner === 'p2') {
       nextP2Wins += 1;
       soundEffects.playVictoryChime();
       triggerCelebrationConfetti();
+      recordGameResult({
+        gameId: 'tic_tac_toe',
+        gameTitle: 'Morpion & Gages',
+        category: 'duo',
+        winner: 'p2',
+        winnerName: profile.partner2.name,
+        pledge: selectedPledge,
+      }).catch(console.error);
     } else if (result.winner === 'tie') {
       nextTies += 1;
       soundEffects.playHeartPulse();
+      recordGameResult({
+        gameId: 'tic_tac_toe',
+        gameTitle: 'Morpion & Gages',
+        category: 'duo',
+        winner: 'tie',
+        winnerName: 'Égalité',
+      }).catch(console.error);
     }
 
     setBoard(newBoard);

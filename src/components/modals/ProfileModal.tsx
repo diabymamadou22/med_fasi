@@ -32,8 +32,11 @@ import {
   Eye,
   KeyRound,
   ShieldCheck,
+  Gamepad2,
+  Play,
+  Gauge,
 } from 'lucide-react';
-import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup } from '../../types';
+import { CoupleProfile, PartnerId, CoupleSettings, FullCoupleBackup, GameAnimationSpeed } from '../../types';
 import { soundEffects } from '../../lib/audio';
 import { triggerCelebrationConfetti } from '../../lib/confetti';
 import { processImageFile } from '../../lib/imageUtils';
@@ -112,6 +115,68 @@ const THEME_COLORS = [
   { label: 'Violet Mystique', color: '#8B5CF6', accent: 'bg-purple-600', border: 'border-purple-300' },
 ];
 
+export const GAME_SPEED_OPTIONS: {
+  id: GameAnimationSpeed;
+  label: string;
+  badge: string;
+  tempo: string;
+  intervalMs: number;
+  emoji: string;
+  desc: string;
+  accent: string;
+  border: string;
+  bgLight: string;
+}[] = [
+  {
+    id: 'slow',
+    label: 'Douce & Accessible',
+    badge: 'Confort & Détente',
+    tempo: '440 ms / case',
+    intervalMs: 440,
+    emoji: '🐢',
+    desc: 'Cadence très calme et apaisée. Idéale pour débuter, pour observer attentivement chaque déplacement sans stress et pour une accessibilité visuelle optimale.',
+    accent: 'text-amber-600 dark:text-amber-400',
+    border: 'border-amber-400',
+    bgLight: 'bg-amber-50/80 dark:bg-amber-950/30',
+  },
+  {
+    id: 'normal',
+    label: 'Standard & Équilibrée',
+    badge: 'Recommandé (Défaut)',
+    tempo: '280 ms / case',
+    intervalMs: 280,
+    emoji: '⚖️',
+    desc: 'Le tempo authentique, harmonieux et fluide. Alliant le suspense amoureux de chaque case au plaisir du jeu à deux.',
+    accent: 'text-blue-600 dark:text-blue-400',
+    border: 'border-blue-400',
+    bgLight: 'bg-blue-50/80 dark:bg-blue-950/30',
+  },
+  {
+    id: 'fast',
+    label: 'Rapide & Compétitive',
+    badge: 'Duels Rythmés',
+    tempo: '140 ms / case',
+    intervalMs: 140,
+    emoji: '⚡',
+    desc: 'Transitions vives et dynamiques. Réduit les temps morts de moitié pour les partenaires compétitifs qui aiment l’action.',
+    accent: 'text-rose-600 dark:text-rose-400',
+    border: 'border-rose-400',
+    bgLight: 'bg-rose-50/80 dark:bg-rose-950/30',
+  },
+  {
+    id: 'ultra',
+    label: 'Éclair / Express',
+    badge: 'Ultra Rapide',
+    tempo: '65 ms / case',
+    intervalMs: 65,
+    emoji: '🚀',
+    desc: 'Déplacements quasi instantanés pour les duellistes expérimentés qui souhaitent enchaîner les parties à toute allure.',
+    accent: 'text-purple-600 dark:text-purple-400',
+    border: 'border-purple-400',
+    bgLight: 'bg-purple-50/80 dark:bg-purple-950/30',
+  },
+];
+
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   profile,
   settings,
@@ -127,10 +192,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   totalMessagesCount = 0,
   onPurgeOldChatMessages,
 }) => {
-  const [modalTab, setModalTab] = useState<'profile' | 'security' | 'storage' | 'backup' | 'app_mobile'>('profile');
+  const [modalTab, setModalTab] = useState<'profile' | 'games' | 'security' | 'storage' | 'backup' | 'app_mobile'>('profile');
   const [activePartnerSubTab, setActivePartnerSubTab] = useState<'both' | 'p1' | 'p2'>(
     initialFocusPartner === 'p2' ? 'p2' : initialFocusPartner === 'p1' ? 'p1' : 'both'
   );
+
+  // Game animation speed states
+  const [gameAnimationSpeed, setGameAnimationSpeed] = useState<GameAnimationSpeed>(
+    settings.gameAnimationSpeed || 'normal'
+  );
+  const [gameSpeedFeedback, setGameSpeedFeedback] = useState<string | null>(null);
+  const [demoPawnStep, setDemoPawnStep] = useState<number>(0);
+  const [isDemoRunning, setIsDemoRunning] = useState<boolean>(false);
 
   // Partner 1 states
   const [partner1Name, setPartner1Name] = useState(profile.partner1.name);
@@ -263,6 +336,44 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     };
     reader.readAsText(file);
     if (backupImportInputRef.current) backupImportInputRef.current.value = '';
+  };
+
+  const handleSaveGameSpeedSettings = (speedToSave?: GameAnimationSpeed) => {
+    const targetSpeed = speedToSave || gameAnimationSpeed;
+    const updatedSettings: CoupleSettings = {
+      ...settings,
+      gameAnimationSpeed: targetSpeed,
+    };
+    onSaveSettings(updatedSettings);
+    soundEffects.playSuccessSparkle();
+    const opt = GAME_SPEED_OPTIONS.find((o) => o.id === targetSpeed);
+    setGameSpeedFeedback(`Vitesse « ${opt?.label || targetSpeed} » enregistrée pour tous vos jeux !`);
+    setTimeout(() => setGameSpeedFeedback(null), 3500);
+  };
+
+  const handleTestSpeedDemo = () => {
+    if (isDemoRunning) return;
+    setIsDemoRunning(true);
+    setDemoPawnStep(0);
+    soundEffects.playPawnStep(1);
+
+    const selectedOption = GAME_SPEED_OPTIONS.find((o) => o.id === gameAnimationSpeed);
+    const intervalMs = selectedOption ? selectedOption.intervalMs : 280;
+
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      setDemoPawnStep(step);
+      soundEffects.playPawnStep(step);
+      if (step >= 4) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setIsDemoRunning(false);
+          setDemoPawnStep(0);
+          soundEffects.playSuccessSparkle();
+        }, Math.max(150, intervalMs * 1.5));
+      }
+    }, intervalMs);
   };
 
   const handleSavePinSettings = (e: React.FormEvent) => {
@@ -471,6 +582,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             >
               <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/20" />
               <span>Profil & Duo</span>
+            </button>
+
+            <button
+              id="tab-games-btn"
+              type="button"
+              onClick={() => setModalTab('games')}
+              className={`flex-1 min-w-[105px] py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                modalTab === 'games'
+                  ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs font-bold'
+                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+              }`}
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-purple-500" />
+              <span>Vitesse Jeux</span>
             </button>
 
             <button
@@ -1202,7 +1327,211 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </form>
           )}
 
-          {/* TAB 2: CODE PIN & SÉCURITÉ */}
+          {/* TAB 2: VITESSE DES ANIMATIONS DE JEUX */}
+          {modalTab === 'games' && (
+            <div className="space-y-5">
+              {/* Header card */}
+              <div className="p-4 bg-gradient-to-r from-purple-50 via-pink-50 to-amber-50 dark:from-stone-800/80 dark:to-stone-800 rounded-2xl border border-purple-200/80 dark:border-purple-900/40 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-gradient-to-tr from-purple-600 to-indigo-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5">
+                    <Gamepad2 className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold text-stone-900 dark:text-white">
+                        Vitesse d'Animation des Jeux
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        Accessibilité & Compétition
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 mt-1 leading-relaxed">
+                      Personnalisez la cadence des animations de vos jeux à deux. Choisissez une allure <strong>douce et apaisée</strong> pour une accessibilité visuelle maximale et savourer chaque mouvement, ou une cadence <strong>rapide et nerveuse</strong> pour des duels compétitifs rythmés.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Speed Options */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-stone-700 dark:text-stone-300 flex items-center justify-between">
+                  <span>Sélectionnez votre allure préférée :</span>
+                  <span className="text-[11px] font-normal text-stone-500">
+                    Actuel : <strong>{GAME_SPEED_OPTIONS.find((o) => o.id === gameAnimationSpeed)?.label}</strong>
+                  </span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {GAME_SPEED_OPTIONS.map((opt) => {
+                    const isSelected = gameAnimationSpeed === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setGameAnimationSpeed(opt.id);
+                          soundEffects.playSoftTap();
+                        }}
+                        className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between gap-2.5 ${
+                          isSelected
+                            ? `${opt.bgLight} ${opt.border} ring-2 ring-purple-400/50 shadow-sm scale-[1.01]`
+                            : 'bg-white dark:bg-stone-800/80 border-stone-200 dark:border-stone-700 hover:border-purple-300 dark:hover:border-purple-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">{opt.emoji}</span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h5 className="text-xs font-bold text-stone-900 dark:text-white">
+                                  {opt.label}
+                                </h5>
+                              </div>
+                              <span className={`text-[10px] font-bold ${opt.accent} block`}>
+                                Cadence : {opt.tempo}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-md font-semibold bg-white/90 dark:bg-stone-700 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-600">
+                              {opt.badge}
+                            </span>
+                            <div
+                              className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                                isSelected
+                                  ? 'bg-purple-600 border-purple-600 text-white'
+                                  : 'border-stone-300 dark:border-stone-600'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-normal">
+                          {opt.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Interactive Demo Track */}
+              <div className="p-4 bg-stone-50 dark:bg-stone-800/60 rounded-2xl border border-stone-200 dark:border-stone-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <span className="text-xs font-bold text-stone-900 dark:text-white">
+                      Simulateur interactif en direct
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-stone-500 font-medium">
+                    Testez la sensation de déplacement
+                  </span>
+                </div>
+
+                {/* Visual miniature board track */}
+                <div className="bg-white dark:bg-stone-900 p-3 rounded-xl border border-stone-200 dark:border-stone-800 flex items-center justify-between gap-1 sm:gap-2 relative">
+                  {[
+                    { step: 0, label: 'Départ', icon: '🏠' },
+                    { step: 1, label: 'Case 1', icon: '1' },
+                    { step: 2, label: 'Case 2', icon: '2' },
+                    { step: 3, label: 'Case 3', icon: '3' },
+                    { step: 4, label: 'Arrivée', icon: '👑' },
+                  ].map((cell) => {
+                    const isOccupied = demoPawnStep === cell.step;
+                    return (
+                      <div
+                        key={cell.step}
+                        className={`flex-1 aspect-square max-w-[64px] rounded-xl border flex flex-col items-center justify-center relative transition-all duration-200 ${
+                          isOccupied
+                            ? 'bg-purple-100 dark:bg-purple-950/60 border-purple-400 shadow-xs'
+                            : 'bg-stone-50 dark:bg-stone-800 border-stone-200 dark:border-stone-700'
+                        }`}
+                      >
+                        <span className="text-[10px] text-stone-400 font-bold mb-0.5">
+                          {cell.icon}
+                        </span>
+                        {isOccupied && (
+                          <motion.div
+                            layoutId="demo-pawn"
+                            transition={{
+                              duration:
+                                gameAnimationSpeed === 'slow'
+                                  ? 0.28
+                                  : gameAnimationSpeed === 'fast'
+                                  ? 0.1
+                                  : gameAnimationSpeed === 'ultra'
+                                  ? 0.05
+                                  : 0.18,
+                              ease: 'easeOut',
+                            }}
+                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-blue-600 via-sky-400 to-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-md border-2 border-white ring-1 ring-blue-300"
+                          >
+                            M1
+                          </motion.div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestSpeedDemo}
+                    disabled={isDemoRunning}
+                    className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/50 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-xs font-bold border border-purple-200 dark:border-purple-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    <Play className={`w-3.5 h-3.5 ${isDemoRunning ? 'animate-spin' : ''}`} />
+                    <span>{isDemoRunning ? 'Simulation en cours...' : 'Tester cette vitesse 🎲'}</span>
+                  </button>
+
+                  <span className="text-[11px] text-stone-500 font-medium">
+                    Allure : <strong>{GAME_SPEED_OPTIONS.find((o) => o.id === gameAnimationSpeed)?.tempo}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Games impacted list */}
+              <div className="p-3.5 bg-stone-50 dark:bg-stone-800/60 rounded-2xl border border-stone-200 dark:border-stone-700 text-xs space-y-1.5 text-stone-600 dark:text-stone-300">
+                <p className="font-bold text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                  <span>🎮</span>
+                  <span>Impact sur vos jeux à deux :</span>
+                </p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] list-disc list-inside">
+                  <li><strong>Ludo MS</strong> : foulée des pions, sortie de base & tour IA</li>
+                  <li><strong>Morpion des Gages</strong> : tempo d'affichage & validation</li>
+                  <li><strong>Roulette de l'Amour</strong> : durée du spin de la roue</li>
+                  <li><strong>Speed Match & Wordle</strong> : réactivité des cartes</li>
+                </ul>
+              </div>
+
+              {/* Feedback toast */}
+              {gameSpeedFeedback && (
+                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>{gameSpeedFeedback}</span>
+                </p>
+              )}
+
+              {/* Save button */}
+              <div className="flex items-center justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveGameSpeedSettings()}
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Enregistrer la vitesse des jeux</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: CODE PIN & SÉCURITÉ */}
           {modalTab === 'security' && (
             <div className="space-y-5">
               <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-stone-800/60 dark:to-stone-800 rounded-2xl border border-amber-200/80 dark:border-amber-900/40 space-y-3">

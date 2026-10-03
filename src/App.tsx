@@ -2881,6 +2881,15 @@ export default function App() {
                 onAddNewQuiz={handleAddNewQuiz}
                 onAddNewDateIdea={handleAddNewDateIdea}
                 onSendChatMessage={handleSendChatMessage}
+                settings={settings}
+                onSaveSettings={(updatedSettings) => {
+                  setSettings(updatedSettings);
+                  saveSettings(updatedSettings).catch(console.error);
+                }}
+                onOpenProfileModal={(pId) => {
+                  setProfileFocusPartner(pId);
+                  setShowProfileModal(true);
+                }}
               />
             </div>
           )}
