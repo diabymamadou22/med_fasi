@@ -961,10 +961,10 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     if (sameSquareTokens.length > 1) {
       const idxInSame = sameSquareTokens.findIndex((t) => t.id === token.id);
       const offsets = [
-        [-9, -9],
-        [9, -9],
-        [-9, 9],
-        [9, 9],
+        [-13, -13],
+        [13, -13],
+        [-13, 13],
+        [13, 13],
       ];
       offsetX = offsets[idxInSame % 4][0];
       offsetY = offsets[idxInSame % 4][1];
@@ -1109,9 +1109,11 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         whileTap={isPlayable && !isMoving ? { scale: 0.94 } : undefined}
       >
         {/* Generous touch target for effortless tapping on mobile */}
-        <circle cx={0} cy={0} r="75" fill="transparent" />
+        <circle cx={0} cy={0} r="88" fill="transparent" />
 
-        {/* 1. Multi-layered Ground Contact Shadows (Stable on ground at y=28, breathing during moves & jumps) */}
+        {/* Global Pawn Scale Wrapper (+35% larger for bold, effortless visibility) */}
+        <g transform="scale(1.35) translate(0, -6)">
+          {/* 1. Multi-layered Ground Contact Shadows (Stable on ground at y=28, breathing during moves & jumps) */}
         <motion.ellipse
           cx={0}
           cy={28}
@@ -1520,6 +1522,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             opacity="0.9"
           />
         </motion.g>
+        </g>
       </motion.g>
     );
   };
@@ -2166,287 +2169,297 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           {/* 10. RENDER AUTHENTIC LUDO PIN PAWNS (Sorted to keep moving token on top) */}
           {allActiveTokens.map(({ token, index }) => renderPawn(token, index))}
         </svg>
+      </div>
+    </div>
+
+    {/* DOCK CONTROLLER: DÉ FIXÉ ENTRE MS ET ST */}
+    <div
+      className={`w-full bg-[#0a1e3f] rounded-2xl border-2 p-2 sm:p-2.5 shadow-lg flex items-center justify-between gap-1.5 sm:gap-2 text-white transition-all duration-500 ${
+        isP1
+          ? 'border-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.35)]'
+          : 'border-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.35)]'
+      }`}
+    >
+      {/* Left: Player 1 (MS - Bleu) */}
+      <div
+        className={`flex items-center gap-1.5 sm:gap-2 p-1.5 px-2 sm:px-2.5 rounded-xl transition-all duration-300 min-w-0 ${
+          isP1
+            ? 'bg-blue-600/70 border-2 border-blue-400 shadow-[0_0_18px_rgba(59,130,246,0.6)] ring-3 sm:ring-4 ring-blue-400/60 scale-[1.02]'
+            : 'opacity-60 scale-95'
+        }`}
+      >
+        <div className="relative shrink-0">
+          <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center text-white text-xs font-black shadow-xs overflow-hidden">
+            {p1.avatar ? (
+              <img src={p1.avatar} alt={p1.name} className="w-full h-full object-cover" />
+            ) : (
+              <span>MS</span>
+            )}
+          </div>
+          {isP1 && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-white shadow-xs" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1">
+            <span className="font-extrabold text-amber-300 text-xs truncate block leading-tight">
+              {p1.name || 'MS'}
+            </span>
+            <span className="text-[9px] font-black text-blue-200 bg-blue-800/80 px-1 py-0.2 rounded border border-blue-400/40">
+              MS
+            </span>
+            {gameMode === 'live' && activePartnerId === 'p1' && (
+              <span className="text-[8px] bg-blue-400/30 text-blue-200 border border-blue-400/40 px-1 rounded-sm font-semibold">
+                Toi
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[10px] text-blue-200 block leading-tight">
+              {p1HomeCount}/{tokensPerPlayer} 🏠
+            </span>
+            {gameMode === 'live' ? (
+              <span
+                className={`text-[8px] font-bold px-1 rounded-sm ${
+                  currentTurn === 'p1'
+                    ? 'bg-emerald-500 text-white shadow-2xs'
+                    : 'bg-stone-800 text-stone-400'
+                }`}
+              >
+                {currentTurn === 'p1' ? '🟢 Tour' : 'Attente'}
+              </span>
+            ) : (
+              isP1 && (
+                <span className="text-[8px] font-extrabold px-1 rounded-sm bg-blue-500 text-white shadow-2xs">
+                  Au tour
+                </span>
+              )
+            )}
+          </div>
         </div>
       </div>
 
-      {/* DOCK CONTROLLER (Matching the reference screenshot with active turn highlights) */}
-      <div
-        className={`w-full bg-[#0a1e3f] rounded-2xl border-2 p-2 shadow-lg flex items-center justify-between gap-2 text-white transition-all duration-500 ${
-          isP1
-            ? 'border-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.35)]'
-            : 'border-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.35)]'
-        }`}
-      >
-        {/* Left: Player 1 (You / Med) */}
-        <div
-          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all duration-300 min-w-0 ${
-            isP1
-              ? 'bg-blue-600/70 border-2 border-blue-400 shadow-[0_0_18px_rgba(59,130,246,0.6)] ring-4 ring-blue-400/60 scale-[1.02] animate-pulse'
-              : 'opacity-55 scale-95'
+      {/* Center: DÉ INTERACTIF FIXÉ ENTRE MS ET ST */}
+      <div className="flex flex-col items-center justify-center shrink-0">
+        <motion.button
+          type="button"
+          disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
+          onClick={() => handleRollDice()}
+          whileHover={isMyTurn && !isRolling && !isMoving ? { scale: 1.1 } : undefined}
+          whileTap={isMyTurn && !isRolling && !isMoving ? { scale: 0.92 } : undefined}
+          animate={
+            isRolling
+              ? {
+                  rotate: [0, 270, 540, 810, 1080],
+                  scale: [1, 1.25, 0.9, 1.15, 1],
+                  y: [0, -12, 3, -6, 0],
+                  filter: [
+                    'blur(0px)',
+                    'blur(4px)',
+                    'blur(5px)',
+                    'blur(2.5px)',
+                    'blur(0px)',
+                  ],
+                  boxShadow: [
+                    '0 0 15px rgba(59,130,246,0.5)',
+                    '0 0 38px rgba(250,204,21,0.95)',
+                    '0 0 28px rgba(16,185,129,0.8)',
+                    '0 0 15px rgba(59,130,246,0.5)',
+                  ],
+                }
+              : diceValue
+              ? {
+                  scale: [1.2, 0.95, 1],
+                  rotate: [0, -6, 6, 0],
+                  filter: 'blur(0px)',
+                }
+              : isMyTurn && !isMoving
+              ? {
+                  scale: [1, 1.08, 1],
+                  filter: 'blur(0px)',
+                  boxShadow: isP1
+                    ? [
+                        '0 0 12px rgba(59,130,246,0.6)',
+                        '0 0 28px rgba(59,130,246,0.95)',
+                        '0 0 12px rgba(59,130,246,0.6)',
+                      ]
+                    : [
+                        '0 0 12px rgba(16,185,129,0.6)',
+                        '0 0 28px rgba(16,185,129,0.95)',
+                        '0 0 12px rgba(16,185,129,0.6)',
+                      ],
+                }
+              : { filter: 'blur(0px)' }
+          }
+          transition={
+            isRolling
+              ? { duration: 1.0, ease: [0.25, 0.1, 0.25, 1] }
+              : diceValue
+              ? { duration: 0.35, ease: 'easeOut' }
+              : isMyTurn
+              ? { repeat: Infinity, duration: 1.6, ease: 'easeInOut' }
+              : { duration: 0.2 }
+          }
+          className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-xl flex items-center justify-center transition-all relative overflow-hidden select-none border-2 sm:border-3 ${
+            !isMyTurn
+              ? 'opacity-55 cursor-not-allowed grayscale-30 ring-1 ring-stone-500 bg-stone-100 border-stone-400'
+              : isP1
+              ? 'bg-gradient-to-b from-white via-blue-50 to-blue-100 border-blue-500 ring-4 ring-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.8)] cursor-pointer'
+              : 'bg-gradient-to-b from-white via-emerald-50 to-emerald-100 border-emerald-500 ring-4 ring-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.8)] cursor-pointer'
           }`}
+          title={
+            !isMyTurn
+              ? `En attente du tour de ${currentTurn === 'p1' ? 'MS' : 'ST'}`
+              : `Au tour de ${currentTurn === 'p1' ? 'MS' : 'ST'} - Lancer le dé`
+          }
         >
-          <div className="relative shrink-0">
-            <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-xs overflow-hidden">
-              {p1.avatar ? (
-                <img src={p1.avatar} alt={p1.name} className="w-full h-full object-cover" />
-              ) : (
-                <span>📍</span>
-              )}
-            </div>
-            {isP1 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-white shadow-xs" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
-                {p1.name}
-              </span>
-              {gameMode === 'live' && activePartnerId === 'p1' && (
-                <span className="text-[8px] bg-blue-400/30 text-blue-200 border border-blue-400/40 px-1 rounded-sm font-semibold">
-                  Toi
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-blue-200 block leading-tight">
-                {p1HomeCount}/{tokensPerPlayer} 🏠
-              </span>
-              {gameMode === 'live' ? (
+          {isRolling ? (
+            <motion.div
+              key={`rolling-${rollingFace}`}
+              initial={{ rotate: -25, scale: 0.8 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ duration: 0.05 }}
+              className="w-full h-full p-2 flex items-center justify-center filter blur-[1.5px]"
+            >
+              {renderDiceDots(rollingFace)}
+            </motion.div>
+          ) : diceValue ? (
+            <motion.div
+              key={`dice-${diceValue}`}
+              initial={{ scale: 0.65, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+              className="w-full h-full p-2"
+            >
+              {renderDiceDots(diceValue)}
+            </motion.div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-0.5">
+              <span className="text-2xl drop-shadow-xs">🎲</span>
+              {isMyTurn && !isMoving && (
                 <span
-                  className={`text-[8px] font-bold px-1 rounded-sm ${
-                    currentTurn === 'p1'
-                      ? 'bg-emerald-500 text-white shadow-2xs'
-                      : 'bg-stone-800 text-stone-400'
+                  className={`text-[8px] font-black uppercase tracking-wider ${
+                    isP1 ? 'text-blue-700' : 'text-emerald-700'
                   }`}
                 >
-                  {currentTurn === 'p1' ? '🟢 Au tour' : 'Attente'}
+                  Lancer
                 </span>
-              ) : (
-                isP1 && (
-                  <span className="text-[8px] font-extrabold px-1 rounded-sm bg-blue-500 text-white shadow-2xs">
-                    Au tour
-                  </span>
-                )
               )}
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Center: The Iconic Dice Button (Couleur nette et stable du tour actif - SANS clignotement) */}
-        <div className="flex flex-col items-center shrink-0">
-          <div className="relative">
-            <motion.button
-              type="button"
-              disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
-              onClick={() => handleRollDice()}
-              whileHover={isMyTurn && !isRolling && !isMoving ? { scale: 1.08 } : undefined}
-              whileTap={isMyTurn && !isRolling && !isMoving ? { scale: 0.92 } : undefined}
-              animate={
-                isRolling
-                  ? {
-                      rotate: [0, 270, 540, 810, 1080],
-                      scale: [1, 1.28, 0.88, 1.15, 1],
-                      y: [0, -20, 5, -10, 0],
-                      filter: [
-                        'blur(0px)',
-                        'blur(4px)',
-                        'blur(5px)',
-                        'blur(2.5px)',
-                        'blur(0px)',
-                      ],
-                      boxShadow: [
-                        '0 0 15px rgba(59,130,246,0.5)',
-                        '0 0 38px rgba(250,204,21,0.95)',
-                        '0 0 28px rgba(16,185,129,0.8)',
-                        '0 0 15px rgba(59,130,246,0.5)',
-                      ],
-                    }
-                  : diceValue
-                  ? {
-                      scale: [1.25, 0.95, 1],
-                      rotate: [0, -5, 5, 0],
-                      filter: 'blur(0px)',
-                    }
-                  : isMyTurn && !isMoving
-                  ? {
-                      scale: [1, 1.05, 1],
-                      filter: 'blur(0px)',
-                      boxShadow: isP1
-                        ? [
-                            '0 0 15px rgba(59,130,246,0.5)',
-                            '0 0 28px rgba(59,130,246,0.85)',
-                            '0 0 15px rgba(59,130,246,0.5)',
-                          ]
-                        : [
-                            '0 0 15px rgba(16,185,129,0.5)',
-                            '0 0 28px rgba(16,185,129,0.85)',
-                            '0 0 15px rgba(16,185,129,0.5)',
-                          ],
-                    }
-                  : { filter: 'blur(0px)' }
-              }
-              transition={
-                isRolling
-                  ? { duration: 1.0, ease: [0.25, 0.1, 0.25, 1] }
-                  : diceValue
-                  ? { duration: 0.35, ease: 'easeOut' }
-                  : isMyTurn
-                  ? { repeat: Infinity, duration: 1.8, ease: 'easeInOut' }
-                  : { duration: 0.2 }
-              }
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-lg flex items-center justify-center transition-all relative overflow-hidden select-none ${
-                !isMyTurn
-                  ? 'opacity-40 cursor-not-allowed grayscale-30 ring-1 ring-stone-500 bg-stone-200 border-2 border-stone-400'
-                  : isP1
-                  ? 'bg-gradient-to-b from-blue-50 to-blue-100 border-3 border-blue-400 ring-4 ring-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.7)] cursor-pointer'
-                  : 'bg-gradient-to-b from-emerald-50 to-emerald-100 border-3 border-emerald-400 ring-4 ring-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.7)] cursor-pointer'
-              }`}
-              title={
-                !isMyTurn
-                  ? `En attente du tour de ${currentTurn === 'p1' ? p1.name : p2.name}`
-                  : `Au tour de ${currentTurn === 'p1' ? p1.name : p2.name} - Lancer le dé`
-              }
-            >
-              {isRolling ? (
-                <motion.div
-                  key={`rolling-${rollingFace}`}
-                  initial={{ rotate: -25, scale: 0.8 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ duration: 0.05 }}
-                  className="w-full h-full p-2 flex items-center justify-center filter blur-[1.5px]"
-                >
-                  {renderDiceDots(rollingFace)}
-                </motion.div>
-              ) : diceValue ? (
-                <motion.div
-                  key={`dice-${diceValue}`}
-                  initial={{ scale: 0.65, rotate: -20 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-                  className="w-full h-full p-2"
-                >
-                  {renderDiceDots(diceValue)}
-                </motion.div>
-              ) : (
-                <div className="flex flex-col items-center justify-center gap-0.5">
-                  <span className="text-2xl drop-shadow-xs">🎲</span>
-                  {isMyTurn && !isMoving && (
-                    <span
-                      className={`text-[8px] font-black uppercase tracking-wider ${
-                        isP1 ? 'text-blue-700' : 'text-emerald-700'
-                      }`}
-                    >
-                      Lancer
-                    </span>
-                  )}
-                </div>
-              )}
+          {/* Turn status indicator on the dice button */}
+          {gameMode === 'live' ? (
+            !isMyTurn ? (
+              <span className="absolute bottom-0.5 bg-stone-900/90 text-[7px] font-bold px-1.5 py-0.2 rounded-full text-amber-300 border border-stone-700">
+                ⏳ Attente
+              </span>
+            ) : (
+              <span
+                className={`absolute bottom-0.5 text-[7px] font-bold px-1.5 py-0.2 rounded-full text-white shadow-xs ${
+                  isP1 ? 'bg-blue-600' : 'bg-emerald-600'
+                }`}
+              >
+                À toi !
+              </span>
+            )
+          ) : (
+            !diceValue && (
+              <span
+                className={`absolute bottom-0.5 text-[7px] font-black px-1.5 py-0.2 rounded-full text-white shadow-2xs ${
+                  isP1 ? 'bg-blue-600' : 'bg-emerald-600'
+                }`}
+              >
+                {isP1 ? 'MS' : 'ST'}
+              </span>
+            )
+          )}
+        </motion.button>
 
-              {/* Turn status indicator on the dice button */}
-              {gameMode === 'live' ? (
-                !isMyTurn ? (
-                  <span className="absolute bottom-0.5 bg-stone-900/90 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-amber-300 border border-stone-700">
-                    ⏳ Attente
-                  </span>
-                ) : (
-                  <span
-                    className={`absolute bottom-0.5 text-[8px] font-bold px-1.5 py-0.2 rounded-full text-white shadow-xs ${
-                      isP1 ? 'bg-blue-600' : 'bg-emerald-600'
-                    }`}
-                  >
-                    À toi !
-                  </span>
-                )
-              ) : (
-                !diceValue && (
-                  <span
-                    className={`absolute bottom-0.5 text-[8px] font-extrabold px-1.5 py-0.2 rounded-full text-white shadow-2xs ${
-                      isP1 ? 'bg-blue-600' : 'bg-emerald-600'
-                    }`}
-                  >
-                    {isP1 ? 'Bleu' : 'Vert'}
-                  </span>
-                )
-              )}
-            </motion.button>
-          </div>
-
-          {/* Turn badge under dice button (stable, sans clignotement) */}
-          <div
-            className={`mt-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold flex items-center gap-1.5 shadow-xs transition-all duration-300 ${
-              isP1
-                ? 'bg-blue-500/25 text-blue-200 border border-blue-400/50 ring-1 ring-blue-400/40'
-                : 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 ring-1 ring-emerald-400/40'
+        {/* Turn status badge under the fixed dice */}
+        <div
+          className={`mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold flex items-center gap-1 shadow-xs transition-all duration-300 ${
+            isP1
+              ? 'bg-blue-500/25 text-blue-200 border border-blue-400/50 ring-1 ring-blue-400/40'
+              : 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 ring-1 ring-emerald-400/40'
+          }`}
+        >
+          <span
+            className={`w-2 h-2 rounded-full ring-1 ring-white/60 ${
+              isP1 ? 'bg-blue-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
             }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ring-1 ring-white/60 ${
-                isP1 ? 'bg-blue-400' : 'bg-emerald-400'
-              }`}
-            />
-            <span className="truncate max-w-[80px]">
-              {isP1 ? p1.name : gameMode === 'ai' ? 'IA' : p2.name}
+          />
+          <span className="font-bold">
+            {isRolling
+              ? 'Roulement...'
+              : diceValue
+              ? `Dé : ${diceValue}`
+              : isP1
+              ? 'MS au tour'
+              : 'ST au tour'}
+          </span>
+        </div>
+      </div>
+
+      {/* Right: Player 2 (ST - Vert) */}
+      <div
+        className={`flex items-center gap-1.5 sm:gap-2 p-1.5 px-2 sm:px-2.5 rounded-xl transition-all duration-300 flex-row-reverse text-right min-w-0 ${
+          !isP1
+            ? 'bg-emerald-600/70 border-2 border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.6)] ring-3 sm:ring-4 ring-emerald-400/60 scale-[1.02]'
+            : 'opacity-60 scale-95'
+        }`}
+      >
+        <div className="relative shrink-0">
+          <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-xs font-black shadow-xs overflow-hidden">
+            {p2.avatar ? (
+              <img src={p2.avatar} alt={p2.name} className="w-full h-full object-cover" />
+            ) : (
+              <span>ST</span>
+            )}
+          </div>
+          {!isP1 && (
+            <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white shadow-xs" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center justify-end gap-1">
+            {gameMode === 'live' && activePartnerId === 'p2' && (
+              <span className="text-[8px] bg-emerald-400/30 text-emerald-200 border border-emerald-400/40 px-1 rounded-sm font-semibold">
+                Toi
+              </span>
+            )}
+            <span className="text-[9px] font-black text-emerald-200 bg-emerald-800/80 px-1 py-0.2 rounded border border-emerald-400/40">
+              ST
+            </span>
+            <span className="font-extrabold text-amber-300 text-xs truncate block leading-tight">
+              {gameMode === 'ai' ? 'ST (IA)' : p2.name || 'ST'}
+            </span>
+          </div>
+          <div className="flex items-center justify-end gap-1.5 mt-0.5">
+            {gameMode === 'live' ? (
+              <span
+                className={`text-[8px] font-bold px-1 rounded-sm ${
+                  currentTurn === 'p2'
+                    ? 'bg-emerald-500 text-white shadow-2xs'
+                    : 'bg-stone-800 text-stone-400'
+                }`}
+              >
+                {currentTurn === 'p2' ? '🟢 Tour' : 'Attente'}
+              </span>
+            ) : (
+              !isP1 && (
+                <span className="text-[8px] font-extrabold px-1 rounded-sm bg-emerald-500 text-white shadow-2xs">
+                  Au tour
+                </span>
+              )
+            )}
+            <span className="text-[10px] text-emerald-200 block leading-tight">
+              {p2HomeCount}/{tokensPerPlayer} 🏠
             </span>
           </div>
         </div>
-
-        {/* Right: Player 2 (Computer / Safi) */}
-        <div
-          className={`flex items-center gap-2 p-1.5 px-2.5 rounded-xl transition-all duration-300 flex-row-reverse text-right min-w-0 ${
-            !isP1
-              ? 'bg-emerald-600/70 border-2 border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.6)] ring-3 ring-emerald-400/60 scale-[1.02]'
-              : 'opacity-55 scale-95'
-          }`}
-        >
-          <div className="relative shrink-0">
-            <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold shadow-xs overflow-hidden">
-              {p2.avatar ? (
-                <img src={p2.avatar} alt={p2.name} className="w-full h-full object-cover" />
-              ) : (
-                <span>📍</span>
-              )}
-            </div>
-            {!isP1 && (
-              <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white shadow-xs" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center justify-end gap-1">
-              {gameMode === 'live' && activePartnerId === 'p2' && (
-                <span className="text-[8px] bg-emerald-400/30 text-emerald-200 border border-emerald-400/40 px-1 rounded-sm font-semibold">
-                  Toi
-                </span>
-              )}
-              <span className="font-bold text-amber-300 text-xs truncate block leading-tight">
-                {gameMode === 'ai' ? 'Computer' : p2.name}
-              </span>
-            </div>
-            <div className="flex items-center justify-end gap-1.5">
-              {gameMode === 'live' ? (
-                <span
-                  className={`text-[8px] font-bold px-1 rounded-sm ${
-                    currentTurn === 'p2'
-                      ? 'bg-emerald-500 text-white shadow-2xs'
-                      : 'bg-stone-800 text-stone-400'
-                  }`}
-                >
-                  {currentTurn === 'p2' ? '🟢 Au tour' : 'Attente'}
-                </span>
-              ) : (
-                !isP1 && (
-                  <span className="text-[8px] font-extrabold px-1 rounded-sm bg-emerald-500 text-white shadow-2xs">
-                    Au tour
-                  </span>
-                )
-              )}
-              <span className="text-[10px] text-emerald-200 block leading-tight">
-                {p2HomeCount}/{tokensPerPlayer} 🏠
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
+    </div>
 
       {/* Narrative event text with interactive roll feedback */}
       <div className="flex items-center justify-center gap-1.5 min-h-[22px] px-2 max-w-sm">
