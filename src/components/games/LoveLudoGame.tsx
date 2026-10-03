@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   RotateCcw,
   MessageCircle,
@@ -230,6 +230,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const [currentTurn, setCurrentTurn] = useState<PartnerId>('p1');
   const [diceValue, setDiceValue] = useState<number | null>(null);
   const [isRolling, setIsRolling] = useState<boolean>(false);
+  const [rollingFace, setRollingFace] = useState<number>(1);
   const [isMoving, setIsMoving] = useState<boolean>(false);
   const [movingTokenId, setMovingTokenId] = useState<string | null>(null);
   const [stepRipple, setStepRipple] = useState<{
@@ -277,15 +278,29 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     [tokensP2, tokensPerPlayer]
   );
 
+  // Combine and sort active tokens so the currently moving token always renders on top
+  const allActiveTokens = useMemo(() => {
+    const p1List = activeTokensP1.map((t, idx) => ({ token: t, index: idx }));
+    const p2List = activeTokensP2.map((t, idx) => ({ token: t, index: idx }));
+    const combined = [...p1List, ...p2List];
+    return combined.sort((a, b) => {
+      if (a.token.id === movingTokenId) return 1;
+      if (b.token.id === movingTokenId) return -1;
+      return 0;
+    });
+  }, [activeTokensP1, activeTokensP2, movingTokenId]);
+
   // Real-time broadcast and sync
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isSyncingFromRemote = useRef<boolean>(false);
   const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const rollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clear timers on unmount
   useEffect(() => {
     return () => {
       if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
+      if (rollIntervalRef.current) clearInterval(rollIntervalRef.current);
     };
   }, []);
 
@@ -427,7 +442,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
   const nextTurnPlayer = (player: PartnerId) => (player === 'p1' ? 'p2' : 'p1');
 
-  // Handle dice rolling
+  // Handle dice rolling with interactive roll animation
   const handleRollDice = (isAiTrigger = false) => {
     if (isRolling || isMoving || winner) return;
 
@@ -440,20 +455,36 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
     if (gameMode === 'ai' && currentTurn === 'p2' && !isAiTrigger) return;
 
+    if (rollIntervalRef.current) clearInterval(rollIntervalRef.current);
+
     soundEffects.playDiceRoll();
     setIsRolling(true);
     setDiceValue(null);
 
+    const rollingPartnerName = currentTurn === 'p1' ? p1.name : p2.name;
+    setLastEventText(`🎲 ${rollingPartnerName} secoue et lance le dé...`);
+
+    // Animation de roulement interactive de 1 seconde avec défilement rapide des faces 1 à 6
+    const ROLL_DURATION_MS = 1000;
+
+    rollIntervalRef.current = setInterval(() => {
+      setRollingFace(Math.floor(Math.random() * 6) + 1);
+    }, 50);
+
     const finalRoll = Math.floor(Math.random() * 6) + 1;
 
+    // Durée de l'animation de rotation rapide et flou : 1 seconde
     setTimeout(() => {
+      if (rollIntervalRef.current) {
+        clearInterval(rollIntervalRef.current);
+        rollIntervalRef.current = null;
+      }
+
       setIsRolling(false);
       setDiceValue(finalRoll);
 
       const nextSixCount = finalRoll === 6 ? consecutiveSixes + 1 : 0;
       setConsecutiveSixes(nextSixCount);
-
-      const rollingPartnerName = currentTurn === 'p1' ? p1.name : p2.name;
 
       // 3 consecutive 6s rule -> pass turn
       if (nextSixCount >= 3) {
@@ -475,7 +506,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         return;
       }
 
-      // Check legal moves
+      // Check legal moves (limite les déplacements autorisés pour le tour en cours)
       const availableMoves = getPlayableTokens(currentTurn, finalRoll);
 
       if (availableMoves.length === 0) {
@@ -492,7 +523,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               diceValue: null,
               lastMoveText: text,
             });
-          }, 1100);
+          }, 1200);
         } else {
           setLastEventText(`${rollingPartnerName} a fait un 6 ! Rejouez.`);
           syncSessionToCloud({
@@ -502,24 +533,28 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         }
       } else if (availableMoves.length === 1) {
         // Exactly 1 move -> execute step-by-step
-        const text = `${rollingPartnerName} a fait un ${finalRoll} !`;
+        const text = finalRoll === 6
+          ? `${rollingPartnerName} a fait un 6 ! 1 seul déplacement possible.`
+          : `${rollingPartnerName} a fait un ${finalRoll} ! Déplacement de ${finalRoll} case${finalRoll > 1 ? 's' : ''}.`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
         setTimeout(() => {
           handleStepByStepMove(availableMoves[0], finalRoll, true);
-        }, 350);
+        }, 450);
       } else {
         const isCurrentMyTurn =
           gameMode === 'local' ||
           (gameMode === 'live' && currentTurn === activePartnerId) ||
           (gameMode === 'ai' && currentTurn === 'p1');
         const text = isCurrentMyTurn
-          ? `Tu as fait un ${finalRoll} ! Touche un pion à déplacer.`
+          ? finalRoll === 6
+            ? `Tu as fait un 6 ! Sors un pion de la base ou avance de 6 cases.`
+            : `Tu as fait un ${finalRoll} ! Choisis parmi tes ${availableMoves.length} pions autorisés.`
           : `${rollingPartnerName} a fait un ${finalRoll} ! En attente de son choix...`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
       }
-    }, 450);
+    }, 650);
   };
 
   // Helper to update a single token in tokens state
@@ -1007,16 +1042,61 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
     }
   };
 
-  // Render individual Luxury 3D Royal Pawn (Agrandie, Épurée, Superbe & Stable SANS clignotement)
+  // Render individual Luxury 3D Royal Pawn with fluid framer-motion positioning, jumping & self-rotation
   const renderPawn = (token: LudoToken, index: number) => {
     const isPlayer1 = token.player === 'p1';
     const pos = getTokenPosition(token, index);
     const isPlayable = playableTokens.some((pt) => pt.id === token.id);
     const isThisTokenMoving = movingTokenId === token.id;
+    const isCurrentPlayerToken = token.player === currentTurn;
+
+    // Seuls les pions SORTIS de case ('path' ou 'home_run') peuvent tourner sur eux-mêmes.
+    // RÈGLE : Les pions ne doivent PAS tourner avant d'avoir cliqué sur le carré du dé (diceValue !== null) !
+    const isExitedFromYard = token.state === 'path' || token.state === 'home_run';
+
+    const shouldSpin =
+      !isMoving &&
+      !isRolling &&
+      diceValue !== null &&
+      isExitedFromYard &&
+      isCurrentPlayerToken &&
+      isMyTurn &&
+      isPlayable;
+
+    // Si on a fait un 6 après avoir cliqué sur le dé : les pions en case ('yard') SAUTENT sur place !
+    const shouldJumpInYard =
+      !isMoving &&
+      !isRolling &&
+      diceValue === 6 &&
+      token.state === 'yard' &&
+      isCurrentPlayerToken &&
+      isMyTurn;
+
+    // Vitesse adaptée selon le pacing choisi (stepInterval)
+    const stepDuration = Math.max(0.08, (speedPacing.stepInterval / 1000) * 0.95);
 
     return (
-      <g
+      <motion.g
         key={token.id}
+        initial={false}
+        animate={{
+          x: pos.x,
+          y: pos.y,
+        }}
+        transition={{
+          x: {
+            type: 'spring',
+            stiffness: speedPacing.stepInterval < 100 ? 650 : speedPacing.stepInterval < 200 ? 460 : 340,
+            damping: 26,
+            mass: 0.5,
+          },
+          y: {
+            type: 'spring',
+            stiffness: speedPacing.stepInterval < 100 ? 650 : speedPacing.stepInterval < 200 ? 460 : 340,
+            damping: 26,
+            mass: 0.5,
+          },
+        }}
         onClick={() => !isMoving && isPlayable && handleStepByStepMove(token)}
         onTouchEnd={(e) => {
           if (!isMoving && isPlayable) {
@@ -1025,69 +1105,131 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           }
         }}
         className={isPlayable && !isMoving ? 'cursor-pointer' : ''}
+        whileHover={isPlayable && !isMoving ? { scale: 1.1 } : undefined}
+        whileTap={isPlayable && !isMoving ? { scale: 0.94 } : undefined}
       >
         {/* Generous touch target for effortless tapping on mobile */}
-        <circle cx={pos.x} cy={pos.y} r="75" fill="transparent" />
+        <circle cx={0} cy={0} r="75" fill="transparent" />
 
-        {/* 1. Multi-layered Ground Contact Shadows (Enlarged & Stable) */}
-        <ellipse
-          cx={pos.x}
-          cy={pos.y + 28}
-          rx={isThisTokenMoving ? '48' : '42'}
-          ry={isThisTokenMoving ? '15' : '12'}
+        {/* 1. Multi-layered Ground Contact Shadows (Stable on ground at y=28, breathing during moves & jumps) */}
+        <motion.ellipse
+          cx={0}
+          cy={28}
+          rx={isThisTokenMoving ? 48 : 42}
+          ry={isThisTokenMoving ? 15 : 12}
           fill="url(#pawn-contact-shadow)"
-          opacity={isThisTokenMoving ? 0.6 : 0.95}
+          animate={
+            isThisTokenMoving
+              ? { scale: [1, 0.75, 1], opacity: [0.9, 0.45, 0.9] }
+              : shouldJumpInYard
+              ? { scale: [1, 0.65, 1], opacity: [0.95, 0.4, 0.95] }
+              : shouldSpin
+              ? { scale: [1, 0.92, 1], opacity: [0.95, 0.8, 0.95] }
+              : { scale: 1, opacity: 0.95 }
+          }
+          transition={
+            isThisTokenMoving
+              ? { repeat: Infinity, duration: stepDuration, ease: 'easeInOut' }
+              : shouldJumpInYard
+              ? { repeat: Infinity, duration: 0.55, ease: 'easeInOut' }
+              : shouldSpin
+              ? { repeat: Infinity, duration: isPlayable ? 1.4 : 2.2, ease: 'easeInOut' }
+              : { duration: 0.25 }
+          }
         />
         <ellipse
-          cx={pos.x}
-          cy={pos.y + 27}
-          rx={isThisTokenMoving ? '30' : '26'}
-          ry={isThisTokenMoving ? '8.5' : '7'}
+          cx={0}
+          cy={27}
+          rx={isThisTokenMoving ? 30 : 26}
+          ry={isThisTokenMoving ? 8.5 : 7}
           fill="#000000"
-          opacity="0.4"
+          opacity="0.38"
         />
 
-        {/* 2. Effet Pion Jouable : Net, luxueux, très simple & SANS CLIGNOTEMENT */}
-        {isPlayable && !isMoving && (
+        {/* 2. Effet Balise Rotative 360° au sol (exclusivement pour les pions sortis de case) */}
+        {shouldSpin && (
           <g style={{ pointerEvents: 'none' }}>
-            {/* Halo lumineux doré doux et stable au sol */}
+            {/* Halo lumineux doré doux au sol */}
             <ellipse
-              cx={pos.x}
-              cy={pos.y + 28}
+              cx={0}
+              cy={28}
+              rx="48"
+              ry="15"
+              fill="url(#pawn-floor-glow)"
+              opacity="0.95"
+            />
+            {/* Anneau doré rotatif 360° en continu sur lui-même */}
+            <motion.g
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: isPlayable ? 2.4 : 3.6, ease: 'linear' }}
+              style={{ transformOrigin: '0px 28px' }}
+            >
+              <ellipse
+                cx={0}
+                cy={28}
+                rx="42"
+                ry="13"
+                fill="none"
+                stroke="#FACC15"
+                strokeWidth="3"
+                strokeDasharray="9 4 3 4"
+              />
+              <circle cx={-42} cy={28} r="3.2" fill="#FEF08A" stroke="#78350F" strokeWidth="0.8" />
+              <circle cx={42} cy={28} r="3.2" fill="#FEF08A" stroke="#78350F" strokeWidth="0.8" />
+              <circle cx={0} cy={15} r="2.6" fill="#FEF08A" stroke="#78350F" strokeWidth="0.8" />
+              <circle cx={0} cy={41} r="2.6" fill="#FEF08A" stroke="#78350F" strokeWidth="0.8" />
+            </motion.g>
+          </g>
+        )}
+
+        {/* Halo doré dynamique et pulsant pour les pions en case qui SAUTENT quand on a fait un 6 */}
+        {shouldJumpInYard && (
+          <g style={{ pointerEvents: 'none' }}>
+            <ellipse
+              cx={0}
+              cy={28}
               rx="46"
               ry="14"
               fill="url(#pawn-floor-glow)"
               opacity="0.95"
             />
-            {/* Anneau d'or fin et net délimitant la case (fixe et élégant) */}
-            <ellipse
-              cx={pos.x}
-              cy={pos.y + 28}
-              rx="41"
-              ry="12.5"
+            <motion.ellipse
+              cx={0}
+              cy={28}
+              rx="40"
+              ry="12"
               fill="none"
               stroke="#FACC15"
               strokeWidth="3.2"
-            />
-            {/* Délicate auréole dorée stable autour de la tête du pion */}
-            <circle
-              cx={pos.x}
-              cy={pos.y - 25}
-              r="38"
-              fill="none"
-              stroke="#FDE047"
-              strokeWidth="2.5"
-              opacity="0.95"
+              strokeDasharray="6 3"
+              animate={{ scale: [1, 1.15, 1], opacity: [0.75, 1, 0.75] }}
+              transition={{ repeat: Infinity, duration: 0.55, ease: 'easeInOut' }}
             />
           </g>
         )}
 
-        {/* 3. Effet Pion en Mouvement : Aérien, net et stable */}
+        {/* Repère doré fixe si un pion en case est jouable (hors saut 6) */}
+        {!shouldSpin && !shouldJumpInYard && isPlayable && !isMoving && token.state === 'yard' && (
+          <g style={{ pointerEvents: 'none' }}>
+            <circle
+              cx={0}
+              cy={28}
+              r="38"
+              fill="none"
+              stroke="#FACC15"
+              strokeWidth="2.5"
+              strokeDasharray="4 3"
+              opacity="0.9"
+            />
+          </g>
+        )}
+
+        {/* 3. Effet Pion en Mouvement : Aérien, net et réactif */}
         {isThisTokenMoving && (
           <g style={{ pointerEvents: 'none' }}>
             <circle
-              cx={pos.x}
-              cy={pos.y - 15}
+              cx={0}
+              cy={-15}
               r="46"
               fill="none"
               stroke="#FDE047"
@@ -1097,44 +1239,122 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           </g>
         )}
 
-        {/* 4. Corps Principal du Pion Agrandie (Élévation fluide en apesanteur si en mouvement) */}
-        <g
-          transform={isThisTokenMoving ? 'translate(0, -14)' : undefined}
-          style={{ transition: `transform ${speedPacing.transitionCss} ease-out` }}
+        {/* 4. Corps Principal du Pion avec Animation Fluide (Saute si en case avec un 6, tourne si sorti de case, sautille si en marche) */}
+        <motion.g
+          animate={
+            isThisTokenMoving
+              ? {
+                  y: [-2, -22, -2],
+                  scaleX: 1,
+                }
+              : shouldJumpInYard
+              ? {
+                  y: [0, -28, 0],
+                  scaleY: [1, 1.08, 0.93, 1],
+                  scaleX: 1, // Ne tourne pas, mais saute joyeusement !
+                }
+              : shouldSpin
+              ? {
+                  scaleX: [1, 0.12, -1, 0.12, 1],
+                  y: isPlayable ? [0, -8, 0] : [0, -3, 0],
+                }
+              : {
+                  scaleX: 1,
+                  y: 0,
+                }
+          }
+          transition={
+            isThisTokenMoving
+              ? {
+                  y: {
+                    repeat: Infinity,
+                    duration: stepDuration,
+                    ease: 'easeInOut',
+                  },
+                }
+              : shouldJumpInYard
+              ? {
+                  y: {
+                    repeat: Infinity,
+                    duration: 0.55,
+                    ease: 'easeInOut',
+                  },
+                  scaleY: {
+                    repeat: Infinity,
+                    duration: 0.55,
+                    ease: 'easeInOut',
+                  },
+                }
+              : shouldSpin
+              ? {
+                  scaleX: {
+                    repeat: Infinity,
+                    duration: isPlayable ? 1.6 : 2.4,
+                    ease: 'easeInOut',
+                  },
+                  y: {
+                    repeat: Infinity,
+                    duration: isPlayable ? 0.8 : 1.2,
+                    ease: 'easeInOut',
+                  },
+                }
+              : { duration: 0.25 }
+          }
+          style={{ transformOrigin: '0px 28px' }}
         >
+          {/* Auréole rotative 360° étincelante autour de la tête quand le pion tourne sur lui-même */}
+          {shouldSpin && (
+            <motion.g
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: isPlayable ? 2.0 : 3.0, ease: 'linear' }}
+              style={{ transformOrigin: '0px -25px' }}
+            >
+              <circle
+                cx={0}
+                cy={-25}
+                r="38"
+                fill="none"
+                stroke="#FDE047"
+                strokeWidth="2.2"
+                strokeDasharray="6 6"
+                opacity="0.95"
+              />
+              <circle cx={-38} cy={-25} r="3" fill="#FFFFFF" opacity="0.95" />
+              <circle cx={38} cy={-25} r="3" fill="#FFFFFF" opacity="0.95" />
+              <circle cx={0} cy={-63} r="3" fill="#FFFFFF" opacity="0.95" />
+              <circle cx={0} cy={13} r="3" fill="#FFFFFF" opacity="0.95" />
+            </motion.g>
+          )}
+
           {/* Socle Lourd à Double Biseau Agrandie (Finition Or Impérial 24k) */}
-          {/* Bague inférieure dorée élargie */}
           <ellipse
-            cx={pos.x}
-            cy={pos.y + 28}
+            cx={0}
+            cy={28}
             rx="39"
             ry="11.5"
             fill="url(#gold-polished)"
             stroke="#78350F"
             strokeWidth="1.2"
           />
-          {/* Biseau en laque royale colorée */}
           <ellipse
-            cx={pos.x}
-            cy={pos.y + 25.5}
+            cx={0}
+            cy={25.5}
             rx="34.5"
             ry="9.5"
             fill={isPlayer1 ? 'url(#p1-royal-body)' : 'url(#p2-royal-body)'}
           />
-          {/* Étage supérieur or */}
           <ellipse
-            cx={pos.x}
-            cy={pos.y + 20.5}
+            cx={0}
+            cy={20.5}
             rx="27.5"
             ry="7.5"
             fill="url(#gold-polished)"
             stroke="#78350F"
             strokeWidth="1"
           />
-          {/* Collerette supérieure */}
           <ellipse
-            cx={pos.x}
-            cy={pos.y + 18.5}
+            cx={0}
+            cy={18.5}
             rx="23.5"
             ry="6"
             fill={isPlayer1 ? '#1E40AF' : '#047857'}
@@ -1142,11 +1362,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Silhouette Sculptée Évasée et Agrandie en Laque Royale 3D */}
           <path
-            d={`M ${pos.x - 14} ${pos.y - 7} 
-                C ${pos.x - 11} ${pos.y + 4}, ${pos.x - 26} ${pos.y + 14}, ${pos.x - 30} ${pos.y + 21}
-                Q ${pos.x} ${pos.y + 27}, ${pos.x + 30} ${pos.y + 21}
-                C ${pos.x + 26} ${pos.y + 14}, ${pos.x + 11} ${pos.y + 4}, ${pos.x + 14} ${pos.y - 7}
-                Z`}
+            d="M -14 -7 C -11 4, -26 14, -30 21 Q 0 27, 30 21 C 26 14, 11 4, 14 -7 Z"
             fill={isPlayer1 ? 'url(#p1-royal-body)' : 'url(#p2-royal-body)'}
             stroke={isPlayer1 ? '#1E3A8A' : '#064E3B'}
             strokeWidth="1.8"
@@ -1154,19 +1370,15 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Reflet Glacé Céramique sur le Flanc Gauche */}
           <path
-            d={`M ${pos.x - 8} ${pos.y - 6}
-                C ${pos.x - 7} ${pos.y + 4}, ${pos.x - 14} ${pos.y + 14}, ${pos.x - 20} ${pos.y + 20}
-                L ${pos.x - 15} ${pos.y + 20}
-                C ${pos.x - 10} ${pos.y + 14}, ${pos.x - 2} ${pos.y + 4}, ${pos.x - 4} ${pos.y - 6}
-                Z`}
+            d="M -8 -6 C -7 4, -14 14, -20 20 L -15 20 C -10 14, -2 4, -4 -6 Z"
             fill="url(#stem-specular)"
             style={{ pointerEvents: 'none' }}
           />
 
           {/* Bague Médiane Dorée Filigrane */}
           <ellipse
-            cx={pos.x}
-            cy={pos.y + 8}
+            cx={0}
+            cy={8}
             rx="18.5"
             ry="5"
             fill="none"
@@ -1176,8 +1388,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Collerette d'Or au Cou */}
           <ellipse
-            cx={pos.x}
-            cy={pos.y - 7}
+            cx={0}
+            cy={-7}
             rx="19.5"
             ry="6"
             fill="url(#gold-polished)"
@@ -1185,8 +1397,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             strokeWidth="1.2"
           />
           <ellipse
-            cx={pos.x}
-            cy={pos.y - 8}
+            cx={0}
+            cy={-8}
             rx="16"
             ry="4.2"
             fill="#FEF08A"
@@ -1194,8 +1406,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Dôme de la Tête : Sertissage d'Or Majestueux Agrandie */}
           <circle
-            cx={pos.x}
-            cy={pos.y - 25}
+            cx={0}
+            cy={-25}
             r="33"
             fill="url(#gold-bezel-radial)"
             stroke="#78350F"
@@ -1204,8 +1416,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Sphère de Cristal Joyau 3D Agrandie (Diamètre 56px) */}
           <circle
-            cx={pos.x}
-            cy={pos.y - 25}
+            cx={0}
+            cy={-25}
             r="28"
             fill={isPlayer1 ? 'url(#p1-sapphire-gem)' : 'url(#p2-emerald-gem)'}
             stroke="#FFFFFF"
@@ -1214,8 +1426,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Facettes Intérieures du Cristal */}
           <circle
-            cx={pos.x}
-            cy={pos.y - 25}
+            cx={0}
+            cy={-25}
             r="22.5"
             fill="none"
             stroke="#FFFFFF"
@@ -1227,19 +1439,19 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Arc de Reflet Verre Cristallin */}
           <ellipse
-            cx={pos.x - 9}
-            cy={pos.y - 35}
+            cx={-9}
+            cy={-35}
             rx="16"
             ry="7.5"
-            transform={`rotate(-25 ${pos.x - 9} ${pos.y - 35})`}
+            transform="rotate(-25 -9 -35)"
             fill="url(#glass-specular)"
             style={{ pointerEvents: 'none' }}
           />
 
           {/* Éclat d'Étoile Éblouissant */}
           <circle
-            cx={pos.x - 11}
-            cy={pos.y - 35.5}
+            cx={-11}
+            cy={-35.5}
             r="3.4"
             fill="#FFFFFF"
             opacity="0.95"
@@ -1249,8 +1461,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           {/* Médaillon Central : Badge Chic Initiale & Numéro Agrandie */}
           {token.state === 'finished' ? (
             <text
-              x={pos.x}
-              y={pos.y - 16}
+              x={0}
+              y={-16}
               fill="#FEF08A"
               fontSize="28"
               fontWeight="900"
@@ -1265,8 +1477,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           ) : (
             <>
               <circle
-                cx={pos.x}
-                cy={pos.y - 24.5}
+                cx={0}
+                cy={-24.5}
                 r="15"
                 fill="rgba(15, 23, 42, 0.7)"
                 stroke="url(#gold-polished)"
@@ -1274,8 +1486,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                 style={{ pointerEvents: 'none' }}
               />
               <text
-                x={pos.x}
-                y={pos.y - 18.5}
+                x={0}
+                y={-18.5}
                 fill="#FEF08A"
                 fontSize="17"
                 fontWeight="900"
@@ -1293,22 +1505,22 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
           {/* Perle de Faîte Impériale */}
           <circle
-            cx={pos.x}
-            cy={pos.y - 56}
+            cx={0}
+            cy={-56}
             r="5.5"
             fill="url(#gold-polished)"
             stroke="#78350F"
             strokeWidth="1"
           />
           <circle
-            cx={pos.x - 1.5}
-            cy={pos.y - 57.8}
+            cx={-1.5}
+            cy={-57.8}
             r="1.8"
             fill="#FFFFFF"
             opacity="0.9"
           />
-        </g>
-      </g>
+        </motion.g>
+      </motion.g>
     );
   };
 
@@ -1951,12 +2163,8 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             </g>
           )}
 
-          {/* 10. RENDER AUTHENTIC LUDO PIN PAWNS */}
-          {/* Player 1 (Blue / You) */}
-          {activeTokensP1.map((t, idx) => renderPawn(t, idx))}
-
-          {/* Player 2 (Green / Com) */}
-          {activeTokensP2.map((t, idx) => renderPawn(t, idx))}
+          {/* 10. RENDER AUTHENTIC LUDO PIN PAWNS (Sorted to keep moving token on top) */}
+          {allActiveTokens.map(({ token, index }) => renderPawn(token, index))}
         </svg>
         </div>
       </div>
@@ -2028,16 +2236,71 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         {/* Center: The Iconic Dice Button (Couleur nette et stable du tour actif - SANS clignotement) */}
         <div className="flex flex-col items-center shrink-0">
           <div className="relative">
-            <button
+            <motion.button
               type="button"
               disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
               onClick={() => handleRollDice()}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-lg flex items-center justify-center transition-all relative overflow-hidden ${
+              whileHover={isMyTurn && !isRolling && !isMoving ? { scale: 1.08 } : undefined}
+              whileTap={isMyTurn && !isRolling && !isMoving ? { scale: 0.92 } : undefined}
+              animate={
+                isRolling
+                  ? {
+                      rotate: [0, 270, 540, 810, 1080],
+                      scale: [1, 1.28, 0.88, 1.15, 1],
+                      y: [0, -20, 5, -10, 0],
+                      filter: [
+                        'blur(0px)',
+                        'blur(4px)',
+                        'blur(5px)',
+                        'blur(2.5px)',
+                        'blur(0px)',
+                      ],
+                      boxShadow: [
+                        '0 0 15px rgba(59,130,246,0.5)',
+                        '0 0 38px rgba(250,204,21,0.95)',
+                        '0 0 28px rgba(16,185,129,0.8)',
+                        '0 0 15px rgba(59,130,246,0.5)',
+                      ],
+                    }
+                  : diceValue
+                  ? {
+                      scale: [1.25, 0.95, 1],
+                      rotate: [0, -5, 5, 0],
+                      filter: 'blur(0px)',
+                    }
+                  : isMyTurn && !isMoving
+                  ? {
+                      scale: [1, 1.05, 1],
+                      filter: 'blur(0px)',
+                      boxShadow: isP1
+                        ? [
+                            '0 0 15px rgba(59,130,246,0.5)',
+                            '0 0 28px rgba(59,130,246,0.85)',
+                            '0 0 15px rgba(59,130,246,0.5)',
+                          ]
+                        : [
+                            '0 0 15px rgba(16,185,129,0.5)',
+                            '0 0 28px rgba(16,185,129,0.85)',
+                            '0 0 15px rgba(16,185,129,0.5)',
+                          ],
+                    }
+                  : { filter: 'blur(0px)' }
+              }
+              transition={
+                isRolling
+                  ? { duration: 1.0, ease: [0.25, 0.1, 0.25, 1] }
+                  : diceValue
+                  ? { duration: 0.35, ease: 'easeOut' }
+                  : isMyTurn
+                  ? { repeat: Infinity, duration: 1.8, ease: 'easeInOut' }
+                  : { duration: 0.2 }
+              }
+              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-lg flex items-center justify-center transition-all relative overflow-hidden select-none ${
                 !isMyTurn
                   ? 'opacity-40 cursor-not-allowed grayscale-30 ring-1 ring-stone-500 bg-stone-200 border-2 border-stone-400'
                   : isP1
-                  ? 'bg-gradient-to-b from-blue-50 to-blue-100 border-3 border-blue-400 ring-4 ring-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.7)] hover:scale-105 cursor-pointer active:scale-95'
-                  : 'bg-gradient-to-b from-emerald-50 to-emerald-100 border-3 border-emerald-400 ring-4 ring-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.7)] hover:scale-105 cursor-pointer active:scale-95'
+                  ? 'bg-gradient-to-b from-blue-50 to-blue-100 border-3 border-blue-400 ring-4 ring-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.7)] cursor-pointer'
+                  : 'bg-gradient-to-b from-emerald-50 to-emerald-100 border-3 border-emerald-400 ring-4 ring-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.7)] cursor-pointer'
               }`}
               title={
                 !isMyTurn
@@ -2046,13 +2309,38 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               }
             >
               {isRolling ? (
-                <Dices
-                  className={`w-7 h-7 animate-spin ${isP1 ? 'text-blue-600' : 'text-emerald-600'}`}
-                />
+                <motion.div
+                  key={`rolling-${rollingFace}`}
+                  initial={{ rotate: -25, scale: 0.8 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ duration: 0.05 }}
+                  className="w-full h-full p-2 flex items-center justify-center filter blur-[1.5px]"
+                >
+                  {renderDiceDots(rollingFace)}
+                </motion.div>
               ) : diceValue ? (
-                <div className="w-full h-full p-2">{renderDiceDots(diceValue)}</div>
+                <motion.div
+                  key={`dice-${diceValue}`}
+                  initial={{ scale: 0.65, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+                  className="w-full h-full p-2"
+                >
+                  {renderDiceDots(diceValue)}
+                </motion.div>
               ) : (
-                <span className="text-2xl">🎲</span>
+                <div className="flex flex-col items-center justify-center gap-0.5">
+                  <span className="text-2xl drop-shadow-xs">🎲</span>
+                  {isMyTurn && !isMoving && (
+                    <span
+                      className={`text-[8px] font-black uppercase tracking-wider ${
+                        isP1 ? 'text-blue-700' : 'text-emerald-700'
+                      }`}
+                    >
+                      Lancer
+                    </span>
+                  )}
+                </div>
               )}
 
               {/* Turn status indicator on the dice button */}
@@ -2081,7 +2369,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
                   </span>
                 )
               )}
-            </button>
+            </motion.button>
           </div>
 
           {/* Turn badge under dice button (stable, sans clignotement) */}
@@ -2160,10 +2448,21 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         </div>
       </div>
 
-      {/* Narrative event text */}
-      <p className="text-[11px] text-stone-500 text-center truncate max-w-xs px-2">
-        {lastEventText}
-      </p>
+      {/* Narrative event text with interactive roll feedback */}
+      <div className="flex items-center justify-center gap-1.5 min-h-[22px] px-2 max-w-sm">
+        {diceValue && (
+          <span
+            className={`px-1.5 py-0.2 rounded-md text-[10px] font-black text-white shadow-xs shrink-0 ${
+              isP1 ? 'bg-blue-600' : 'bg-emerald-600'
+            }`}
+          >
+            Dé : {diceValue}
+          </span>
+        )}
+        <p className="text-[11px] font-medium text-stone-600 text-center truncate">
+          {lastEventText}
+        </p>
+      </div>
 
       {/* Winner Celebration Modal */}
       <AnimatePresence>
