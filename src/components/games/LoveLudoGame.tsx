@@ -482,6 +482,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
       setIsRolling(false);
       setDiceValue(finalRoll);
+      soundEffects.playDiceSettle();
 
       const nextSixCount = finalRoll === 6 ? consecutiveSixes + 1 : 0;
       setConsecutiveSixes(nextSixCount);
@@ -699,7 +700,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
     // Check arrival at center home
     if (finalToken.step === 56) {
-      soundEffects.playSuccessSparkle();
+      soundEffects.playPawnHome();
       triggerHeartConfetti();
       gotBonusTurn = true; // Entering home grants bonus turn!
     }
@@ -732,7 +733,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         if (capturedIdx >= 0) {
           capturedOpponent = true;
           gotBonusTurn = true; // Capturing grants another roll!
-          soundEffects.playVictoryChime();
+          soundEffects.playPawnCapture();
           triggerHeartConfetti();
 
           const updatedOpponent: LudoToken = {
@@ -2172,20 +2173,20 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
       </div>
     </div>
 
-    {/* DOCK CONTROLLER: DÉ FIXÉ ENTRE MS ET ST */}
+    {/* DOCK CONTROLLER: DÉ TOTALEMENT FIXE ENTRE MS ET ST (SANS AUCUN VA-ET-VIENT) */}
     <div
-      className={`w-full bg-[#0a1e3f] rounded-2xl border-2 p-2 sm:p-2.5 shadow-lg flex items-center justify-between gap-1.5 sm:gap-2 text-white transition-all duration-500 ${
+      className={`w-full bg-[#0a1e3f] rounded-2xl border-2 p-2 sm:p-2.5 shadow-lg flex items-center justify-between gap-1.5 text-white transition-colors duration-300 ${
         isP1
-          ? 'border-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.35)]'
-          : 'border-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.35)]'
+          ? 'border-blue-400/80 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+          : 'border-emerald-400/80 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
       }`}
     >
-      {/* Left: Player 1 (MS - Bleu) */}
+      {/* Left: Player 1 (MS - Bleu) - Totalement stable sans transform scale */}
       <div
-        className={`flex items-center gap-1.5 sm:gap-2 p-1.5 px-2 sm:px-2.5 rounded-xl transition-all duration-300 min-w-0 ${
+        className={`flex-1 min-w-0 max-w-[135px] sm:max-w-[150px] flex items-center gap-1.5 sm:gap-2 p-1.5 px-2 rounded-xl transition-colors duration-200 ${
           isP1
-            ? 'bg-blue-600/70 border-2 border-blue-400 shadow-[0_0_18px_rgba(59,130,246,0.6)] ring-3 sm:ring-4 ring-blue-400/60 scale-[1.02]'
-            : 'opacity-60 scale-95'
+            ? 'bg-blue-600/70 border-2 border-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.5)] ring-2 ring-blue-400/50'
+            : 'bg-blue-950/40 border border-blue-900/50 opacity-60'
         }`}
       >
         <div className="relative shrink-0">
@@ -2197,30 +2198,27 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             )}
           </div>
           {isP1 && (
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-2 ring-white shadow-xs" />
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-300 ring-2 ring-white shadow-xs" />
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
             <span className="font-extrabold text-amber-300 text-xs truncate block leading-tight">
               {p1.name || 'MS'}
             </span>
-            <span className="text-[9px] font-black text-blue-200 bg-blue-800/80 px-1 py-0.2 rounded border border-blue-400/40">
-              MS
-            </span>
             {gameMode === 'live' && activePartnerId === 'p1' && (
-              <span className="text-[8px] bg-blue-400/30 text-blue-200 border border-blue-400/40 px-1 rounded-sm font-semibold">
+              <span className="text-[8px] bg-blue-400/30 text-blue-200 border border-blue-400/40 px-1 rounded-sm font-semibold shrink-0">
                 Toi
               </span>
             )}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[10px] text-blue-200 block leading-tight">
+            <span className="text-[10px] text-blue-200 block leading-tight shrink-0">
               {p1HomeCount}/{tokensPerPlayer} 🏠
             </span>
             {gameMode === 'live' ? (
               <span
-                className={`text-[8px] font-bold px-1 rounded-sm ${
+                className={`text-[8px] font-bold px-1 rounded-sm shrink-0 ${
                   currentTurn === 'p1'
                     ? 'bg-emerald-500 text-white shadow-2xs'
                     : 'bg-stone-800 text-stone-400'
@@ -2230,7 +2228,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               </span>
             ) : (
               isP1 && (
-                <span className="text-[8px] font-extrabold px-1 rounded-sm bg-blue-500 text-white shadow-2xs">
+                <span className="text-[8px] font-extrabold px-1 rounded-sm bg-blue-500 text-white shadow-2xs shrink-0">
                   Au tour
                 </span>
               )
@@ -2239,174 +2237,89 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
         </div>
       </div>
 
-      {/* Center: DÉ INTERACTIF FIXÉ ENTRE MS ET ST */}
-      <div className="flex flex-col items-center justify-center shrink-0">
-        <motion.button
+      {/* Center: DÉ TOTALEMENT FIXE (SANS AUCUN VA-ET-VIENT, NI SAUT, NI DÉPLACEMENT) */}
+      <div className="w-[84px] shrink-0 flex flex-col items-center justify-center">
+        <button
           type="button"
           disabled={isRolling || isMoving || Boolean(winner) || !isMyTurn}
           onClick={() => handleRollDice()}
-          whileHover={isMyTurn && !isRolling && !isMoving ? { scale: 1.1 } : undefined}
-          whileTap={isMyTurn && !isRolling && !isMoving ? { scale: 0.92 } : undefined}
-          animate={
-            isRolling
-              ? {
-                  rotate: [0, 270, 540, 810, 1080],
-                  scale: [1, 1.25, 0.9, 1.15, 1],
-                  y: [0, -12, 3, -6, 0],
-                  filter: [
-                    'blur(0px)',
-                    'blur(4px)',
-                    'blur(5px)',
-                    'blur(2.5px)',
-                    'blur(0px)',
-                  ],
-                  boxShadow: [
-                    '0 0 15px rgba(59,130,246,0.5)',
-                    '0 0 38px rgba(250,204,21,0.95)',
-                    '0 0 28px rgba(16,185,129,0.8)',
-                    '0 0 15px rgba(59,130,246,0.5)',
-                  ],
-                }
-              : diceValue
-              ? {
-                  scale: [1.2, 0.95, 1],
-                  rotate: [0, -6, 6, 0],
-                  filter: 'blur(0px)',
-                }
-              : isMyTurn && !isMoving
-              ? {
-                  scale: [1, 1.08, 1],
-                  filter: 'blur(0px)',
-                  boxShadow: isP1
-                    ? [
-                        '0 0 12px rgba(59,130,246,0.6)',
-                        '0 0 28px rgba(59,130,246,0.95)',
-                        '0 0 12px rgba(59,130,246,0.6)',
-                      ]
-                    : [
-                        '0 0 12px rgba(16,185,129,0.6)',
-                        '0 0 28px rgba(16,185,129,0.95)',
-                        '0 0 12px rgba(16,185,129,0.6)',
-                      ],
-                }
-              : { filter: 'blur(0px)' }
-          }
-          transition={
-            isRolling
-              ? { duration: 1.0, ease: [0.25, 0.1, 0.25, 1] }
-              : diceValue
-              ? { duration: 0.35, ease: 'easeOut' }
-              : isMyTurn
-              ? { repeat: Infinity, duration: 1.6, ease: 'easeInOut' }
-              : { duration: 0.2 }
-          }
-          className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-xl flex items-center justify-center transition-all relative overflow-hidden select-none border-2 sm:border-3 ${
+          className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-xl flex items-center justify-center relative overflow-hidden select-none border-2 sm:border-3 transition-colors duration-200 ${
             !isMyTurn
-              ? 'opacity-55 cursor-not-allowed grayscale-30 ring-1 ring-stone-500 bg-stone-100 border-stone-400'
+              ? 'opacity-50 cursor-not-allowed grayscale-30 ring-1 ring-stone-600 bg-stone-100 border-stone-400'
               : isP1
-              ? 'bg-gradient-to-b from-white via-blue-50 to-blue-100 border-blue-500 ring-4 ring-blue-400/90 shadow-[0_0_20px_rgba(59,130,246,0.8)] cursor-pointer'
-              : 'bg-gradient-to-b from-white via-emerald-50 to-emerald-100 border-emerald-500 ring-4 ring-emerald-400/90 shadow-[0_0_20px_rgba(16,185,129,0.8)] cursor-pointer'
+              ? 'bg-gradient-to-b from-white via-blue-50 to-blue-100 border-blue-500 ring-2 sm:ring-3 ring-blue-400/80 shadow-[0_0_16px_rgba(59,130,246,0.6)] cursor-pointer'
+              : 'bg-gradient-to-b from-white via-emerald-50 to-emerald-100 border-emerald-500 ring-2 sm:ring-3 ring-emerald-400/80 shadow-[0_0_16px_rgba(16,185,129,0.6)] cursor-pointer'
           }`}
           title={
             !isMyTurn
-              ? `En attente du tour de ${currentTurn === 'p1' ? 'MS' : 'ST'}`
-              : `Au tour de ${currentTurn === 'p1' ? 'MS' : 'ST'} - Lancer le dé`
+              ? `En attente du tour de ${currentTurn === 'p1' ? (p1.name || 'MS') : (p2.name || 'ST')}`
+              : `Au tour de ${currentTurn === 'p1' ? (p1.name || 'MS') : (p2.name || 'ST')} - Cliquez pour lancer le dé`
           }
         >
           {isRolling ? (
             <motion.div
               key={`rolling-${rollingFace}`}
-              initial={{ rotate: -25, scale: 0.8 }}
-              animate={{ rotate: 0, scale: 1 }}
-              transition={{ duration: 0.05 }}
-              className="w-full h-full p-2 flex items-center justify-center filter blur-[1.5px]"
+              animate={{ rotate: [0, 90, 180, 270, 360] }}
+              transition={{ duration: 0.22, repeat: Infinity, ease: 'linear' }}
+              className="w-full h-full p-2 flex items-center justify-center filter blur-[1px]"
             >
               {renderDiceDots(rollingFace)}
             </motion.div>
           ) : diceValue ? (
-            <motion.div
-              key={`dice-${diceValue}`}
-              initial={{ scale: 0.65, rotate: -20 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-              className="w-full h-full p-2"
-            >
+            <div className="w-full h-full p-2 flex items-center justify-center">
               {renderDiceDots(diceValue)}
-            </motion.div>
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-0.5">
-              <span className="text-2xl drop-shadow-xs">🎲</span>
-              {isMyTurn && !isMoving && (
+            <div className="flex flex-col items-center justify-center py-1">
+              <span className="text-2xl leading-none">🎲</span>
+              {isMyTurn && !isMoving ? (
                 <span
-                  className={`text-[8px] font-black uppercase tracking-wider ${
+                  className={`text-[9px] font-black uppercase tracking-wider mt-0.5 leading-none ${
                     isP1 ? 'text-blue-700' : 'text-emerald-700'
                   }`}
                 >
                   Lancer
                 </span>
+              ) : (
+                <span className="text-[8px] font-bold text-stone-500 mt-0.5 leading-none">
+                  {isP1 ? 'MS' : 'ST'}
+                </span>
               )}
             </div>
           )}
+        </button>
 
-          {/* Turn status indicator on the dice button */}
-          {gameMode === 'live' ? (
-            !isMyTurn ? (
-              <span className="absolute bottom-0.5 bg-stone-900/90 text-[7px] font-bold px-1.5 py-0.2 rounded-full text-amber-300 border border-stone-700">
-                ⏳ Attente
-              </span>
-            ) : (
-              <span
-                className={`absolute bottom-0.5 text-[7px] font-bold px-1.5 py-0.2 rounded-full text-white shadow-xs ${
-                  isP1 ? 'bg-blue-600' : 'bg-emerald-600'
-                }`}
-              >
-                À toi !
-              </span>
-            )
-          ) : (
-            !diceValue && (
-              <span
-                className={`absolute bottom-0.5 text-[7px] font-black px-1.5 py-0.2 rounded-full text-white shadow-2xs ${
-                  isP1 ? 'bg-blue-600' : 'bg-emerald-600'
-                }`}
-              >
-                {isP1 ? 'MS' : 'ST'}
-              </span>
-            )
-          )}
-        </motion.button>
-
-        {/* Turn status badge under the fixed dice */}
+        {/* Turn status badge under the fixed dice - Stable et sans déplacement */}
         <div
-          className={`mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold flex items-center gap-1 shadow-xs transition-all duration-300 ${
+          className={`mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold flex items-center justify-center gap-1 shadow-xs transition-colors duration-200 whitespace-nowrap ${
             isP1
               ? 'bg-blue-500/25 text-blue-200 border border-blue-400/50 ring-1 ring-blue-400/40'
               : 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 ring-1 ring-emerald-400/40'
           }`}
         >
           <span
-            className={`w-2 h-2 rounded-full ring-1 ring-white/60 ${
-              isP1 ? 'bg-blue-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
+            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+              isP1 ? 'bg-blue-400' : 'bg-emerald-400'
             }`}
           />
-          <span className="font-bold">
+          <span className="truncate max-w-[70px]">
             {isRolling
-              ? 'Roulement...'
+              ? 'Lancer...'
               : diceValue
               ? `Dé : ${diceValue}`
               : isP1
-              ? 'MS au tour'
-              : 'ST au tour'}
+              ? `${p1.name || 'MS'} au tour`
+              : `${p2.name || 'ST'} au tour`}
           </span>
         </div>
       </div>
 
-      {/* Right: Player 2 (ST - Vert) */}
+      {/* Right: Player 2 (ST - Vert) - Totalement stable sans transform scale */}
       <div
-        className={`flex items-center gap-1.5 sm:gap-2 p-1.5 px-2 sm:px-2.5 rounded-xl transition-all duration-300 flex-row-reverse text-right min-w-0 ${
+        className={`flex-1 min-w-0 max-w-[135px] sm:max-w-[150px] flex items-center gap-1.5 sm:gap-2 p-1.5 px-2 rounded-xl transition-colors duration-200 flex-row-reverse text-right ${
           !isP1
-            ? 'bg-emerald-600/70 border-2 border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.6)] ring-3 sm:ring-4 ring-emerald-400/60 scale-[1.02]'
-            : 'opacity-60 scale-95'
+            ? 'bg-emerald-600/70 border-2 border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)] ring-2 ring-emerald-400/50'
+            : 'bg-emerald-950/40 border border-emerald-900/50 opacity-60'
         }`}
       >
         <div className="relative shrink-0">
@@ -2418,19 +2331,16 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
             )}
           </div>
           {!isP1 && (
-            <span className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white shadow-xs" />
+            <span className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full bg-emerald-300 ring-2 ring-white shadow-xs" />
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center justify-end gap-1">
             {gameMode === 'live' && activePartnerId === 'p2' && (
-              <span className="text-[8px] bg-emerald-400/30 text-emerald-200 border border-emerald-400/40 px-1 rounded-sm font-semibold">
+              <span className="text-[8px] bg-emerald-400/30 text-emerald-200 border border-emerald-400/40 px-1 rounded-sm font-semibold shrink-0">
                 Toi
               </span>
             )}
-            <span className="text-[9px] font-black text-emerald-200 bg-emerald-800/80 px-1 py-0.2 rounded border border-emerald-400/40">
-              ST
-            </span>
             <span className="font-extrabold text-amber-300 text-xs truncate block leading-tight">
               {gameMode === 'ai' ? 'ST (IA)' : p2.name || 'ST'}
             </span>
@@ -2438,7 +2348,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           <div className="flex items-center justify-end gap-1.5 mt-0.5">
             {gameMode === 'live' ? (
               <span
-                className={`text-[8px] font-bold px-1 rounded-sm ${
+                className={`text-[8px] font-bold px-1 rounded-sm shrink-0 ${
                   currentTurn === 'p2'
                     ? 'bg-emerald-500 text-white shadow-2xs'
                     : 'bg-stone-800 text-stone-400'
@@ -2448,12 +2358,12 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
               </span>
             ) : (
               !isP1 && (
-                <span className="text-[8px] font-extrabold px-1 rounded-sm bg-emerald-500 text-white shadow-2xs">
+                <span className="text-[8px] font-extrabold px-1 rounded-sm bg-emerald-500 text-white shadow-2xs shrink-0">
                   Au tour
                 </span>
               )
             )}
-            <span className="text-[10px] text-emerald-200 block leading-tight">
+            <span className="text-[10px] text-emerald-200 block leading-tight shrink-0">
               {p2HomeCount}/{tokensPerPlayer} 🏠
             </span>
           </div>

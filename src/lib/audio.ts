@@ -77,19 +77,147 @@ class RomanticSoundEffects {
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
-      // Realistic dice rolling rattle ticks
-      [0, 0.06, 0.12, 0.18, 0.25, 0.33].forEach((t, i) => {
+      // Realistic 1-second tumbling dice rattle clatter
+      const clatterTimes = [0, 0.05, 0.11, 0.18, 0.26, 0.35, 0.45, 0.56, 0.68, 0.81, 0.92];
+      clatterTimes.forEach((t, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(450 + i * 80, ctx.currentTime + t);
-        osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + t + 0.04);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime + t);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.04);
+        osc.type = i % 2 === 0 ? 'triangle' : 'square';
+        // Random wooden/resin cube clatter pitch variation
+        const freq = 380 + (i * 35) % 240 + Math.random() * 60;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + t);
+        osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + t + 0.035);
+        const volume = Math.max(0.04, 0.09 - i * 0.005);
+        gain.gain.setValueAtTime(volume, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.035);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.04);
+        osc.stop(ctx.currentTime + t + 0.035);
+      });
+    } catch {}
+  }
+
+  playDiceSettle() {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      // Crisp solid landing click of the die face settling flat
+      [0, 0.035].forEach((t, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        const startFreq = idx === 0 ? 540 : 380;
+        osc.frequency.setValueAtTime(startFreq, ctx.currentTime + t);
+        osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + t + 0.045);
+        gain.gain.setValueAtTime(idx === 0 ? 0.12 : 0.06, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.045);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + t);
+        osc.stop(ctx.currentTime + t + 0.045);
+      });
+    } catch {}
+  }
+
+  // Effet sonore dynamique pour la capture d'un pion adverse
+  playPawnCapture() {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      // 1. Percussive punch impact (whack!)
+      const punchOsc = ctx.createOscillator();
+      const punchGain = ctx.createGain();
+      punchOsc.type = 'triangle';
+      punchOsc.frequency.setValueAtTime(260, ctx.currentTime);
+      punchOsc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.12);
+      punchGain.gain.setValueAtTime(0.22, ctx.currentTime);
+      punchGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      punchOsc.connect(punchGain);
+      punchGain.connect(ctx.destination);
+      punchOsc.start(ctx.currentTime);
+      punchOsc.stop(ctx.currentTime + 0.12);
+
+      // 2. High-energy comic swoosh / zap as the captured pawn is ejected
+      const zapOsc = ctx.createOscillator();
+      const zapGain = ctx.createGain();
+      zapOsc.type = 'sawtooth';
+      zapOsc.frequency.setValueAtTime(980, ctx.currentTime + 0.04);
+      zapOsc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.28);
+      zapGain.gain.setValueAtTime(0.12, ctx.currentTime + 0.04);
+      zapGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+      zapOsc.connect(zapGain);
+      zapGain.connect(ctx.destination);
+      zapOsc.start(ctx.currentTime + 0.04);
+      zapOsc.stop(ctx.currentTime + 0.28);
+
+      // 3. Yard return landing bounce (thud!)
+      const bounceOsc = ctx.createOscillator();
+      const bounceGain = ctx.createGain();
+      bounceOsc.type = 'sine';
+      bounceOsc.frequency.setValueAtTime(320, ctx.currentTime + 0.26);
+      bounceOsc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.38);
+      bounceGain.gain.setValueAtTime(0.15, ctx.currentTime + 0.26);
+      bounceGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+      bounceOsc.connect(bounceGain);
+      bounceGain.connect(ctx.destination);
+      bounceOsc.start(ctx.currentTime + 0.26);
+      bounceOsc.stop(ctx.currentTime + 0.38);
+    } catch {}
+  }
+
+  // Effet sonore triomphant pour l'arrivée à la maison (Case 56)
+  playPawnHome() {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      // Warm celebratory base chord (C3 + G3)
+      [130.81, 196.0].forEach((freq) => {
+        const bassOsc = ctx.createOscillator();
+        const bassGain = ctx.createGain();
+        bassOsc.type = 'triangle';
+        bassOsc.frequency.setValueAtTime(freq, ctx.currentTime);
+        bassGain.gain.setValueAtTime(0.1, ctx.currentTime);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        bassOsc.connect(bassGain);
+        bassGain.connect(ctx.destination);
+        bassOsc.start(ctx.currentTime);
+        bassOsc.stop(ctx.currentTime + 0.6);
+      });
+
+      // Joyful ascending golden chime arpeggio: C5 -> E5 -> G5 -> C6 -> E6
+      const fanfareNotes = [
+        { freq: 523.25, time: 0 },
+        { freq: 659.25, time: 0.08 },
+        { freq: 783.99, time: 0.16 },
+        { freq: 1046.5, time: 0.25 },
+        { freq: 1318.51, time: 0.35 },
+      ];
+
+      fanfareNotes.forEach(({ freq, time }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+        gain.gain.setValueAtTime(0.14, ctx.currentTime + time);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + time);
+        osc.stop(ctx.currentTime + time + 0.5);
+
+        // Harmonic shimmer overtone
+        const harm = ctx.createOscillator();
+        const harmGain = ctx.createGain();
+        harm.type = 'triangle';
+        harm.frequency.setValueAtTime(freq * 2, ctx.currentTime + time);
+        harmGain.gain.setValueAtTime(0.04, ctx.currentTime + time);
+        harmGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + 0.3);
+        harm.connect(harmGain);
+        harmGain.connect(ctx.destination);
+        harm.start(ctx.currentTime + time);
+        harm.stop(ctx.currentTime + time + 0.3);
       });
     } catch {}
   }
