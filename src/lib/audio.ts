@@ -78,34 +78,34 @@ class RomanticSoundEffects {
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      // Son doux & feutré de dé en bois roulant sur tapis de velours
-      const rollMoments = [0, 0.08, 0.17, 0.27, 0.38, 0.50, 0.63, 0.77, 0.90];
+      // Son feutré, chaleureux et bien audible de dé en bois roulant
+      const rollMoments = [0, 0.07, 0.15, 0.24, 0.35, 0.47, 0.60, 0.74, 0.88];
       rollMoments.forEach((t, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         const filter = ctx.createBiquadFilter();
 
-        // Onde sinusoïdale pure très douce filtrée passe-bas
-        osc.type = 'sine';
+        // Son boisé rond et chaleureux filtré pour rester doux mais bien audible
+        osc.type = 'triangle';
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(320, ctx.currentTime + t);
+        filter.frequency.setValueAtTime(750, ctx.currentTime + t);
 
-        // Fréquences douces et graves (marimba feutré / bois doux)
-        const baseFreq = 220 + ((i * 18) % 60);
+        // Fréquences acoustiques perceptibles et douces (320Hz à 460Hz)
+        const baseFreq = 340 + ((i * 24) % 110);
         osc.frequency.setValueAtTime(baseFreq, ctx.currentTime + t);
-        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.7, ctx.currentTime + t + 0.045);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.6, ctx.currentTime + t + 0.055);
 
-        // Volume très doux, atténué et apaisant
-        const volume = Math.max(0.015, 0.035 - i * 0.002);
+        // Volume rehaussé pour être nettement perceptible sur tous haut-parleurs (0.16)
+        const volume = Math.max(0.09, 0.16 - i * 0.008);
         gain.gain.setValueAtTime(volume, ctx.currentTime + t);
-        gain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + t + 0.045);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.055);
 
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(ctx.destination);
 
         osc.start(ctx.currentTime + t);
-        osc.stop(ctx.currentTime + t + 0.045);
+        osc.stop(ctx.currentTime + t + 0.055);
       });
     } catch {}
   }
@@ -115,27 +115,28 @@ class RomanticSoundEffects {
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      // Son doux & feutré d'arrêt du dé (petit « toc » boisé velouté et très doux)
+      // Son d'arrêt du dé net, chaleureux et bien audible (clac boisé feutré)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const filter = ctx.createBiquadFilter();
 
-      osc.type = 'sine';
+      osc.type = 'triangle';
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(300, ctx.currentTime);
+      filter.frequency.setValueAtTime(700, ctx.currentTime);
 
-      osc.frequency.setValueAtTime(190, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.06);
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.08);
 
-      gain.gain.setValueAtTime(0.035, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0005, ctx.currentTime + 0.06);
+      // Volume nettement audible (0.20)
+      gain.gain.setValueAtTime(0.20, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
 
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.06);
+      osc.stop(ctx.currentTime + 0.08);
     } catch {}
   }
 

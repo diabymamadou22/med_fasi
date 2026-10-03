@@ -295,12 +295,15 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const isSyncingFromRemote = useRef<boolean>(false);
   const moveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const rollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const rollRevealedAtRef = useRef<number>(0);
+  const moveDelayTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Clear timers on unmount
   useEffect(() => {
     return () => {
       if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
       if (rollIntervalRef.current) clearInterval(rollIntervalRef.current);
+      if (moveDelayTimerRef.current) clearTimeout(moveDelayTimerRef.current);
     };
   }, []);
 
@@ -482,6 +485,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
 
       setIsRolling(false);
       setDiceValue(finalRoll);
+      rollRevealedAtRef.current = Date.now();
       soundEffects.playDiceSettle();
 
       const nextSixCount = finalRoll === 6 ? consecutiveSixes + 1 : 0;
@@ -533,15 +537,16 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
           });
         }
       } else if (availableMoves.length === 1) {
-        // Exactly 1 move -> execute step-by-step
+        // Court délai de 100ms pour laisser le joueur visualiser le résultat du dé avant que l'action ne commence
         const text = finalRoll === 6
           ? `${rollingPartnerName} a fait un 6 ! 1 seul déplacement possible.`
           : `${rollingPartnerName} a fait un ${finalRoll} ! Déplacement de ${finalRoll} case${finalRoll > 1 ? 's' : ''}.`;
         setLastEventText(text);
         syncSessionToCloud({ diceValue: finalRoll, lastMoveText: text });
-        setTimeout(() => {
+        if (moveDelayTimerRef.current) clearTimeout(moveDelayTimerRef.current);
+        moveDelayTimerRef.current = setTimeout(() => {
           handleStepByStepMove(availableMoves[0], finalRoll, true);
-        }, 450);
+        }, 100);
       } else {
         const isCurrentMyTurn =
           gameMode === 'local' ||
@@ -571,6 +576,17 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   const handleStepByStepMove = (token: LudoToken, rollToUse?: number, isAutoMove = false) => {
     const roll = rollToUse ?? diceValue;
     if (!roll || winner || isRolling || isMoving) return;
+
+    // Délai de 100ms garanti entre l'affichage du dé et le mouvement effectif du pion
+    const elapsedSinceRoll = Date.now() - (rollRevealedAtRef.current || 0);
+    if (elapsedSinceRoll < 100) {
+      const remainingDelay = 100 - elapsedSinceRoll;
+      if (moveDelayTimerRef.current) clearTimeout(moveDelayTimerRef.current);
+      moveDelayTimerRef.current = setTimeout(() => {
+        handleStepByStepMove(token, rollToUse, isAutoMove);
+      }, remainingDelay);
+      return;
+    }
 
     // Strict Live Security Check: Med cannot play for Safi, and Safi cannot play for Med!
     if (gameMode === 'live') {
@@ -866,6 +882,7 @@ export const LoveLudoGame: React.FC<LoveLudoGameProps> = ({
   // Reset Game
   const handleResetGame = () => {
     if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
+    if (moveDelayTimerRef.current) clearTimeout(moveDelayTimerRef.current);
     soundEffects.playSoftTap();
 
     const freshP1: LudoToken[] = Array.from({ length: 4 }, (_, idx) => ({
